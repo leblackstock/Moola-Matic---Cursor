@@ -1,2 +1,5 @@
 node backend\server.js
 
+git add .
+git commit -m "GPT-4-Turbo Image Integration Works"
+git push origin main

@@ -1,9 +1,10 @@
 const express = require('express');
 const cors = require('cors');
-const axios = require('axios');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const axios = require('axios');
+
 const app = express();
 const port = process.env.PORT || 5000;
 
@@ -51,108 +52,159 @@ app.post('/api/upload-image', upload.single('image'), (req, res) => {
   res.json({ file_id: req.file.filename, url: `http://localhost:5000/uploads/${req.file.filename}` });
 });
 
-// API route to handle chat requests
-app.post('/api/chat', async (req, res) => {
-  const { messages, imageFile } = req.body;
+async function analyzeImage(imageFile, contextText) {
+  console.log("analyzeImage function called");
+  console.log("Image file received:", imageFile);
 
-  const handleChatRequest = async (messages, onDataCallback, imageFile) => {
-    console.log("handleChatRequest function called");
-    console.log("Messages:", messages);
+  if (!imageFile || !(imageFile instanceof Buffer)) {
+    console.error("Invalid image file provided. Expected a Buffer object:", imageFile);
+    return "Error: Invalid image file provided.";
+  }
 
-    const safeCallback = typeof onDataCallback === 'function' 
-      ? onDataCallback 
-      : (content, isComplete) => console.log('Received content:', content, 'Is complete:', isComplete);
+  let promptText = "Analyze the item in this image comprehensively:\n\n";
 
-    let accumulatedContent = '';
+  if (contextText && contextText !== "") {
+    promptText += `${contextText}\n\n`;
+  }
 
-    try {
-      let imageFileId = null;
-
-      // Step 1: If there's an image file, upload it first
-      if (imageFile instanceof File) {  // Ensure it's a File object
-        imageFileId = await handleImageUpload(imageFile);
-      }
-
-      // Step 2: Now use the uploaded image URL in the next requests
-      const thread = await openai.beta.threads.create();
-      console.log("Thread created:", thread.id);
-
-      for (const message of messages) {
-        let messageContent = message.content;
-        if (imageFileId && message.role === 'user') {
-          messageContent.push({
-            type: 'image_file',
-            image_file: { file_id: imageFileId }
-          });
-        }
-
-        await openai.beta.threads.messages.create(thread.id, {
-          role: message.role,
-          content: messageContent
-        });
-      }
-
-      const run = await openai.beta.threads.runs.create(thread.id, {
-        assistant_id: ASSISTANT_ID,
-        stream: true
-      });
-
-      for await (const chunk of run) {
-        if (chunk.event === 'thread.message.delta' && chunk.data.delta.content) {
-          const content = chunk.data.delta.content[0].text.value;
-          accumulatedContent += content;
-          safeCallback(content, false);
-        }
-      }
-
-      safeCallback(accumulatedContent, true);
-    } catch (error) {
-      console.error('OpenAI API error:', error);
-      safeCallback('Sorry, an error occurred. Please try again later.', true);
-    }
-  };
-
-  const handleImageUpload = async (imageFile) => {
-    if (!(imageFile instanceof File)) {
-      console.error('Image upload failed: No valid file provided.');
-      return null;
-    }
-
-    try {
-      const formData = new FormData();
-      formData.append('image', imageFile);
-
-      console.log('Sending image upload request');
-      console.log('Image file:', imageFile);
-      const response = await axios.post('http://localhost:5000/api/upload-image', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
-      console.log('Image upload response:', response.data);
-      return response.data.url;
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      if (error.response) {
-        console.error('Response data:', error.response.data);
-        console.error('Response status:', error.response.status);
-        console.error('Response headers:', error.response.headers);
-      } else if (error.request) {
-        console.error('No response received:', error.request);
-      } else {
-        console.error('Error setting up request:', error.message);
-      }
-      throw error;
-    }
-  };
+  promptText += "Please provide a detailed analysis of the item in the image by:\n" +
+    "1. Identifying what it is and its primary function\n" +
+    "2. Noting any historical or cultural significance, including makers, brands, or artists\n" +
+    "3. Describing its materials, dimensions, and distinguishing features like markings or signatures\n" +
+    "4. Assessing its condition, including damage, wear, restoration, and signs of authenticity such as patina or provenance\n" +
+    "5. Evaluating the craftsmanship quality and design features like patterns or styles\n" +
+    "6. Estimating its market value based on current trends and its condition\n" +
+    "7. If the image contains mathematical content, please analyze or solve it\n" +
+    "8. Provide feedback on how this item relates to case interviews, management consulting assessments, or problem-solving scenarios based on the conversation context\n\n" +
+    "Ensure your analysis is comprehensive and covers all these aspects.";
 
   try {
-    await handleChatRequest(messages, (content, isComplete) => {
-      if (isComplete) {
-        res.json({ content });
+    const base64Image = imageFile.toString('base64');
+
+    console.log("Sending request to OpenAI for image analysis...");
+    const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+      model: "gpt-4-turbo",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: promptText },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:image/jpeg;base64,${base64Image}`,
+                detail: "auto"
+              }
+            }
+          ]
+        }
+      ],
+      max_tokens: 300
+    }, {
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json'
       }
-    }, imageFile);
+    });
+
+    console.log("Received response from OpenAI:", JSON.stringify(response.data, null, 2));
+    
+    if (response.data.choices && response.data.choices[0] && response.data.choices[0].message) {
+      const imageAnalysis = response.data.choices[0].message.content;
+      console.log("Image analysis successful");
+      return `The following response is from the image analysis: "${imageAnalysis}". Also return user response as "The image was analyzed, and the following observations were made: ${imageAnalysis}. How would you like to proceed?"`;
+    } else {
+      console.error("No content in image analysis response");
+      return "Error: Unable to analyze the image. No content in response.";
+    }
+  } catch (error) {
+    console.error("Error in image analysis:", error);
+    return `Error analyzing image: ${error.message}`;
+  }
+}
+
+async function handleChatRequest(messages, onDataCallback, imageFile) {
+  console.log("handleChatRequest function called");
+  console.log("Image file received:", imageFile ? "Yes" : "No");
+  console.log("Messages:", messages);
+
+  const safeCallback = typeof onDataCallback === 'function' 
+    ? onDataCallback 
+    : (content, isComplete) => console.log('Received content:', content, 'Is complete:', isComplete);
+
+  let accumulatedContent = '';
+
+  try {
+    let imageAnalysisResult = '';
+    if (imageFile) {
+      console.log("Image detected, attempting analysis...");
+      const contextText = messages.slice(0, -1).map(m => `${m.role}: ${m.content}`).join('\n');
+      imageAnalysisResult = await analyzeImage(imageFile, contextText);
+      console.log("Image analysis result:", imageAnalysisResult);
+    }
+
+    const allMessages = [
+      ...messages,
+      ...(imageAnalysisResult ? [{ role: 'assistant', content: imageAnalysisResult }] : [])
+    ];
+
+    const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+      model: "gpt-4-turbo",
+      messages: allMessages,
+      stream: true,
+    }, {
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      responseType: 'stream'
+    });
+
+    response.data.on('data', (chunk) => {
+      const lines = chunk.toString().split('\n').filter(line => line.trim() !== '');
+      for (const line of lines) {
+        const message = line.replace(/^data: /, '');
+        if (message === '[DONE]') {
+          safeCallback(accumulatedContent, true);
+          return;
+        }
+        try {
+          const parsed = JSON.parse(message);
+          const content = parsed.choices[0].delta.content || '';
+          accumulatedContent += content;
+          safeCallback(content, false);
+        } catch (error) {
+          console.error('Error parsing stream message:', error);
+        }
+      }
+    });
+
+    response.data.on('end', () => {
+      safeCallback(accumulatedContent, true);
+    });
+
+  } catch (error) {
+    console.error('OpenAI API error:', error);
+    safeCallback('Sorry, an error occurred. Please try again later.', true);
+  }
+}
+
+app.post('/api/chat', upload.single('image'), async (req, res) => {
+  const { messages } = req.body;
+  const imageFile = req.file;
+
+  try {
+    let responseContent = '';
+    await handleChatRequest(
+      JSON.parse(messages),
+      (content, isComplete) => {
+        responseContent += content;
+        if (isComplete) {
+          res.json({ content: responseContent });
+        }
+      },
+      imageFile ? imageFile.buffer : null
+    );
   } catch (error) {
     console.error('Error in chat request:', error);
     res.status(500).json({ error: 'An error occurred during the chat request.' });
