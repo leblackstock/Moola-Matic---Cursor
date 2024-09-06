@@ -19,35 +19,36 @@ export async function handleChatRequest(messages, onDataCallback) {
   let accumulatedContent = '';
 
   try {
-    const thread = await openai.beta.threads.create();
+    const thread = await openai.beta.threads.create(); // Create thread
     console.log("Thread created:", thread.id);
 
-    // Add all messages to the thread
-    for (const message of messages) {
-      await openai.beta.threads.messages.create(thread.id, {
-        role: message.role,
-        content: Array.isArray(message.content) ? message.content : [{ type: 'text', text: message.content }]
+    // Ensure messages is defined and processed correctly
+    if (messages && messages.length) {
+      // Add all messages to the thread
+      for (const message of messages) {
+        await openai.beta.threads.messages.create(thread.id, {
+          role: message.role,
+          content: message.content
+        });
+      }
+
+      const run = await openai.beta.threads.runs.create(thread.id, {
+        assistant_id: ASSISTANT_ID,
+        stream: true
       });
+
+      for await (const chunk of run) {
+        if (chunk.event === 'thread.message.delta' && chunk.data.delta.content) {
+          const content = chunk.data.delta.content[0].text.value;
+          accumulatedContent += content;
+          safeCallback(content, false);
+        }
+      }
+
+      safeCallback(accumulatedContent, true);
+    } else {
+      console.error("Messages array is empty or undefined.");
     }
-
-    const run = await openai.beta.threads.runs.create(thread.id, {
-      assistant_id: ASSISTANT_ID,
-    });
-
-    let status;
-    do {
-      status = await openai.beta.threads.runs.retrieve(thread.id, run.id);
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for 1 second before checking again
-    } while (status.status !== 'completed');
-
-    const messages = await openai.beta.threads.messages.list(thread.id);
-    const lastMessage = messages.data[0];
-
-    if (lastMessage.content[0].type === 'text') {
-      accumulatedContent = lastMessage.content[0].text.value;
-    }
-
-    safeCallback(accumulatedContent, true);
   } catch (error) {
     console.error('OpenAI API error:', error);
     safeCallback('Sorry, an error occurred. Please try again later.', true);
@@ -89,4 +90,3 @@ export const handleImageUpload = async (imageFile) => {
     throw error;
   }
 };
-

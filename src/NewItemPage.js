@@ -135,7 +135,7 @@ function NewItemPage() {
 
       const imageUrl = await handleImageUpload(imageFile);
       console.log("Image uploaded, URL:", imageUrl);
-      
+
       const newMessage = { 
         role: 'user', 
         content: [
@@ -143,12 +143,15 @@ function NewItemPage() {
           { type: 'image_url', image_url: { url: imageUrl } }
         ]
       };
+
+      // Make sure messages is referenced properly here
       const newMessages = [...messages, newMessage];
       setMessages(newMessages);
-      
+
+      // Now pass the correct messages to the handleChatRequest
       await handleChatRequest(newMessages, (content, isComplete) => {
         if (isComplete) {
-          setMessages(prevMessages => [...prevMessages, { role: 'assistant', content: content }]);
+          setMessages(prevMessages => [...prevMessages, { role: 'assistant', content }]);
           setCurrentMessage('');
         } else {
           setCurrentMessage(prevMessage => prevMessage + content);
