@@ -129,21 +129,31 @@ function NewItemPage() {
   const sendImageToAI = async (imageFile) => {
     setIsLoading(true);
     try {
+      if (!(imageFile instanceof File)) {
+        throw new Error('Invalid image file');
+      }
+
       const imageUrl = await handleImageUpload(imageFile);
       console.log("Image uploaded, URL:", imageUrl);
       
-      const newMessage = { role: 'user', content: "I've uploaded an image. Can you describe it?" };
+      const newMessage = { 
+        role: 'user', 
+        content: [
+          { type: 'text', text: "I've uploaded an image. Can you describe it?" },
+          { type: 'image_url', image_url: { url: imageUrl } }
+        ]
+      };
       const newMessages = [...messages, newMessage];
       setMessages(newMessages);
       
       await handleChatRequest(newMessages, (content, isComplete) => {
         if (isComplete) {
-          setMessages(prevMessages => [...prevMessages, { role: 'assistant', content }]);
+          setMessages(prevMessages => [...prevMessages, { role: 'assistant', content: content }]);
           setCurrentMessage('');
         } else {
           setCurrentMessage(prevMessage => prevMessage + content);
         }
-      }, imageUrl); // Pass imageUrl here, not imageFile
+      });
     } catch (error) {
       console.error('Error sending image to AI:', error);
       setMessages(prevMessages => [...prevMessages, { role: 'assistant', content: 'Sorry, an error occurred while processing the image. Please try again.' }]);
@@ -176,7 +186,17 @@ function NewItemPage() {
         >
           {messages.map((msg, index) => (
             <div key={index} className={msg.role === 'user' ? 'user-message' : 'ai-message'}>
-              <strong>{msg.role === 'user' ? 'You' : 'AI'}:</strong> {msg.content}
+              <strong>{msg.role === 'user' ? 'You' : 'AI'}:</strong>
+              {Array.isArray(msg.content) ? (
+                msg.content.map((content, i) => (
+                  <div key={i}>
+                    {content.type === 'text' && content.text}
+                    {content.type === 'image_url' && <img src={content.image_url.url} alt="Uploaded" style={{maxWidth: '100%', height: 'auto'}} />}
+                  </div>
+                ))
+              ) : (
+                msg.content
+              )}
             </div>
           ))}
           {currentMessage && (

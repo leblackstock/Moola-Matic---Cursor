@@ -8,7 +8,7 @@ const openai = new OpenAI({
 
 const ASSISTANT_ID = 'asst_4nMAXSwdqUcvfzfiYlBdzfYO';
 
-export async function handleChatRequest(messages, onDataCallback, imageFile) {
+export async function handleChatRequest(messages, onDataCallback) {
   console.log("handleChatRequest function called");
   console.log("Messages:", messages);
 
@@ -19,41 +19,32 @@ export async function handleChatRequest(messages, onDataCallback, imageFile) {
   let accumulatedContent = '';
 
   try {
-    // If there's an image file, upload it first
-    let imageFileId = null;
-    if (imageFile) {
-      imageFileId = await handleImageUpload(imageFile);
-    }
-
     const thread = await openai.beta.threads.create();
     console.log("Thread created:", thread.id);
 
-    // Add all messages to the thread, including any potential image reference
+    // Add all messages to the thread
     for (const message of messages) {
-      const messageContent = message.content;
-      if (imageFileId && message.role === 'user') {
-        messageContent.push({
-          type: 'image_file',
-          image_file: { file_id: imageFileId }
-        });
-      }
       await openai.beta.threads.messages.create(thread.id, {
         role: message.role,
-        content: messageContent
+        content: Array.isArray(message.content) ? message.content : [{ type: 'text', text: message.content }]
       });
     }
 
     const run = await openai.beta.threads.runs.create(thread.id, {
       assistant_id: ASSISTANT_ID,
-      stream: true
     });
 
-    for await (const chunk of run) {
-      if (chunk.event === 'thread.message.delta' && chunk.data.delta.content) {
-        const content = chunk.data.delta.content[0].text.value;
-        accumulatedContent += content;
-        safeCallback(content, false);
-      }
+    let status;
+    do {
+      status = await openai.beta.threads.runs.retrieve(thread.id, run.id);
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for 1 second before checking again
+    } while (status.status !== 'completed');
+
+    const messages = await openai.beta.threads.messages.list(thread.id);
+    const lastMessage = messages.data[0];
+
+    if (lastMessage.content[0].type === 'text') {
+      accumulatedContent = lastMessage.content[0].text.value;
     }
 
     safeCallback(accumulatedContent, true);
@@ -64,9 +55,17 @@ export async function handleChatRequest(messages, onDataCallback, imageFile) {
 }
 
 export const handleImageUpload = async (imageFile) => {
+  if (!(imageFile instanceof File)) {
+    throw new Error('Invalid image file');
+  }
+
   try {
     const formData = new FormData();
     formData.append('image', imageFile);
+
+    console.log('Sending image upload request');
+    console.log('Image file:', imageFile);
+    console.log('FormData contents:', Array.from(formData.entries()));
 
     const response = await axios.post('http://localhost:5000/api/upload-image', formData, {
       headers: {
@@ -74,9 +73,19 @@ export const handleImageUpload = async (imageFile) => {
       },
     });
 
-    return response.data.url; // Return the URL of the uploaded image
+    console.log('Image upload response:', response.data);
+    return response.data.url;
   } catch (error) {
     console.error('Error uploading image:', error);
+    if (error.response) {
+      console.error('Response data:', error.response.data);
+      console.error('Response status:', error.response.status);
+      console.error('Response headers:', error.response.headers);
+    } else if (error.request) {
+      console.error('No response received:', error.request);
+    } else {
+      console.error('Error setting up request:', error.message);
+    }
     throw error;
   }
 };
