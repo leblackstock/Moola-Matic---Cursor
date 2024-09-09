@@ -4,8 +4,8 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import moolaMaticLogo from './Images/Moola-Matic Logo 01.jpeg';
-import NewItemPage from './NewItemPage';
-import ViewItemsPage from './ViewItemsPage';
+import NewItemPage from './NewItemPage.js';  // Add .js extension
+import ViewItemsPage from './ViewItemsPage.js';  // Add .js extension
 
 function Sidebar() {
   return (

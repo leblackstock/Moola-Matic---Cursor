@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 import treasureSpecs from './Images/Treasure_Specs01.jpeg';
-import { handleChatRequest, handleImageUpload } from './api/chat'; // Update this import
+import { handleChatRequest, handleImageUpload } from './api/chat.js'; // Add .js extension
 import styled from 'styled-components'; // Add this new import
 
 // Add this styled component definition
@@ -66,14 +66,8 @@ function NewItemPage() {
     setCurrentMessage('');
 
     try {
-      await handleChatRequest(newMessages, (content, isComplete) => {
-        if (isComplete) {
-          setMessages(prevMessages => [...prevMessages, { role: 'assistant', content }]);
-          setCurrentMessage('');
-        } else {
-          setCurrentMessage(prevMessage => prevMessage + content);
-        }
-      });
+      const response = await handleChatRequest(newMessages);
+      setMessages(prevMessages => [...prevMessages, { role: 'assistant', content: response }]);
     } catch (error) {
       console.error('Error:', error);
       setMessages(prevMessages => [...prevMessages, { role: 'assistant', content: 'Sorry, an error occurred. Please try again.' }]);
@@ -133,7 +127,20 @@ function NewItemPage() {
         throw new Error('Invalid image file');
       }
 
-      const imageUrl = await handleImageUpload(imageFile);
+      const formData = new FormData();
+      formData.append('image', imageFile);
+
+      // Call the backend API to handle the image upload
+      const response = await fetch('/api/upload-image', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Image upload failed');
+      }
+
+      const { imageUrl } = await response.json();
       console.log("Image uploaded, URL:", imageUrl);
 
       const newMessage = { 

@@ -1,25 +1,45 @@
-const express = require('express');
-const cors = require('cors');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-const axios = require('axios');
+import express from 'express';
+import cors from 'cors';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import axios from 'axios';
+import dotenv from 'dotenv';
+import OpenAI from 'openai';
+import rateLimit from 'express-rate-limit';
+import helmet from 'helmet';
+import { fileURLToPath } from 'url';
+import { processChat } from './chatService.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 5000;
+app.use(cors());
+app.use(helmet());
+app.use(express.json());  // Place this after cors and helmet
+app.set('trust proxy', 1);
+const port = process.env.PORT || 3001;
 
-const uploadDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadDir)){
-    fs.mkdirSync(uploadDir, { recursive: true });
-}
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
 
 // Enable CORS for all routes
-app.use(cors({
-  origin: 'http://localhost:3000',  // Your frontend
+const corsOptions = {
+  origin: process.env.NODE_ENV === 'production' 
+    ? process.env.FRONTEND_URL 
+    : 'http://localhost:3000',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
-}));
+};
+app.use(cors(corsOptions));
+
+// Add security headers
+app.use(helmet());
 
 // Set up multer for handling file uploads
 const storage = multer.diskStorage({
@@ -31,7 +51,26 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ storage: storage });
+const upload = multer({
+  storage: storage,
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+    if (!allowedTypes.includes(file.mimetype)) {
+      return cb(new Error('Invalid file type'), false);
+    }
+    cb(null, true);
+  },
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  }
+});
+
+// Rate limiting
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100 // limit each IP to 100 requests per windowMs
+});
+app.use('/api/', apiLimiter);
 
 // Simple route to test server
 app.get('/', (req, res) => {
@@ -39,18 +78,15 @@ app.get('/', (req, res) => {
 });
 
 // New route for image upload
-app.post('/api/upload-image', upload.single('image'), (req, res) => {
-  console.log('Received upload request');
-  console.log('Request file:', req.file);
-
-  if (!req.file) {
-    console.error('No file uploaded');
-    return res.status(400).json({ error: 'No file uploaded.' });
-  }
-
-  console.log('File uploaded successfully');
-  res.json({ file_id: req.file.filename, url: `http://localhost:5000/uploads/${req.file.filename}` });
-});
+// app.post('/api/upload-image', upload.single('image'), async (req, res) => {
+//   try {
+//     const imageUrl = await handleImageUpload(req.file);
+//     res.json({ imageUrl });
+//   } catch (error) {
+//     console.error('Error uploading image:', error);
+//     res.status(500).json({ error: 'Image upload failed' });
+//   }
+// });
 
 async function analyzeImage(imageFile, contextText) {
   console.log("analyzeImage function called");
@@ -123,102 +159,38 @@ async function analyzeImage(imageFile, contextText) {
   }
 }
 
-async function handleChatRequest(messages, onDataCallback, imageFile) {
-  console.log("handleChatRequest function called");
-  console.log("Image file received:", imageFile ? "Yes" : "No");
-  console.log("Messages:", messages);
-
-  const safeCallback = typeof onDataCallback === 'function' 
-    ? onDataCallback 
-    : (content, isComplete) => console.log('Received content:', content, 'Is complete:', isComplete);
-
-  let accumulatedContent = '';
-
+app.post('/api/chat', async (req, res) => {
   try {
-    let imageAnalysisResult = '';
-    if (imageFile) {
-      console.log("Image detected, attempting analysis...");
-      const contextText = messages.slice(0, -1).map(m => `${m.role}: ${m.content}`).join('\n');
-      imageAnalysisResult = await analyzeImage(imageFile, contextText);
-      console.log("Image analysis result:", imageAnalysisResult);
-    }
+    const { messages } = req.body;
+    console.log('Received chat request with messages:', messages);
 
-    const allMessages = [
-      ...messages,
-      ...(imageAnalysisResult ? [{ role: 'assistant', content: imageAnalysisResult }] : [])
-    ];
+    const response = await processChat(messages);
+    console.log('Sending response:', response);
 
-    const response = await axios.post('https://api.openai.com/v1/chat/completions', {
-      model: "gpt-4-turbo",
-      messages: allMessages,
-      stream: true,
-    }, {
-      headers: {
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      responseType: 'stream'
-    });
-
-    response.data.on('data', (chunk) => {
-      const lines = chunk.toString().split('\n').filter(line => line.trim() !== '');
-      for (const line of lines) {
-        const message = line.replace(/^data: /, '');
-        if (message === '[DONE]') {
-          safeCallback(accumulatedContent, true);
-          return;
-        }
-        try {
-          const parsed = JSON.parse(message);
-          const content = parsed.choices[0].delta.content || '';
-          accumulatedContent += content;
-          safeCallback(content, false);
-        } catch (error) {
-          console.error('Error parsing stream message:', error);
-        }
-      }
-    });
-
-    response.data.on('end', () => {
-      safeCallback(accumulatedContent, true);
-    });
-
+    res.json({ response });
   } catch (error) {
-    console.error('OpenAI API error:', error);
-    safeCallback('Sorry, an error occurred. Please try again later.', true);
-  }
-}
-
-app.post('/api/chat', upload.single('image'), async (req, res) => {
-  const { messages } = req.body;
-  const imageFile = req.file;
-
-  try {
-    let responseContent = '';
-    await handleChatRequest(
-      JSON.parse(messages),
-      (content, isComplete) => {
-        responseContent += content;
-        if (isComplete) {
-          res.json({ content: responseContent });
-        }
-      },
-      imageFile ? imageFile.buffer : null
-    );
-  } catch (error) {
-    console.error('Error in chat request:', error);
-    res.status(500).json({ error: 'An error occurred during the chat request.' });
+    console.error('Chat request error:', error);
+    res.status(500).json({ error: 'An error occurred while processing the chat request' });
   }
 });
 
 // Serve uploaded images
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).send('Something broke!');
+  res.status(500).json({ error: 'An internal server error occurred' });
 });
 
-app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
-});
+function startServer(port) {
+  app.listen(port, (err) => {
+    if (err) {
+      console.error('Failed to start server:', err);
+    } else {
+      console.log(`Server is running on http://localhost:${port}`);
+    }
+  });
+}
+
+startServer(port);
