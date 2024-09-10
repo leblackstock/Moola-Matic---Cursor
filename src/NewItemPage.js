@@ -3,10 +3,9 @@ import { useParams } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 import treasureSpecs from './Images/Treasure_Specs01.jpeg';
-import { handleChatRequest, handleImageUpload } from './api/chat.js'; // Add .js extension
-import styled from 'styled-components'; // Add this new import
+import { handleChatWithAssistant, analyzeImageWithGPT4Turbo } from './api/chat.js';
+import styled from 'styled-components';
 
-// Add this styled component definition
 const StyledTextarea = styled.textarea`
   resize: none;
   overflow-y: hidden;
@@ -14,11 +13,65 @@ const StyledTextarea = styled.textarea`
   max-height: 150px;
 `;
 
+const MessageContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: ${props => props.$isUser ? 'flex-end' : 'flex-start'};
+  margin-bottom: 10px;
+`;
+
+const MessageBubble = styled.div`
+  max-width: 80%;
+  padding: 10px 15px;
+  border-radius: 10px;
+  background: ${props => props.$isUser ? 'linear-gradient(45deg, #2D0037, #4A0E4E)' : 'rgba(139, 0, 0, 0.8)'};
+  color: #F5DEB3;
+  text-align: ${props => props.$isUser ? 'right' : 'left'};
+  white-space: pre-wrap;
+  word-wrap: break-word;
+`;
+
+const InputContainer = styled.div`
+  display: flex;
+  align-items: center;
+  background: rgba(13, 0, 26, 0.6);
+  border: 1px solid #4A0E4E;
+  border-radius: 25px;
+  padding: 5px 10px;
+  margin-bottom: 10px;
+`;
+
+const ImagePreview = styled.img`
+  max-width: 40px;
+  max-height: 40px;
+  border-radius: 50%;
+  margin-right: 10px;
+`;
+
+const ImageInput = styled.input`
+  display: none;
+`;
+
+const ImageButton = styled.button`
+  background: none;
+  border: none;
+  color: #F5DEB3;
+  font-size: 1.2em;
+  cursor: pointer;
+  padding: 5px;
+  margin-right: 10px;
+  transition: all 0.3s ease;
+
+  &:hover {
+    color: #40F4F0;
+  }
+`;
+
 function NewItemPage() {
-  const { itemId } = useParams(); // Assuming you're using react-router and passing itemId as a URL parameter
+  const { itemId } = useParams();
 
   const [item, setItem] = useState({
-    id: itemId, // Set the id to the itemId from the URL
+    id: itemId,
     name: '',
     description: '',
     purchasePrice: 0,
@@ -34,7 +87,6 @@ function NewItemPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
 
-  // Function to update item properties
   const updateItem = (field, value) => {
     setItem(prevItem => ({
       ...prevItem,
@@ -45,41 +97,62 @@ function NewItemPage() {
   const handleSubmit = (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    // Add logic to submit the item data
     console.log('Submitting item:', item);
     setIsSubmitting(false);
   };
 
-  // New state for chat
   const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
+  const [textInput, setTextInput] = useState('');
+  const [imageInput, setImageInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [currentMessage, setCurrentMessage] = useState('');
+  const [imagePreview, setImagePreview] = useState('');
+  const [showImageInput, setShowImageInput] = useState(false);
+  const [imageAnalysisHistory, setImageAnalysisHistory] = useState([]);
 
-  const sendMessage = async () => {
-    if (!input.trim()) return;
+  const sendMessage = async (isImageQuestion = false) => {
+    const input = isImageQuestion ? imageInput.trim() : textInput.trim();
+    
+    if (!input) return;
 
-    const newMessages = [...messages, { role: 'user', content: input }];
-    setMessages(newMessages);
-    setInput('');
+    let newMessage = {
+      role: 'user',
+      content: input
+    };
+
+    setTextInput('');
+    setImageInput('');
+    setMessages(prevMessages => [...prevMessages, newMessage]);
     setIsLoading(true);
     setCurrentMessage('');
 
     try {
-      const response = await handleChatRequest(newMessages);
+      let response;
+      if (imagePreview && isImageQuestion) {
+        const updatedImageHistory = [
+          ...imageAnalysisHistory,
+          newMessage
+        ];
+        response = await analyzeImageWithGPT4Turbo(imagePreview, updatedImageHistory);
+        setImageAnalysisHistory(updatedImageHistory);
+      } else {
+        response = await handleChatWithAssistant([...messages, newMessage]);
+      }
       setMessages(prevMessages => [...prevMessages, { role: 'assistant', content: response }]);
     } catch (error) {
       console.error('Error:', error);
       setMessages(prevMessages => [...prevMessages, { role: 'assistant', content: 'Sorry, an error occurred. Please try again.' }]);
     } finally {
       setIsLoading(false);
+      if (isImageQuestion) {
+        setImagePreview('');
+        setShowImageInput(false);
+      }
     }
   };
 
-  // Modify this ref
   const messagesContainerRef = useRef(null);
 
-  // Update this effect
   useEffect(() => {
     if (messagesContainerRef.current) {
       messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
@@ -88,7 +161,7 @@ function NewItemPage() {
 
   const [showImageModal, setShowImageModal] = useState(false);
   const fileInputRef = useRef(null);
-  const cameraInputRef = useRef(null); // Add this new ref
+  const cameraInputRef = useRef(null);
 
   const handleImageButtonClick = () => {
     setShowImageModal(true);
@@ -101,74 +174,76 @@ function NewItemPage() {
 
   const handleMediaClick = () => {
     fileInputRef.current.click();
-    setShowImageModal(false); // Close the modal immediately when opening file picker
+    setShowImageModal(false);
   };
 
   const handleFileChange = async (event) => {
     const files = event.target.files;
     if (files && files.length > 0) {
       console.log('Files selected:', files);
-      setItem(prevItem => ({
-        ...prevItem,
-        images: [...prevItem.images, ...Array.from(files)]
-      }));
 
-      // Send the first selected image to the AI chatbot
       const imageFile = files[0];
-      await sendImageToAI(imageFile);
-    }
-    setShowImageModal(false);
-  };
+      try {
+        console.log('Image file:', imageFile);
 
-  const sendImageToAI = async (imageFile) => {
-    setIsLoading(true);
-    try {
-      if (!(imageFile instanceof File)) {
-        throw new Error('Invalid image file');
+        const imagePreviewUrl = URL.createObjectURL(imageFile);
+        console.log('Image preview URL:', imagePreviewUrl);
+
+        setImagePreview(imagePreviewUrl);
+        setShowImageInput(true);
+
+        // Log the current messages state before updating
+        console.log('Current messages:', messages);
+
+        setMessages(prevMessages => {
+          const newMessages = [
+            ...prevMessages,
+            { role: 'user', image: imagePreviewUrl, content: 'Image uploaded' }
+          ];
+          console.log('Updated messages:', newMessages);
+          return newMessages;
+        });
+
+        setIsLoading(true);
+
+        const promptText = 'Analyze this image';
+        console.log('Prompt text:', promptText);
+
+        console.log('Calling analyzeImageWithGPT4Turbo with:', imageFile, promptText);
+        const aiAnalysis = await analyzeImageWithGPT4Turbo(imageFile, promptText);
+        console.log('AI Analysis result:', aiAnalysis);
+
+        setImageAnalysisHistory([
+          { role: 'user', content: 'Analyze this image' },
+          { role: 'assistant', content: aiAnalysis }
+        ]);
+        console.log('Image analysis history updated');
+
+        setMessages(prevMessages => {
+          const newMessages = [
+            ...prevMessages,
+            { role: 'assistant', content: aiAnalysis }
+          ];
+          console.log('Final updated messages:', newMessages);
+          return newMessages;
+        });
+
+      } catch (error) {
+        console.error('Error processing image:', error);
+        setMessages(prevMessages => {
+          const newMessages = [
+            ...prevMessages,
+            { role: 'assistant', content: `Sorry, I encountered an error while processing the image: ${error.message}` }
+          ];
+          console.log('Error message added to messages:', newMessages);
+          return newMessages;
+        });
+      } finally {
+        setIsLoading(false);
+        console.log('Loading state set to false');
       }
-
-      const formData = new FormData();
-      formData.append('image', imageFile);
-
-      // Call the backend API to handle the image upload
-      const response = await fetch('/api/upload-image', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error('Image upload failed');
-      }
-
-      const { imageUrl } = await response.json();
-      console.log("Image uploaded, URL:", imageUrl);
-
-      const newMessage = { 
-        role: 'user', 
-        content: [
-          { type: 'text', text: "I've uploaded an image. Can you describe it?" },
-          { type: 'image_url', image_url: { url: imageUrl } }
-        ]
-      };
-
-      // Make sure messages is referenced properly here
-      const newMessages = [...messages, newMessage];
-      setMessages(newMessages);
-
-      // Now pass the correct messages to the handleChatRequest
-      await handleChatRequest(newMessages, (content, isComplete) => {
-        if (isComplete) {
-          setMessages(prevMessages => [...prevMessages, { role: 'assistant', content }]);
-          setCurrentMessage('');
-        } else {
-          setCurrentMessage(prevMessage => prevMessage + content);
-        }
-      });
-    } catch (error) {
-      console.error('Error sending image to AI:', error);
-      setMessages(prevMessages => [...prevMessages, { role: 'assistant', content: 'Sorry, an error occurred while processing the image. Please try again.' }]);
-    } finally {
-      setIsLoading(false);
+    } else {
+      console.log('No files selected');
     }
   };
 
@@ -186,68 +261,89 @@ function NewItemPage() {
         </div>
       </div>
       
-      {/* Updated Chat interface */}
       <div className="ai-chat-box mb-5">
         <h3 className="text-center mb-4" style={{color: '#F5DEB3'}}>Moola-Matic Wizard</h3>
-        <div 
-          className="messages p-3 mb-3" 
-          style={{height: '300px', overflowY: 'auto'}}
-          ref={messagesContainerRef} // Add this line
-        >
+        <div className="messages" ref={messagesContainerRef}>
           {messages.map((msg, index) => (
-            <div key={index} className={msg.role === 'user' ? 'user-message' : 'ai-message'}>
-              <strong>{msg.role === 'user' ? 'You' : 'AI'}:</strong>
-              {Array.isArray(msg.content) ? (
-                msg.content.map((content, i) => (
-                  <div key={i}>
-                    {content.type === 'text' && content.text}
-                    {content.type === 'image_url' && <img src={content.image_url.url} alt="Uploaded" style={{maxWidth: '100%', height: 'auto'}} />}
-                  </div>
-                ))
-              ) : (
-                msg.content
-              )}
-            </div>
+            <MessageContainer key={index} $isUser={msg.role === 'user'}>
+              <MessageBubble $isUser={msg.role === 'user'}>
+                <p>{msg.role === 'user' ? 'You: ' : 'AI: '}{msg.content}</p>
+                {msg.image && (
+                  <img 
+                    src={msg.image} 
+                    alt="Uploaded" 
+                    className="uploaded-image" 
+                    style={{maxWidth: '100%', marginTop: '10px'}} 
+                  />
+                )}
+              </MessageBubble>
+            </MessageContainer>
           ))}
           {currentMessage && (
-            <div className="ai-message">
-              <strong>AI:</strong> {currentMessage}
-            </div>
+            <MessageContainer $isUser={false}>
+              <MessageBubble $isUser={false}>
+                <p>AI: {currentMessage}</p>
+              </MessageBubble>
+            </MessageContainer>
           )}
           {isLoading && <div className="ai-typing">AI is typing</div>}
         </div>
-        <div className="input-area d-flex">
+        <InputContainer>
           <StyledTextarea
-            className="chat-input form-control me-2"
-            value={input}
+            className="chat-input"
+            value={textInput}
             onChange={(e) => {
-              setInput(e.target.value);
+              setTextInput(e.target.value);
               e.target.style.height = 'auto';
               e.target.style.height = e.target.scrollHeight + 'px';
             }}
             onKeyPress={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                sendMessage();
+                sendMessage(false);
               }
             }}
-            placeholder="Type your message..."
+            placeholder="Ask a general question..."
             rows="1"
-          ></StyledTextarea>
-          <button className="send-button" onClick={sendMessage} disabled={isLoading}>
+          />
+          <button className="send-button" onClick={() => sendMessage(false)} disabled={isLoading}>
             <i className="fas fa-paper-plane"></i>
           </button>
-        </div>
+        </InputContainer>
+
+        {imagePreview && (
+          <InputContainer>
+            <ImagePreview src={imagePreview} alt="Preview" />
+            <StyledTextarea
+              className="chat-input"
+              value={imageInput}
+              onChange={(e) => {
+                setImageInput(e.target.value);
+                e.target.style.height = 'auto';
+                e.target.style.height = e.target.scrollHeight + 'px';
+              }}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  sendMessage(true);
+                }
+              }}
+              placeholder="Ask about the image..."
+              rows="1"
+            />
+            <button className="send-button" onClick={() => sendMessage(true)} disabled={isLoading}>
+              <i className="fas fa-image"></i>
+            </button>
+          </InputContainer>
+        )}
       </div>
 
-      {/* Modify the Add Images button */}
       <div className="mb-4 text-center">
         <button className="btn btn-primary-theme" onClick={handleImageButtonClick}>
           <i className="fas fa-image me-2"></i>Add Images
         </button>
       </div>
 
-      {/* Add this custom modal using the provided CSS classes */}
       {showImageModal && (
         <div className="select-box-overlay" onClick={() => setShowImageModal(false)}>
           <div className="select-box" onClick={(e) => e.stopPropagation()}>
@@ -274,10 +370,9 @@ function NewItemPage() {
         onChange={handleFileChange}
       />
 
-      <input
+      <ImageInput
         type="file"
         ref={fileInputRef}
-        style={{ display: 'none' }}
         accept="image/*"
         multiple
         onChange={handleFileChange}

@@ -1,33 +1,35 @@
 const API_URL = process.env.NODE_ENV === 'production'
   ? '/api'
-  : 'http://localhost:3001/api';
+  : `http://localhost:${process.env.BACKEND_PORT || 3001}/api`;
+
+const MOOLA_MATIC_ASSISTANT_ID = process.env.REACT_APP_MOOLA_MATIC_ASSISTANT_ID;
 
 export const handleChatRequest = async (messages) => {
   try {
-    console.log('Sending messages to server:', messages);
-    console.log('API URL:', API_URL);
+    console.log('Sending messages to Moola-Matic assistant:', messages);
 
     const response = await fetch(`${API_URL}/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ messages }),
+      body: JSON.stringify({
+        assistantId: MOOLA_MATIC_ASSISTANT_ID,
+        messages: messages.map(msg => ({
+          role: msg.role,
+          content: msg.content
+        }))
+      }),
     });
 
-    console.log('Received response status:', response.status);
-
     if (!response.ok) {
-      const errorData = await response.text();
-      console.error('Error response:', errorData);
-      throw new Error(`Server error: ${response.status}`);
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
 
     const data = await response.json();
-    console.log('Parsed response data:', data);
+    console.log('Received response from Moola-Matic assistant:', data);
     
-    // Return the response content directly
-    return data.response;
+    return data.content;
   } catch (error) {
     console.error('Error in handleChatRequest:', error);
     throw error;
@@ -35,10 +37,71 @@ export const handleChatRequest = async (messages) => {
 };
 
 export const handleImageUpload = async (imageFile) => {
-  // Implement your image upload logic here
-  // This might involve saving the file to disk or cloud storage
-  // and returning the URL where the image can be accessed
-  console.log('Backend: Image upload requested for:', imageFile.name);
-  // Return the URL where the image is stored
-  return `https://your-backend-url.com/uploads/${imageFile.name}`;
+  const formData = new FormData();
+  formData.append('image', imageFile);
+
+  const response = await fetch(`${API_URL}/upload-image`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error('Image upload failed');
+  }
+
+  const data = await response.json();
+  return data.url;
+};
+
+export const handleChatWithAssistant = async (messages) => {
+  try {
+    console.log('Sending messages to Moola-Matic assistant:', messages);
+
+    const response = await fetch(`${API_URL}/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        assistantId: MOOLA_MATIC_ASSISTANT_ID,
+        messages: messages
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('Received response from Moola-Matic assistant:', data);
+    
+    return data.content;
+  } catch (error) {
+    console.error('Error in handleChatWithAssistant:', error);
+    throw error;
+  }
+};
+
+export const analyzeImageWithGPT4Turbo = async (imageFile, messages) => {
+  const formData = new FormData();
+  formData.append('image', imageFile);
+  formData.append('messages', JSON.stringify(messages));
+
+  try {
+    const response = await fetch(`${API_URL}/upload-image`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Image analysis failed');
+    }
+
+    const data = await response.json();
+    return data.ai_analysis;
+  } catch (error) {
+    console.error('Error in analyzeImageWithGPT4Turbo:', error);
+    throw error;
+  }
 };
