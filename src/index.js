@@ -4,11 +4,14 @@ import './index.css';
 import App from './App.js';  // Add .js extension
 import reportWebVitals from './reportWebVitals.js';  // Add .js extension
 import 'bootstrap/dist/css/bootstrap.min.css';
+import { BrowserRouter as Router } from 'react-router-dom'; // Import BrowserRouter
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
-    <App />
+    <Router> {/* Wrap App with Router */}
+      <App />
+    </Router>
   </React.StrictMode>
 );
 

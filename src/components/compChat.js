@@ -1,103 +1,206 @@
-import React, { useState } from 'react';
-import { handleChatRequest, handleImageUpload, handleChatWithAssistant, analyzeImageWithGPT4Turbo } from '../api/chat';
+// frontend/src/components/CompChat.js
 
-function Chat() {
+import React, { useState, useEffect, useRef } from 'react';
+import { handleChatWithAssistant, analyzeImageWithGPT4Turbo, askQuestionAboutImage } from '../api/chat';
+import styled from 'styled-components';
+
+// Styled components for the chat UI
+const ChatContainer = styled.div`
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+`;
+
+const MessagesContainer = styled.div`
+  height: 400px;
+  overflow-y: auto;
+  border: 1px solid #4A0E4E;
+  border-radius: 10px;
+  padding: 10px;
+  background-color: #1a001a;
+`;
+
+const Message = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: ${props => props.$isUser ? 'flex-end' : 'flex-start'};
+  margin-bottom: 10px;
+`;
+
+const MessageBubble = styled.div`
+  background: ${props => props.$isUser ? 'linear-gradient(45deg, #2D0037, #4A0E4E)' : 'rgba(139, 0, 0, 0.8)'};
+  color: #F5DEB3;
+  padding: 10px 15px;
+  border-radius: 10px;
+  max-width: 70%;
+  word-wrap: break-word;
+`;
+
+const InputArea = styled.div`
+  display: flex;
+  align-items: center;
+  margin-top: 10px;
+`;
+
+const StyledInput = styled.input`
+  flex: 1;
+  padding: 10px;
+  border: 1px solid #4A0E4E;
+  border-radius: 20px;
+  background-color: #330033;
+  color: #F5DEB3;
+  margin-right: 10px;
+`;
+
+const SendButton = styled.button`
+  background: #4A0E4E;
+  color: #F5DEB3;
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  cursor: pointer;
+  font-size: 1em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:disabled {
+    background: #333333;
+    cursor: not-allowed;
+  }
+`;
+
+const ImageButton = styled.button`
+  background: none;
+  border: none;
+  color: #F5DEB3;
+  font-size: 1.5em;
+  cursor: pointer;
+  margin-right: 10px;
+
+  &:hover {
+    color: #40F4F0;
+  }
+`;
+
+const ImagePreview = styled.img`
+  max-width: 100px;
+  max-height: 100px;
+  margin-top: 10px;
+  border-radius: 10px;
+`;
+
+function CompChat() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
-  const [imageInput, setImageInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef(null);
 
-  const sendMessage = async (isImageQuestion = false) => {
-    const messageContent = isImageQuestion ? imageInput.trim() : input.trim();
-    if (!messageContent && !imageFile) return;
-
-    const newMessage = messageContent ? { role: 'user', content: messageContent } : null;
-    let aiResponse;
-
-    if (imageFile) {
-      // Send image for analysis to GPT-4 Turbo
-      const imageAnalysis = await analyzeImageWithGPT4Turbo(imageFile, messageContent || "Analyze this image");
-      const messagesWithAnalysis = [
-        ...messages,
-        ...(newMessage ? [newMessage] : []),
-        { role: 'assistant', content: `Image analysis: ${imageAnalysis}` }
-      ];
-
-      // Send everything (image + analysis + message) to the Moola-Matic assistant
-      aiResponse = await handleChatWithAssistant(messagesWithAnalysis);
-    } else {
-      const newMessages = [...messages, newMessage];
-      aiResponse = await handleChatWithAssistant(newMessages);
+  // Scroll to the bottom when messages update
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
+  }, [messages]);
 
-    if (aiResponse) {
+  // Function to send a message
+  const sendMessage = async () => {
+    if (!input.trim() && !imageFile) return;
+
+    const newMessage = {
+      role: 'user',
+      content: input.trim() || 'Image uploaded',
+    };
+
+    setMessages(prevMessages => [...prevMessages, newMessage]);
+    setInput('');
+    setIsLoading(true);
+
+    try {
+      let responseContent;
+
+      if (imageFile) {
+        responseContent = await analyzeImageWithGPT4Turbo(imageFile, [...messages, newMessage]);
+      } else {
+        responseContent = await handleChatWithAssistant([...messages, newMessage]);
+      }
+
+      const assistantMessage = {
+        role: 'assistant',
+        content: responseContent,
+      };
+
+      setMessages(prevMessages => [...prevMessages, assistantMessage]);
+    } catch (error) {
+      console.error('Error in sendMessage:', error);
       setMessages(prevMessages => [
         ...prevMessages,
-        ...(newMessage ? [newMessage] : []),
-        { role: 'assistant', content: aiResponse }
+        { role: 'assistant', content: 'Sorry, an error occurred. Please try again.' },
       ]);
+    } finally {
+      setIsLoading(false);
+      setImageFile(null);
+      setImagePreview(null);
     }
-
-    // Clear inputs and reset state
-    setInput('');
-    setImageInput('');
-    setImageFile(null);
-    setImagePreview(null);
   };
 
-  const handleFileUpload = (e) => {
+  // Handle image upload
+  const handleImageUpload = (e) => {
     const file = e.target.files[0];
-    setImageFile(file);
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreview(reader.result);
-    };
-    reader.readAsDataURL(file);
+    if (file) {
+      setImageFile(file);
+      setImagePreview(URL.createObjectURL(file));
+    }
   };
 
   return (
-    <div className="chat-container">
-      <div className="chat-messages">
-        {messages.map((message, index) => (
-          <div key={index} className={`message ${message.role}`}>
-            {message.role === 'image' ? (
-              <img src={message.content} alt="Uploaded" className="uploaded-image" />
-            ) : (
-              message.content
-            )}
-          </div>
+    <ChatContainer>
+      <h2>Moola-Matic Chat</h2>
+      <MessagesContainer>
+        {messages.map((msg, index) => (
+          <Message key={index} $isUser={msg.role === 'user'}>
+            <MessageBubble $isUser={msg.role === 'user'}>
+              {msg.content}
+              {msg.image && <ImagePreview src={msg.image} alt="Uploaded" />}
+            </MessageBubble>
+          </Message>
         ))}
-      </div>
-      <div className="chat-input">
-        <input
+        {isLoading && <MessageBubble>AI is typing...</MessageBubble>}
+        <div ref={messagesEndRef} />
+      </MessagesContainer>
+      <InputArea>
+        <ImageButton onClick={() => document.getElementById('image-upload').click()}>
+          📷
+        </ImageButton>
+        <StyledInput
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-          placeholder="Type a message..."
+          placeholder="Type your message..."
+          onKeyPress={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              sendMessage();
+            }
+          }}
         />
-        <input
-          type="file"
-          accept="image/*"
-          onChange={handleFileUpload}
-        />
-        {imagePreview && <img src={imagePreview} alt="Preview" className="image-preview" />}
-        <button onClick={() => sendMessage()}>Send</button>
-      </div>
-      {imageFile && (
-        <div className="image-input-area">
-          <textarea
-            value={imageInput}
-            onChange={(e) => setImageInput(e.target.value)}
-            placeholder="Ask a question about the image..."
-            rows="2"
-          ></textarea>
-          <button onClick={() => sendMessage(true)}>Ask About Image</button>
-        </div>
-      )}
-    </div>
+        <SendButton onClick={sendMessage} disabled={isLoading}>
+          ➤
+        </SendButton>
+      </InputArea>
+      <input
+        type="file"
+        id="image-upload"
+        style={{ display: 'none' }}
+        accept="image/*"
+        onChange={handleImageUpload}
+      />
+      {imagePreview && <ImagePreview src={imagePreview} alt="Preview" />}
+    </ChatContainer>
   );
 }
 
-export default Chat;
+export default CompChat;
