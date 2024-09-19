@@ -32,9 +32,10 @@ if (!BACKEND_PORT) {
   process.exit(1);
 }
 
-// Initialize OpenAI with API key
-const openai = new OpenAI({
+// Initialize OpenAI Client with Assistants API support
+const client = new OpenAI({
   apiKey: OPENAI_API_KEY,
+  // Add any additional configuration if needed
 });
 
 // Initialize Express Router
@@ -50,37 +51,34 @@ router.use(bodyParser.json());
  */
 const interactWithMoolaMaticAssistant = async (messages) => {
   try {
-    console.log('Interacting with Moola-Matic Assistant:', messages);
+    // Step 1: Create a new thread
+    const threadId = await createThread();
 
-    // Use the Assistant ID from the environment variable
-    const assistantId = MOOLA_MATIC_ASSISTANT_ID;
-
-    // Create a chat completion using OpenAI's Assistant Chat API for Moola-Matic
-    const response = await openai.assistants.chat({
-      assistantId: assistantId,
-      messages: messages,
-      temperature: 1,       // Set temperature for more creative responses
-      max_tokens: 2048,     // Adjust max_tokens as needed
-      top_p: 1,
-      frequency_penalty: 0,
-      presence_penalty: 0,
-      response_format: "text",
-    });
-
-    // Extract the assistant's response from the API response
-    const assistantResponse = response.choices[0].message?.content.trim();
-
-    if (!assistantResponse) {
-      console.error('No content received from Moola-Matic Assistant.');
-      throw new Error('No response from Moola-Matic.');
+    // Step 2: Add user messages to the thread
+    for (const msg of messages) {
+      await addMessageToThread(threadId, msg.role, msg.content);
     }
 
-    console.log('Moola-Matic response:', assistantResponse);
+    // Step 3: Create a run
+    const runId = await createRun(threadId, MOOLA_MATIC_ASSISTANT_ID);
+
+    // Step 4: Wait for run completion
+    let run = await waitForRunCompletion(threadId, runId);
+
+    // Handle required actions if any
+    if (run.required_action) {
+      await handleRequiredAction(threadId, runId, run.required_action);
+      // Wait for the run to complete after submitting tool outputs
+      run = await waitForRunCompletion(threadId, runId);
+    }
+
+    // Step 5: Retrieve assistant response
+    const assistantResponse = await getAssistantResponse(threadId);
 
     return assistantResponse;
   } catch (error) {
-    console.error('Error in interactWithMoolaMaticAssistant:', error);
-    throw new Error('An error occurred while processing your request with Moola-Matic.');
+    console.error('Error interacting with assistant:', error);
+    throw new Error('Failed to interact with Moola-Matic Assistant.');
   }
 };
 
@@ -95,21 +93,23 @@ router.post('/chat', async (req, res) => {
   // Error handling for invalid message format
   if (!messages || !Array.isArray(messages)) {
     console.error('Invalid messages format received.');
-    return res.status(400).json({ error: 'Invalid messages format. Expected an array of messages.' });
+    return res.status(400).json({
+      error: 'Invalid messages format. Expected an array of messages.',
+    });
   }
 
   try {
-    // Get response from Moola-Matic
+    // Interact with the assistant
     const assistantResponse = await interactWithMoolaMaticAssistant(messages);
 
-    // Optionally, save conversation history here using your preferred method
-    // Example: saveConversation(req.session.userId, messages, assistantResponse);
+    // Optionally, save conversation history here
 
     return res.json({ content: assistantResponse });
   } catch (error) {
     console.error('Error in /chat:', error);
-    // Provide a user-friendly error message without exposing technical details
-    return res.status(500).json({ error: 'Failed to process chat with Moola-Matic. Please try again later.' });
+    return res.status(500).json({
+      error: 'Failed to process chat with Moola-Matic. Please try again later.',
+    });
   }
 });
 
@@ -127,3 +127,173 @@ export default router;
 
 // Add this export at the end of the file
 export { interactWithMoolaMaticAssistant };
+
+// Function to create a new thread
+const createThread = async () => {
+  try {
+    const thread = await client.beta.threads.create();
+    return thread.id;
+  } catch (error) {
+    console.error('Error creating thread:', error);
+    throw error;
+  }
+};
+
+// Function to add a message to a thread
+const addMessageToThread = async (threadId, role, content) => {
+  try {
+    await client.beta.threads.messages.create({
+      thread_id: threadId,
+      role: role, // 'user' or 'assistant'
+      content: content,
+    });
+  } catch (error) {
+    console.error('Error adding message to thread:', error);
+    throw error;
+  }
+};
+
+// Function to create a run
+const createRun = async (threadId, assistantId) => {
+  try {
+    const run = await client.beta.threads.runs.create({
+      thread_id: threadId,
+      assistant_id: assistantId,
+    });
+    return run.id;
+  } catch (error) {
+    console.error('Error creating run:', error);
+    throw error;
+  }
+};
+
+// Function to poll run status until completion
+const waitForRunCompletion = async (threadId, runId) => {
+  try {
+    let run = await client.beta.threads.runs.retrieve({
+      thread_id: threadId,
+      run_id: runId,
+    });
+
+    while (run.status === 'queued' || run.status === 'in_progress') {
+      await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait for 1 second
+      run = await client.beta.threads.runs.retrieve({
+        thread_id: threadId,
+        run_id: runId,
+      });
+    }
+
+    if (run.status === 'completed') {
+      return run;
+    } else {
+      throw new Error(`Run failed with status: ${run.status}`);
+    }
+  } catch (error) {
+    console.error('Error waiting for run completion:', error);
+    throw error;
+  }
+};
+
+// Function to get assistant response from a thread
+const getAssistantResponse = async (threadId) => {
+  try {
+    const messages = await client.beta.threads.messages.list({
+      thread_id: threadId,
+      order: 'asc',
+    });
+
+    // Find the latest assistant message
+    const assistantMessage = messages.data.reverse().find(
+      (message) => message.role === 'assistant'
+    );
+
+    if (assistantMessage && assistantMessage.content) {
+      return assistantMessage.content[0].text.value.trim();
+    } else {
+      throw new Error('No assistant response found.');
+    }
+  } catch (error) {
+    console.error('Error retrieving assistant response:', error);
+    throw error;
+  }
+};
+
+// Function to update assistant with tools
+const updateAssistantWithTools = async (assistantId, tools) => {
+  try {
+    const updatedAssistant = await client.beta.assistants.update(assistantId, {
+      tools: tools, // Array of tools
+    });
+    return updatedAssistant;
+  } catch (error) {
+    console.error('Error updating assistant with tools:', error);
+    throw error;
+  }
+};
+
+// Function to handle required actions
+const handleRequiredAction = async (threadId, runId, requiredAction) => {
+  try {
+    if (requiredAction && requiredAction.submit_tool_outputs) {
+      const toolCalls = requiredAction.submit_tool_outputs.tool_calls;
+
+      const toolOutputs = [];
+
+      for (const toolCall of toolCalls) {
+        if (toolCall.type === 'function') {
+          const functionName = toolCall.function.name;
+          const args = JSON.parse(toolCall.function.arguments);
+
+          // Call your custom function based on functionName
+          if (functionName === 'display_quiz') {
+            output = displayQuiz(args.title, args.questions);
+          }
+          // Add more function handlers as needed
+
+          toolOutputs.push({
+            tool_call_id: toolCall.id,
+            output: JSON.stringify(output),
+          });
+        }
+        // Handle other tool types if necessary
+      }
+
+      // Submit tool outputs back to the run
+      await client.beta.threads.runs.submit_tool_outputs({
+        thread_id: threadId,
+        run_id: runId,
+        tool_outputs: toolOutputs,
+      });
+    }
+  } catch (error) {
+    console.error('Error handling required action:', error);
+    throw error;
+  }
+};
+
+// Mock function to display a quiz (replace with actual implementation)
+const displayQuiz = (title, questions) => {
+  console.log(`Quiz: ${title}\n`);
+  const responses = [];
+
+  for (const question of questions) {
+    console.log(question.question_text);
+    let response = '';
+
+    if (question.question_type === 'MULTIPLE_CHOICE') {
+      question.choices.forEach((choice, index) => {
+        console.log(`${index}. ${choice}`);
+      });
+      // Mock user response (replace with actual user input)
+      response = '0'; // Example choice
+    } else if (question.question_type === 'FREE_RESPONSE') {
+      // Mock user response (replace with actual user input)
+      response = "I don't know.";
+    }
+
+    responses.push(response);
+    console.log('');
+  }
+
+  return responses;
+};
