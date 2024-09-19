@@ -25,11 +25,11 @@ const BACKEND_PORT = process.env.BACKEND_PORT || 3001;
 const FRONTEND_PORT = process.env.FRONTEND_PORT || 3000;
 
 // Retrieve Assistant ID from .env
-const assistantId = process.env.ASSISTANT_ID;
+const assistantId = process.env.MOOLA_MATIC_ASSISTANT_ID;
 
 if (!assistantId) {
-  console.error('ASSISTANT_ID is not defined in the .env file.');
-  process.exit(1); // Exit the application if ASSISTANT_ID is missing
+  console.error('MOOLA_MATIC_ASSISTANT_ID is not defined in the .env file.');
+  process.exit(1); // Exit the application if MOOLA_MATIC_ASSISTANT_ID is missing
 }
 
 // Initialize Express app

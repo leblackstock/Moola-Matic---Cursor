@@ -1,13 +1,15 @@
-// backend/chatservice.js
+// backend/chatService.js
 
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+// Resolve __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Load environment variables from .env file
 dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 // Initialize OpenAI with API key
@@ -46,6 +48,7 @@ export const handleChatWithAssistant = async (messages) => {
   try {
     console.log('Processing text-only chat with Moola-Matic:', messages);
 
+    // Create a new thread for each interaction to maintain isolation
     const thread = await openai.beta.threads.create({
       assistant_id: await initializeAssistant(),
     });
