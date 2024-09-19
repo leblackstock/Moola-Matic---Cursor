@@ -10,9 +10,11 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import session from 'express-session';
 import { fileURLToPath } from 'url';
+import chatImagesRouter from './chat/chatImages.js';
 
 // Import the assistant module functions
-import { handleMoolaMaticChat, handleImageAnalysis, manageContext } from './chat/chatService.js';
+import { handleMoolaMaticChat, manageContext } from './chat/chatService.js';
+
 
 // Resolve __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -20,6 +22,8 @@ const __dirname = path.dirname(__filename);
 
 // Load environment variables from .env file
 dotenv.config({ path: path.resolve(__dirname, '.env') });
+
+
 
 // Define ports for backend and frontend
 const BACKEND_PORT = process.env.BACKEND_PORT || 3001;
@@ -122,70 +126,8 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
-/**
- * Image Analysis and Chat Endpoint
- * @route POST /api/analyze-image
- * @desc Handles image uploads, analyzes them with GPT-4 Turbo, and responds via Moola-Matic Assistant
- * @access Public
- */
-app.post('/api/analyze-image', upload.single('image'), async (req, res) => {
-  const imageFile = req.file;
-  const { messages } = req.body;
-
-  if (!imageFile) {
-    console.error('No image file uploaded.');
-    return res.status(400).json({ error: 'No image file uploaded.' });
-  }
-
-  if (!messages) {
-    console.error('No messages provided.');
-    return res.status(400).json({ error: 'No messages provided.' });
-  }
-
-  try {
-    console.log('Received image analysis request with messages:', messages);
-
-    // Read the uploaded image file
-    const imageData = fs.readFileSync(imageFile.path);
-
-    let parsedMessages;
-    try {
-      // Parse messages from JSON string to array
-      parsedMessages = JSON.parse(messages);
-      if (!Array.isArray(parsedMessages)) {
-        throw new Error('Parsed messages are not an array.');
-      }
-    } catch (parseError) {
-      console.error('Error parsing messages:', parseError);
-      return res.status(400).json({ error: 'Invalid messages format. Expected a JSON array.' });
-    }
-
-    // Handle image analysis and get response from GPT-4 Turbo
-    const gptAnalysis = await analyzeImageWithGPT4Turbo(imageData, parsedMessages);
-
-    // Pass GPT-4 Turbo's analysis to Moola-Matic Assistant
-    const assistantResponse = await handleMoolaMaticChat([...parsedMessages, { role: 'assistant', content: gptAnalysis }], assistantId);
-
-    // Update context in session
-    const updatedMessages = [...parsedMessages, { role: 'assistant', content: gptAnalysis }, { role: 'assistant', content: assistantResponse }];
-
-    req.session.context = updatedMessages;
-
-    // Initialize uploadedImages array in session if it doesn't exist
-    if (!req.session.uploadedImages) {
-      req.session.uploadedImages = [];
-    }
-
-    // Store the path of the uploaded image in the session for cleanup
-    req.session.uploadedImages.push(imageFile.path);
-    console.log(`Image ${imageFile.path} saved to session.`);
-
-    res.json({ content: assistantResponse, context: updatedMessages });
-  } catch (error) {
-    console.error('Error analyzing image:', error);
-    res.status(500).json({ error: 'An error occurred during image analysis.' });
-  }
-});
+// Add this line to use the chatImages router
+app.use('/api', chatImagesRouter);
 
 /**
  * Endpoint to handle user logout and clean up uploaded images

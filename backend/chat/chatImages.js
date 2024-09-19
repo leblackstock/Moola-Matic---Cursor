@@ -14,7 +14,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Load environment variables from .env file
-dotenv.config({ path: path.resolve(__dirname, '.env') });
+dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 
 // Validate essential environment variables
 const { OPENAI_API_KEY, BACKEND_PORT, SESSION_SECRET } = process.env;

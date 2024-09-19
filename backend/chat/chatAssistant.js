@@ -124,3 +124,6 @@ router.post('/analyze-image', (req, res) => {
 });
 
 export default router;
+
+// Add this export at the end of the file
+export { interactWithMoolaMaticAssistant };

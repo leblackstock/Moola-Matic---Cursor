@@ -3,7 +3,7 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { processTextChat } from './chatAssistant.js'; // Import the chat processing function
+import { interactWithMoolaMaticAssistant } from './chatAssistant.js'; // Updated import statement
 
 // Resolve __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -99,3 +99,14 @@ export const manageContext = async (messages) => {
 //     throw new Error('Failed to save image reference. Image handling is not permitted.');
 //   }
 // };
+
+// Update the handleMoolaMaticChat function to use interactWithMoolaMaticAssistant
+export const handleMoolaMaticChat = async (messages, assistantId) => {
+  try {
+    const response = await interactWithMoolaMaticAssistant(messages);
+    return response;
+  } catch (error) {
+    console.error('Error in handleMoolaMaticChat:', error);
+    throw error;
+  }
+};
