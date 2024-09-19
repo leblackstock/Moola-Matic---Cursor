@@ -1,4 +1,4 @@
-// frontend/src/components/NewItemPage.js
+// frontend/src/NewItemPage.js
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';

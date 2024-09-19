@@ -1,4 +1,4 @@
-// frontend/src/components/CompChat.js
+// frontend/src/components/compChat.js
 
 import React, { useState, useEffect, useRef } from 'react';
 import { handleChatWithAssistant, analyzeImageWithGPT4Turbo, askQuestionAboutImage } from '../api/chat';

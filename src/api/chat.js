@@ -6,9 +6,9 @@ const API_URL = process.env.NODE_ENV === 'production'
   : `http://localhost:${process.env.REACT_APP_BACKEND_PORT || 3001}/api`;
 
 /**
- * Function to handle chat with the assistant
- * @param {Array} messages - Array of message objects
- * @returns {String} - Assistant's response content
+ * Function to handle chat with the Moola-Matic Assistant
+ * @param {Array} messages - Array of message objects { role: 'user' | 'assistant', content: '...' }
+ * @returns {Promise<String>} - Assistant's response content
  */
 export const handleChatWithAssistant = async (messages) => {
   try {
@@ -40,8 +40,8 @@ export const handleChatWithAssistant = async (messages) => {
 /**
  * Function to analyze an image with GPT-4 Turbo
  * @param {File} imageFile - The image file to analyze
- * @param {Array} messages - Array of message objects
- * @returns {String} - AI analysis content
+ * @param {Array} messages - Array of message objects { role: 'user' | 'assistant', content: '...' }
+ * @returns {Promise<String>} - AI analysis content
  */
 export const analyzeImageWithGPT4Turbo = async (imageFile, messages) => {
   try {
@@ -74,7 +74,7 @@ export const analyzeImageWithGPT4Turbo = async (imageFile, messages) => {
 /**
  * Function to ask questions about the uploaded image
  * @param {String} question - The question to ask about the image
- * @returns {String} - Assistant's response content
+ * @returns {Promise<String>} - Assistant's response content
  */
 export const askQuestionAboutImage = async (question) => {
   try {

@@ -11,14 +11,15 @@ import helmet from 'helmet';
 import session from 'express-session';
 import { fileURLToPath } from 'url';
 
-// Import the assistant module
-import { handleChatWithAssistant, analyzeImageAndChat } from './chatService.js';
+// Import the assistant module functions
+import { handleMoolaMaticChat, handleImageAnalysis, manageContext } from './chat/chatService.js';
 
-// Load environment variables from .env file
-dotenv.config();
-
+// Resolve __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Load environment variables from .env file
+dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 // Define ports for backend and frontend
 const BACKEND_PORT = process.env.BACKEND_PORT || 3001;
@@ -89,7 +90,7 @@ app.get('/', (req, res) => {
 /**
  * Text-Only Chat Endpoint
  * @route POST /api/chat
- * @desc Handles text messages from the frontend and responds using Moola-Matic assistant
+ * @desc Handles text messages from the frontend and responds using Moola-Matic Assistant
  * @access Public
  */
 app.post('/api/chat', async (req, res) => {
@@ -103,11 +104,14 @@ app.post('/api/chat', async (req, res) => {
   try {
     console.log('Received text-only chat request with messages:', messages);
 
+    // Manage and possibly summarize the context before processing
+    const managedMessages = await manageContext(messages);
+
     // Handle chat with the assistant exclusively using the predefined Assistant ID
-    const assistantResponse = await handleChatWithAssistant(messages, assistantId);
+    const assistantResponse = await handleMoolaMaticChat(managedMessages, assistantId);
 
     // Update context in session
-    const updatedMessages = [...messages, { role: 'assistant', content: assistantResponse }];
+    const updatedMessages = [...managedMessages, { role: 'assistant', content: assistantResponse }];
 
     req.session.context = updatedMessages;
 
@@ -121,7 +125,7 @@ app.post('/api/chat', async (req, res) => {
 /**
  * Image Analysis and Chat Endpoint
  * @route POST /api/analyze-image
- * @desc Handles image uploads, analyzes them with GPT-4 Turbo, and responds via Moola-Matic
+ * @desc Handles image uploads, analyzes them with GPT-4 Turbo, and responds via Moola-Matic Assistant
  * @access Public
  */
 app.post('/api/analyze-image', upload.single('image'), async (req, res) => {
@@ -141,10 +145,12 @@ app.post('/api/analyze-image', upload.single('image'), async (req, res) => {
   try {
     console.log('Received image analysis request with messages:', messages);
 
+    // Read the uploaded image file
     const imageData = fs.readFileSync(imageFile.path);
 
     let parsedMessages;
     try {
+      // Parse messages from JSON string to array
       parsedMessages = JSON.parse(messages);
       if (!Array.isArray(parsedMessages)) {
         throw new Error('Parsed messages are not an array.');
@@ -154,13 +160,15 @@ app.post('/api/analyze-image', upload.single('image'), async (req, res) => {
       return res.status(400).json({ error: 'Invalid messages format. Expected a JSON array.' });
     }
 
-    // Analyze the image and handle chat using the predefined Assistant ID
-    const assistantResponse = await analyzeImageAndChat(imageData, parsedMessages, assistantId);
+    // Handle image analysis and get response from GPT-4 Turbo
+    const gptAnalysis = await analyzeImageWithGPT4Turbo(imageData, parsedMessages);
 
-    // Save assistant's response to context
-    const updatedMessages = [...parsedMessages, { role: 'assistant', content: assistantResponse }];
+    // Pass GPT-4 Turbo's analysis to Moola-Matic Assistant
+    const assistantResponse = await handleMoolaMaticChat([...parsedMessages, { role: 'assistant', content: gptAnalysis }], assistantId);
 
-    // Store context and image reference in session
+    // Update context in session
+    const updatedMessages = [...parsedMessages, { role: 'assistant', content: gptAnalysis }, { role: 'assistant', content: assistantResponse }];
+
     req.session.context = updatedMessages;
 
     // Initialize uploadedImages array in session if it doesn't exist
@@ -168,7 +176,7 @@ app.post('/api/analyze-image', upload.single('image'), async (req, res) => {
       req.session.uploadedImages = [];
     }
 
-    // Store the path of the uploaded image in the session
+    // Store the path of the uploaded image in the session for cleanup
     req.session.uploadedImages.push(imageFile.path);
     console.log(`Image ${imageFile.path} saved to session.`);
 

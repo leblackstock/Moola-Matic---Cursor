@@ -1,11 +1,17 @@
+// src/index.js
+
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
-import App from './App.js';  // Add .js extension
-import reportWebVitals from './reportWebVitals.js';  // Add .js extension
+import App from './App.js';  // Ensure correct path and .js extension
+import reportWebVitals from './reportWebVitals.js';  // Ensure correct path and .js extension
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { BrowserRouter as Router } from 'react-router-dom'; // Import BrowserRouter
+import { BrowserRouter as Router } from 'react-router-dom'; // Import BrowserRouter for routing
 
+/**
+ * Root rendering of the React application.
+ * Wraps the App component with Router for client-side routing.
+ */
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
