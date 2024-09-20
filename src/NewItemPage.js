@@ -119,18 +119,15 @@ function NewItemPage() {
     return msgs;
   };
 
-  // Function to send messages to the AI assistants
+  // Updated sendMessage function
   const sendMessage = async (isImageQuestion = false) => {
     const input = textInput.trim();
     if (!input && !imageFile) return;
 
     const newMessage = {
       content: input || 'Image uploaded',
+      role: 'user', // Explicitly set the role to 'user'
     };
-    // Set role to 'user' only if it's not already set
-    if (newMessage.role === undefined) {
-      newMessage.role = 'user';
-    }
 
     setTextInput('');
     setMessages(prevMessages => [...prevMessages, newMessage]);
@@ -142,25 +139,28 @@ function NewItemPage() {
       // Summarize messages if necessary
       updatedMessages = await summarizeMessages(updatedMessages);
 
-      let responseContent;
+      // Initialize variable to hold response
+      let assistantResponses = [];
 
       if (imageFile && (isImageQuestion || messages.length === 0)) {
-        // Include the image if it's the initial analysis or a follow-up question about the image
-        responseContent = await analyzeImageWithGPT4Turbo(imageFile, updatedMessages);
+        // **Step 1:** Analyze the image with GPT-4 Turbo
+        const analysisContent = await analyzeImageWithGPT4Turbo(imageFile, updatedMessages);
+        const gptResponse = { role: 'assistant', content: analysisContent, source: 'gpt-4-turbo' };
+        assistantResponses.push(gptResponse);
+
+        // **Step 2:** Send GPT-4 Turbo's analysis to Moola-Matic Assistant
+        const moolaMaticResponseContent = await handleChatWithAssistant([...updatedMessages, gptResponse]);
+        const moolaMaticResponse = { role: 'assistant', content: moolaMaticResponseContent, source: 'moola-matic' };
+        assistantResponses.push(moolaMaticResponse);
       } else {
-        // Regular chat without image
-        responseContent = await handleChatWithAssistant(updatedMessages);
+        // Handle Text-Only Messages
+        const chatContent = await handleChatWithAssistant(updatedMessages);
+        const moolaMaticResponse = { role: 'assistant', content: chatContent, source: 'moola-matic' };
+        assistantResponses.push(moolaMaticResponse);
       }
 
-      // GPT-4 Turbo's response
-      const gptResponse = { role: 'assistant', content: responseContent, source: 'gpt-4-turbo' };
-
-      // Feed GPT-4 Turbo's response into the Moola-Matic assistant
-      const assistantResponseContent = await handleChatWithAssistant([...updatedMessages, gptResponse]);
-      const assistantResponse = { role: 'assistant', content: assistantResponseContent, source: 'moola-matic' };
-
-      // Update messages with both GPT-4 Turbo and assistant responses
-      setMessages(prevMessages => [...prevMessages, gptResponse, assistantResponse]);
+      // Update messages state with assistant responses
+      setMessages(prevMessages => [...prevMessages, ...assistantResponses]);
     } catch (error) {
       console.error('Error in sendMessage:', error);
       setMessages(prevMessages => [
