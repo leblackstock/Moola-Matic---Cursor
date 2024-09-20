@@ -125,9 +125,12 @@ function NewItemPage() {
     if (!input && !imageFile) return;
 
     const newMessage = {
-      role: 'user',
       content: input || 'Image uploaded',
     };
+    // Set role to 'user' only if it's not already set
+    if (newMessage.role === undefined) {
+      newMessage.role = 'user';
+    }
 
     setTextInput('');
     setMessages(prevMessages => [...prevMessages, newMessage]);
