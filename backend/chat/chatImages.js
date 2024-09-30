@@ -8,6 +8,9 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid'; // For generating unique identifiers
+import multer from 'multer';
+import session from 'express-session';
+import { interactWithMoolaMaticAssistant } from './chatAssistant.js';
 
 // Resolve __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -34,7 +37,7 @@ if (!SESSION_SECRET) {
   process.exit(1);
 }
 
-// Initialize OpenAI with API key
+// Initialize OpenAI client
 const openai = new OpenAI({
   apiKey: OPENAI_API_KEY,
 });
@@ -42,8 +45,23 @@ const openai = new OpenAI({
 // Initialize Express Router
 const router = express.Router();
 
+// Configure session middleware
+router.use(session({
+  secret: SESSION_SECRET,
+  resave: false,
+  saveUninitialized: true,
+  cookie: { secure: false }, // Set to true if using HTTPS
+}));
+
 // Parse JSON bodies
-router.use(bodyParser.json());
+router.use(bodyParser.json({ limit: '10mb' })); // Increased limit for large images
+
+// Setup multer for handling file uploads
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+});
 
 /**
  * Directory to store draft images
@@ -57,12 +75,87 @@ if (!fs.existsSync(DRAFT_IMAGES_DIR)) {
 }
 
 /**
- * Route to handle image-based chat interactions using base64 image data
- * POST /api/analyze-image
- * Body: { imageData: String, messages: Array }
+ * Analyzes an image and retrieves financial advice based on the analysis.
+ * @param {string} imageBase64 - The base64 encoded image string.
+ * @param {Array} originalMessages - The original array of chat messages.
+ * @returns {Promise<string>} - The final response from the Moola-Matic assistant.
  */
-router.post('/analyze-image', async (req, res) => {
-  const { imageData, messages } = req.body;
+async function analyzeImage(imageBase64, originalMessages) {
+  try {
+    // Step 1: Analyze the image using OpenAI's GPT-4-Turbo model
+    const openAIResponse = await openai.chat.completions.create({
+      model: "gpt-4-turbo",
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:image/jpeg;base64,${imageBase64}`,
+              },
+            },
+            {
+              type: "text",
+              text: "What is this?\n",
+            },
+          ],
+        },
+      ],
+      temperature: 1,
+      max_tokens: 2048,
+      top_p: 1,
+      frequency_penalty: 0,
+      presence_penalty: 0,
+      response_format: {
+        type: "text",
+      },
+    });
+
+    // Extract the image analysis result
+    const imageAnalysis = openAIResponse.choices[0].message.content.trim();
+
+    // Step 2: Create a new array of messages including the analysis
+    const updatedMessages = [
+      ...originalMessages,
+      {
+        role: "assistant",
+        content: [
+          {
+            type: "text",
+            text: imageAnalysis,
+          },
+        ],
+      },
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: "Based on the above analysis, can you provide financial advice?\n",
+          },
+        ],
+      },
+    ];
+
+    // Step 3: Interact with the Moola-Matic assistant using the updated messages
+    const finalResponse = await interactWithMoolaMaticAssistant(updatedMessages);
+
+    return finalResponse;
+  } catch (error) {
+    console.error("Error during image analysis integration:", error);
+    throw error;
+  }
+}
+
+/**
+ * Route to handle image-based chat interactions using uploaded image files
+ * POST /api/analyze-image
+ * Expects multipart/form-data with 'image' and 'messages' fields
+ */
+router.post('/analyze-image', upload.single('image'), async (req, res) => {
+  const { messages } = req.body;
+  const imageFile = req.file;
 
   // Access session data
   const session = req.session;
@@ -71,28 +164,35 @@ router.post('/analyze-image', async (req, res) => {
     return res.status(401).json({ error: 'Unauthorized: No active session.' });
   }
 
-  // Error handling for missing image data or messages
-  if (!imageData || typeof imageData !== 'string') {
-    console.error('Invalid or missing image data provided. Expected a base64 string.');
-    return res.status(400).json({ error: 'Invalid or missing image data. Expected a base64 string.' });
+  // Error handling for missing image file
+  if (!imageFile) {
+    console.error('No image file uploaded.');
+    return res.status(400).json({ error: 'No image file uploaded.' });
   }
 
-  if (!messages || !Array.isArray(messages)) {
-    console.error('Invalid messages format received. Expected an array of messages.');
-    return res.status(400).json({ error: 'Invalid messages format. Expected an array of messages.' });
+  // Error handling for invalid messages
+  let parsedMessages;
+  try {
+    parsedMessages = JSON.parse(messages);
+    if (!Array.isArray(parsedMessages)) {
+      throw new Error('Messages should be an array.');
+    }
+  } catch (err) {
+    console.error('Invalid messages format received. Expected a JSON array.', err);
+    return res.status(400).json({ error: 'Invalid messages format. Expected a JSON array.' });
   }
 
   try {
-    console.log('Processing image-based chat with base64 image data.');
+    console.log('Processing image-based chat with uploaded image file.');
 
     // Generate a unique identifier for the draft image
     const imageId = uuidv4();
-    const imageFilename = `draft_${imageId}.png`; // Assuming PNG; adjust as needed
+    const imageExtension = path.extname(imageFile.originalname) || '.png';
+    const imageFilename = `draft_${imageId}${imageExtension}`;
     const imagePath = path.join(DRAFT_IMAGES_DIR, imageFilename);
 
-    // Decode base64 image data and save to the drafts directory
-    const buffer = Buffer.from(imageData, 'base64');
-    fs.writeFileSync(imagePath, buffer);
+    // Save the image file to the drafts directory
+    fs.writeFileSync(imagePath, imageFile.buffer);
     console.log(`Draft image saved as ${imageFilename} at ${imagePath}.`);
 
     // Store the draft image reference in the session
@@ -107,39 +207,22 @@ router.post('/analyze-image', async (req, res) => {
     });
     console.log('Draft image reference added to the session.');
 
-    // Construct a prompt or message including the base64 image data
-    const analysisPrompt = [
-      ...messages,
-      { role: 'system', content: 'The user has provided the following image data for analysis.' },
-      { role: 'assistant', content: `Image data (base64): ${imageData}` } // Including the base64 image data
-    ];
+    // Convert image to base64 for OpenAI API
+    const base64Image = imageFile.buffer.toString('base64');
 
-    // Create a chat completion using OpenAI's API with the base64 image data
-    const response = await openai.chat.completions.create({
-      model: "gpt-4-turbo",
-      messages: analysisPrompt,
-      temperature: 1,
-      max_tokens: 2048,
-      top_p: 1,
-      frequency_penalty: 0,
-      presence_penalty: 0,
-      response_format: "text",
-    });
+    // Call the analyzeImage function to process the image and get financial advice
+    const financialAdvice = await analyzeImage(base64Image, parsedMessages);
 
-    // Extract the assistant's response from the API response
-    const assistantResponse = response.choices[0].message?.content.trim();
+    // Optionally, you can delete the image after processing to save space
+    // fs.unlinkSync(imagePath);
+    // Remove the image reference from the session if deleted
+    // session.draftImages = session.draftImages.filter(img => img.id !== imageId);
 
-    if (!assistantResponse) {
-      console.error('No content received from OpenAI API for image analysis.');
-      throw new Error('No response received for image analysis.');
-    }
-
-    console.log('Image analysis response:', assistantResponse);
-
-    return res.json({ content: assistantResponse });
+    // Send the financial advice back to the client
+    res.json({ advice: financialAdvice });
   } catch (error) {
-    console.error('Error in /api/analyze-image:', error);
-    return res.status(500).json({ error: 'Failed to process image analysis chat. Please try again later.' });
+    console.error('Error processing image analysis:', error);
+    res.status(500).json({ error: 'Image analysis failed.' });
   }
 });
 

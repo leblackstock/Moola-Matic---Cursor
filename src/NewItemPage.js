@@ -51,6 +51,10 @@ const ImagePreview = styled.img`
   margin-right: 10px;
 `;
 
+const ImageInputContainer = styled(InputContainer)`
+  margin-top: 10px;
+`;
+
 function NewItemPage() {
   const { itemId } = useParams();
 
@@ -100,6 +104,10 @@ function NewItemPage() {
   const [imageFile, setImageFile] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [imagePreview, setImagePreview] = useState('');
+
+  // New state variables for image input and analysis
+  const [imageInput, setImageInput] = useState('');
+  const [imageAnalysis, setImageAnalysis] = useState(null);
 
   // Function to summarize messages to optimize token usage
   const summarizeMessages = async (msgs) => {
@@ -212,6 +220,56 @@ function NewItemPage() {
 
       const imagePreviewUrl = URL.createObjectURL(image);
       setImagePreview(imagePreviewUrl);
+
+      // Immediately analyze the image
+      setIsLoading(true);
+      try {
+        const analysisContent = await analyzeImageWithGPT4Turbo(image, []);
+        setImageAnalysis(analysisContent);
+      } catch (error) {
+        console.error('Error analyzing image:', error);
+        setImageAnalysis('Failed to analyze image. Please try again.');
+      }
+      setIsLoading(false);
+    }
+  };
+
+  const sendImageMessage = async () => {
+    if (!imageFile || !imageAnalysis) return;
+
+    const newMessage = {
+      content: imageInput.trim() || 'Image uploaded',
+      role: 'user',
+      image: imagePreview,
+    };
+
+    setMessages(prevMessages => [...prevMessages, newMessage]);
+    setIsLoading(true);
+
+    try {
+      const aiResponse = await handleChatWithAssistant([
+        ...messages,
+        newMessage,
+        { role: 'assistant', content: imageAnalysis },
+      ]);
+
+      setMessages(prevMessages => [
+        ...prevMessages,
+        { role: 'assistant', content: imageAnalysis },
+        { role: 'assistant', content: aiResponse },
+      ]);
+    } catch (error) {
+      console.error('Error in sendImageMessage:', error);
+      setMessages(prevMessages => [
+        ...prevMessages,
+        { role: 'assistant', content: 'Sorry, an error occurred. Please try again.' },
+      ]);
+    } finally {
+      setIsLoading(false);
+      setImageFile(null);
+      setImagePreview('');
+      setImageInput('');
+      setImageAnalysis(null);
     }
   };
 
@@ -325,6 +383,29 @@ function NewItemPage() {
         accept="image/*"
         onChange={handleFileChange}
       />
+
+      {/* Image preview and input */}
+      {imagePreview && (
+        <ImageInputContainer>
+          <ImagePreview src={imagePreview} alt="Preview" />
+          <StyledTextarea
+            className="chat-input"
+            value={imageInput}
+            onChange={(e) => setImageInput(e.target.value)}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendImageMessage();
+              }
+            }}
+            placeholder="Add a message about this image..."
+            rows="1"
+          />
+          <button className="send-button" onClick={sendImageMessage} disabled={isLoading}>
+            <i className="fas fa-paper-plane"></i>
+          </button>
+        </ImageInputContainer>
+      )}
 
       {/* Item Details Form */}
       <form onSubmit={handleSubmit}>

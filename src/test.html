@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Combat Flowchart for Level 1 Barbarian</title>
+    <!-- Include JointJS CSS and JS from CDN with integrity and crossorigin attributes -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jointjs/3.7.5/joint.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/backbone.js/1.4.0/backbone-min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jointjs/3.7.5/joint.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <style>
+        /* Overall Dark Theme Styling */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #121212; /* Dark background */
+            color: #e0e0e0;            /* Light text color */
+            font-size: 0.85em;         /* Decreased page font size */
+        }
+        h1, h2, h3 {
+            text-align: center;
+            color: #ffffff; /* White headings */
+        }
+        /* Note and Additional Considerations Styling */
+        .note, .additional-considerations, .conclusion {
+            margin: 20px auto;
+            max-width: 800px;
+            background-color: #1e1e1e; /* Slightly lighter dark background */
+            padding: 20px;
+            border-left: 5px solid #BB86FC; /* Vibrant border color */
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+            border-radius: 5px;
+        }
+        ul {
+            padding-left: 20px;
+        }
+        hr {
+            border: none;
+            border-top: 1px solid #333;
+            margin: 40px 0;
+        }
+        /* Diagram Container Styling */
+        #myDiagramDiv {
+            width: 100%;
+            height: 800px;
+            background-color: #1e1e1e; /* Slightly lighter dark background */
+            border: 2px solid #BB86FC; /* Vibrant border color */
+            border-radius: 5px;
+            margin: 20px auto;
+            position: relative; /* To position watermark overlay */
+            padding-bottom: 40px;  /* Space for watermark */
+            padding-right: 40px; /* Space for watermark */
+            box-sizing: border-box; /* Include padding in width and height */
+            overflow: hidden; /* Prevent scrollbars */
+        }
+        /* Print Button Styling */
+        #printButton {
+            display: block;
+            margin: 20px auto;
+            padding: 10px 20px;
+            background-color: #BB86FC;
+            color: #ffffff;
+            border: none;
+            border-radius: 5px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        #printButton:hover {
+            background-color: #9b6bdc;
+        }
+        /* Watermark Overlay Styling */
+        #watermarkOverlay {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            color: rgba(255, 255, 255, 0.5); /* Semi-transparent white */
+            font-size: 14px;
+            pointer-events: none; /* Allow clicks to pass through */
+            user-select: none; /* Prevent text selection */
+            z-index: 10; /* Ensure watermark is on top */
+        }
+        /* @media print rules */
+        @media print {
+            /* Hide all elements by default */
+            body * {
+                display: none;
+            }
+            /* Show only the flowchart */
+            .printableFlowchart {
+                display: block !important;
+                border: none !important;
+                width: 100% !important;
+                height: 850px !important; /* Fixed height for flowchart */
+                margin: 0 !important;
+                background-color: white !important; /* White background for print */
+                box-shadow: none !important;
+                padding-bottom: 40px !important;  /* Space for watermark */
+                padding-right: 40px !important; /* Space for watermark */
+                box-sizing: border-box; /* Include padding in width and height */
+                position: relative !important; /* For watermark positioning */
+            }
+            .printableFlowchart * {
+                display: block !important;
+            }
+            /* Show all content together on the second page */
+            .printableContent {
+                display: block !important;
+                color: #000000 !important; /* Black text for print */
+                page-break-before: always; /* Start content on new page */
+                font-size: 1em; /* Adjust font size to fit content */
+                margin: 0; /* Remove additional margins */
+            }
+            .printableContent * {
+                display: block !important;
+            }
+            /* Hide the print button during printing */
+            #printButton {
+                display: none !important;
+            }
+            /* Optionally, hide the watermark during print if desired */
+            /* If you want to keep it, remove the following lines */
+            /* #watermarkOverlay {
+                display: none !important;
+            } */
+        }
+    </style>
+</head>
+<body>
+    <h1>Combat Flowchart for a Level 1 Dungeons & Dragons Barbarian</h1>
+
+    <!-- Print Button -->
+    <button id="printButton">Print Flowchart</button>
+
+    <!-- Flowchart Div with class 'printableFlowchart' -->
+    <div id="myDiagramDiv" class="printableFlowchart">
+        <!-- Overlay for Watermark -->
+        <div id="watermarkOverlay">JointJS 3.7.5</div>
+    </div>
+
+    <hr>
+
+    <!-- Group all printable content into one container -->
+    <div class="printableContent">
+        <div class="note">
+            <strong>Note:</strong> This flowchart outlines the decision-making process for a level 1 barbarian during combat in Dungeons & Dragons 5th Edition. It helps determine the best course of action based on the situation at hand.
+        </div>
+
+        <div class="additional-considerations">
+            <h2>Additional Considerations:</h2>
+            <ul>
+                <li><strong>Conserve Resources:</strong> Remember, at level 1, you have limited uses of Rage (2 per long rest). Use them wisely.</li>
+                <li><strong>Positioning:</strong> Always be mindful of your positioning on the battlefield to maximize your effectiveness and minimize risks.</li>
+                <li><strong>Communication:</strong> Coordinate with your party members to strategize and support each other during combat.</li>
+                <li><strong>Environmental Factors:</strong> Use the environment to your advantage, such as taking cover or utilizing terrain features.</li>
+            </ul>
+        </div>
+
+        <div class="conclusion">
+            <p>By following this flowchart, you can make effective decisions during combat, maximizing your barbarian's strengths and contributing significantly to your party's success.</p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            init();
+        });
+
+        function init() {
+            // Check if joint object is available
+            if (typeof joint === 'undefined') {
+                console.error('JointJS library is not loaded properly.');
+                return;
+            }
+
+            if (!joint.dia || !joint.dia.Graph) {
+                console.error('JointJS Graph module is not available.');
+                return;
+            }
+
+            // Initialize JointJS graph and paper
+            const graph = new joint.dia.Graph();
+
+            const paper = new joint.dia.Paper({
+                el: document.getElementById('myDiagramDiv'),
+                model: graph,
+                width: '100%',
+                height: '100%',
+                gridSize: 10,
+                background: { color: '#1e1e1e' },
+                defaultLink: new joint.dia.Link({
+                    attrs: {
+                        '.connection': { stroke: '#BB86FC', 'stroke-width': 2 },
+                        '.marker-target': { fill: '#BB86FC', stroke: '#BB86FC' }
+                    }
+                }),
+                interactive: { elementMove: false },
+                snapLinks: { radius: 75 },
+                defaultConnectionPoint: { name: 'boundary' },
+                defaultAnchor: { name: 'center' },
+                defaultConnector: { name: 'rounded' },
+                defaultLinkLabel: {
+                    markup: [
+                        {
+                            tagName: 'rect',
+                            selector: 'body'
+                        }, {
+                            tagName: 'text',
+                            selector: 'label'
+                        }
+                    ],
+                    attrs: {
+                        label: {
+                            text: '',
+                            fill: '#ffffff',
+                            fontSize: 14,
+                            textAnchor: 'middle',
+                            yAlignment: 'middle',
+                            pointerEvents: 'none'
+                        },
+                        body: {
+                            ref: 'label',
+                            refWidth: '100%',
+                            refHeight: '100%',
+                            refX: 0,
+                            refY: 0,
+                            fill: 'none'
+                        }
+                    }
+                }
+            });
+
+            // Define styles for different categories
+            const categoryStyles = {
+                'decision': {
+                    fill: '#80CBC4',
+                    stroke: '#4DB6AC',
+                    text: '#000000'
+                },
+                'action': {
+                    fill: '#A5D6A7',
+                    stroke: '#81C784',
+                    text: '#000000'
+                },
+                'startend': {
+                    fill: '#90CAF9',
+                    stroke: '#64B5F6',
+                    text: '#000000'
+                }
+            };
+
+            // Function to create a node
+            function createNode(id, label, category) {
+                return new joint.shapes.standard.Rectangle({
+                    id: id,
+                    size: { width: 200, height: 60 },
+                    attrs: {
+                        body: {
+                            fill: categoryStyles[category].fill,
+                            stroke: categoryStyles[category].stroke,
+                            strokeWidth: 2,
+                            rx: 5,
+                            ry: 5
+                        },
+                        label: {
+                            text: label,
+                            fill: categoryStyles[category].text,
+                            fontSize: 14,
+                            fontWeight: 'bold',
+                            textWrap: { width: 180 }
+                        }
+                    },
+                    data: { category: category }
+                });
+            }
+
+            // Define nodes
+            const nodes = [
+                createNode('StartOfTurn', 'Start of Turn', 'startend'),
+                createNode('AssessRageAvailability', 'Assess Rage Availability', 'decision'),
+                createNode('DecideToRage', 'Decide to Rage', 'action'),
+                createNode('ProceedWithoutRaging', 'Proceed without Raging', 'action'),
+                createNode('IsCombatSignificant', 'Is this combat significant enough to use a Rage?', 'decision'),
+                createNode('EnterRage', 'Use your bonus action to enter Rage.', 'action'),
+                createNode('SaveRage', 'Save Rage for later', 'action'),
+                createNode('EvaluateEnemyProximity', 'Evaluate Enemy Proximity', 'decision'),
+                createNode('AttackNearestEnemy', 'Attack the nearest enemy with a melee weapon.\nApply Rage bonus if Raging.', 'action'),
+                createNode('CanReachEnemy', 'Can you reach an enemy by moving?', 'decision'),
+                createNode('UseRangedOptions', 'Use Ranged Options', 'decision'),
+                createNode('TakeDodgeAction', 'Take the Dodge action to\nincrease your defenses.', 'action'),
+                createNode('EndOfDecision', 'End of Decision', 'action'),
+                createNode('MoveTowardsEnemy', 'Move towards the enemy.', 'action'),
+                createNode('AfterMovingAttack', 'After moving, if you have an action left,\nattack the enemy.', 'action'),
+                createNode('AssessMovementRisks', 'Assess Movement Risks', 'decision'),
+                createNode('DecideRiskOrRoute', 'Decide whether to risk it\nor find an alternative route.', 'action'),
+                createNode('UseAttack', 'Use it to attack the enemy.', 'action'),
+                createNode('MoveTowardsAlly', 'Move towards the ally\nand attack enemies threatening them.', 'action'),
+                createNode('FocusTarget', 'Focus on your current target\nor nearest enemy.', 'action'),
+                createNode('MonitorHealth', 'Monitor Health Status', 'decision'),
+                createNode('CheckHealingOptions', 'Check for Healing Options', 'decision'),
+                createNode('ProceedAttack', 'Proceed with attacking enemies.', 'action'),
+                createNode('DrinkPotion', 'Use your action to drink the potion.', 'action'),
+                createNode('ConsiderMovingAlly', 'Consider moving towards an ally\nwho can heal you.', 'action'),
+                createNode('ConsiderDefensiveActions', 'Consider Defensive Actions', 'action'),
+                createNode('TakeDodgeOrMove', 'Take the Dodge action\nor move to a safer location.', 'action'),
+                createNode('SupportAllies', 'Support Allies', 'decision'),
+                createNode('EndOfTurn', 'End of Turn\nPrepare for your next turn by planning your actions\nbased on the evolving combat situation.', 'startend')
+            ];
+
+            // Add nodes to the graph
+            graph.addCells(nodes);
+
+            // Define links between nodes
+            const links = [
+                { source: 'StartOfTurn', target: 'AssessRageAvailability', label: '' },
+                { source: 'AssessRageAvailability', target: 'DecideToRage', label: 'Yes' },
+                { source: 'AssessRageAvailability', target: 'ProceedWithoutRaging', label: 'No' },
+                { source: 'DecideToRage', target: 'IsCombatSignificant', label: '' },
+                { source: 'IsCombatSignificant', target: 'EnterRage', label: 'Yes' },
+                { source: 'IsCombatSignificant', target: 'SaveRage', label: 'No' },
+                { source: 'ProceedWithoutRaging', target: 'EvaluateEnemyProximity', label: '' },
+                { source: 'EnterRage', target: 'EvaluateEnemyProximity', label: '' },
+                { source: 'SaveRage', target: 'EvaluateEnemyProximity', label: '' },
+                { source: 'EvaluateEnemyProximity', target: 'AttackNearestEnemy', label: 'Yes' },
+                { source: 'EvaluateEnemyProximity', target: 'CanReachEnemy', label: 'No' },
+                { source: 'CanReachEnemy', target: 'UseRangedOptions', label: 'No' },
+                { source: 'CanReachEnemy', target: 'AssessMovementRisks', label: 'Yes' },
+                { source: 'AssessMovementRisks', target: 'DecideRiskOrRoute', label: 'Yes' },
+                { source: 'AssessMovementRisks', target: 'MoveTowardsEnemy', label: 'No' },
+                { source: 'MoveTowardsEnemy', target: 'AfterMovingAttack', label: '' },
+                { source: 'DecideRiskOrRoute', target: 'EndOfDecision', label: '' },
+                { source: 'UseRangedOptions', target: 'UseAttack', label: 'Yes' },
+                { source: 'UseRangedOptions', target: 'TakeDodgeAction', label: 'No' },
+                { source: 'AttackNearestEnemy', target: 'EndOfDecision', label: '' },
+                { source: 'UseAttack', target: 'EndOfDecision', label: '' },
+                { source: 'TakeDodgeAction', target: 'EndOfDecision', label: '' },
+                { source: 'EndOfDecision', target: 'MonitorHealth', label: '' },
+                { source: 'MonitorHealth', target: 'CheckHealingOptions', label: 'Yes' },
+                { source: 'MonitorHealth', target: 'ProceedAttack', label: 'No' },
+                { source: 'CheckHealingOptions', target: 'DrinkPotion', label: 'Yes' },
+                { source: 'CheckHealingOptions', target: 'ConsiderMovingAlly', label: 'No' },
+                { source: 'DrinkPotion', target: 'ConsiderDefensiveActions', label: '' },
+                { source: 'ConsiderMovingAlly', target: 'ConsiderDefensiveActions', label: '' },
+                { source: 'ConsiderDefensiveActions', target: 'TakeDodgeOrMove', label: '' },
+                { source: 'ProceedAttack', target: 'SupportAllies', label: '' },
+                { source: 'TakeDodgeOrMove', target: 'SupportAllies', label: '' },
+                { source: 'DrinkPotion', target: 'SupportAllies', label: '' },
+                { source: 'ConsiderMovingAlly', target: 'SupportAllies', label: '' },
+                { source: 'SupportAllies', target: 'MoveTowardsAlly', label: 'Yes' },
+                { source: 'SupportAllies', target: 'FocusTarget', label: 'No' },
+                { source: 'MoveTowardsAlly', target: 'EndOfTurn', label: '' },
+                { source: 'FocusTarget', target: 'EndOfTurn', label: '' }
+            ];
+
+            // Function to create and add links to the graph
+            function createLink(source, target, label) {
+                const link = new joint.dia.Link({
+                    source: { id: source },
+                    target: { id: target },
+                    labels: [{
+                        position: 0.5,
+                        attrs: {
+                            text: {
+                                text: label,
+                                fill: '#ffffff',
+                                fontSize: 14,
+                                textAnchor: 'middle',
+                                yAlignment: 'middle'
+                            }
+                        }
+                    }],
+                    router: { name: 'manhattan' },
+                    connector: { name: 'rounded' },
+                    attrs: {
+                        '.connection': { stroke: '#BB86FC', 'stroke-width': 2 },
+                        '.marker-target': { fill: '#BB86FC', stroke: '#BB86FC' }
+                    }
+                });
+                graph.addCell(link);
+            }
+
+            // Add links to the graph
+            links.forEach(link => createLink(link.source, link.target, link.label));
+
+            // Custom layout function
+            function applyCustomLayout(graph, options = {}) {
+                const elements = graph.getElements();
+                const levelHeight = options.levelHeight || 100;
+                const levelWidth = options.levelWidth || 200;
+                const marginX = options.marginX || 50;
+                const marginY = options.marginY || 50;
+
+                // Create a map of nodes to their levels
+                const levels = new Map();
+                elements.forEach(el => {
+                    const incomingLinks = graph.getConnectedLinks(el, { inbound: true });
+                    let level = 0;
+                    if (incomingLinks.length > 0) {
+                        level = Math.max(...incomingLinks.map(link => {
+                            const sourceEl = link.getSourceElement();
+                            return sourceEl ? (levels.get(sourceEl) || 0) + 1 : 0;
+                        }));
+                    }
+                    levels.set(el, level);
+                });
+
+                // Find the maximum level
+                const maxLevel = Math.max(...levels.values());
+
+                // Position elements based on their level
+                const levelCounts = new Array(maxLevel + 1).fill(0);
+                elements.forEach(el => {
+                    const level = levels.get(el);
+                    const count = levelCounts[level];
+                    el.position(marginX + count * levelWidth, marginY + level * levelHeight);
+                    levelCounts[level]++;
+                });
+
+                // Update link vertices
+                graph.getLinks().forEach(link => {
+                    const sourcePos = link.getSourceElement().position();
+                    const targetPos = link.getTargetElement().position();
+                    const sourceLevel = levels.get(link.getSourceElement());
+                    const targetLevel = levels.get(link.getTargetElement());
+                    
+                    if (sourceLevel < targetLevel) {
+                        const vertices = [
+                            { x: sourcePos.x + levelWidth / 2, y: sourcePos.y + levelHeight },
+                            { x: targetPos.x + levelWidth / 2, y: targetPos.y }
+                        ];
+                        link.set('vertices', vertices);
+                    } else {
+                        // For links going up or to the same level, use a different routing
+                        const midY = (sourcePos.y + targetPos.y) / 2;
+                        const vertices = [
+                            { x: sourcePos.x + levelWidth / 2, y: midY },
+                            { x: targetPos.x + levelWidth / 2, y: midY }
+                        ];
+                        link.set('vertices', vertices);
+                    }
+                });
+            }
+
+            // Apply custom layout
+            applyCustomLayout(graph, {
+                levelHeight: 100,
+                levelWidth: 250,
+                marginX: 50,
+                marginY: 50
+            });
+
+            // Enable pan and zoom
+            paper.on('blank:pointerdown', function(evt, x, y) {
+                paper.setInteractivity(true);
+            });
+
+            // Function to apply print-specific styles
+            function applyPrintStyles() {
+                // Change node colors for print
+                graph.getElements().forEach(element => {
+                    const category = element.attributes.data.category;
+                    if (category === 'decision') {
+                        element.attr('body/fill', '#B2DFDB');
+                        element.attr('body/stroke', '#004D40');
+                        element.attr('label/fill', '#000000');
+                    } else if (category === 'action') {
+                        element.attr('body/fill', '#C8E6C9');
+                        element.attr('body/stroke', '#2E7D32');
+                        element.attr('label/fill', '#000000');
+                    } else if (category === 'startend') {
+                        element.attr('body/fill', '#81D4FA');
+                        element.attr('body/stroke', '#0277BD');
+                        element.attr('label/fill', '#000000');
+                    }
+                });
+
+                // Change link colors for print
+                graph.getLinks().forEach(link => {
+                    link.attr({
+                        '.connection': { stroke: '#000000' },
+                        '.marker-target': { fill: '#000000', stroke: '#000000' },
+                        'label/text': link.labels()[0].attrs.text.text,
+                        'label/fill': '#000000'
+                    });
+                });
+
+                // Optionally, remove the watermark or change its appearance for print
+                // Uncomment the line below if you want to hide the watermark during print
+                // document.getElementById('watermarkOverlay').style.display = 'none';
+            }
+
+            // Function to reset styles after printing
+            function resetStyles() {
+                // Reset node colors
+                graph.getElements().forEach(element => {
+                    const category = element.attributes.data.category;
+                    if (categoryStyles[category]) {
+                        element.attr('body/fill', categoryStyles[category].fill);
+                        element.attr('body/stroke', categoryStyles[category].stroke);
+                        element.attr('label/fill', categoryStyles[category].text);
+                    }
+                });
+
+                // Reset link colors
+                graph.getLinks().forEach(link => {
+                    link.attr({
+                        '.connection': { stroke: '#BB86FC' },
+                        '.marker-target': { fill: '#BB86FC', stroke: '#BB86FC' },
+                        'label/fill': '#ffffff'
+                    });
+                });
+
+                // Optionally, restore the watermark's appearance
+                // Uncomment the line below if you hid the watermark during print
+                // document.getElementById('watermarkOverlay').style.display = 'block';
+            }
+
+            // Add event listeners for print events
+            window.addEventListener("beforeprint", applyPrintStyles);
+            window.addEventListener("afterprint", resetStyles);
+
+            // Add event listener to the print button
+            document.getElementById("printButton").addEventListener("click", function() {
+                window.print();
+            });
+
+            console.log('JointJS flowchart initialized successfully.');
+        }
+    </script>
+</body>
+</html>
