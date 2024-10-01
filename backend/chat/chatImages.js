@@ -10,7 +10,7 @@ import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid'; // For generating unique identifiers
 import multer from 'multer';
 import session from 'express-session';
-import { interactWithMoolaMaticAssistant } from './chatAssistant.js';
+import { interactWithMoolaMaticAssistant, waitForRunCompletion, getAssistantResponse } from './chatAssistant.js';
 
 // Resolve __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -114,34 +114,30 @@ async function analyzeImage(imageBase64, originalMessages) {
 
     // Extract the image analysis result
     const imageAnalysis = openAIResponse.choices[0].message.content.trim();
+    
+    // Add logging for the image analysis result
+    console.log('Image analysis result:', imageAnalysis);
 
     // Step 2: Create a new array of messages including the analysis
     const updatedMessages = [
       ...originalMessages,
       {
-        role: "assistant",
-        content: [
-          {
-            type: "text",
-            text: imageAnalysis,
-          },
-        ],
+        role: "user",
+        content: "Image Analysis: " + imageAnalysis,
       },
       {
         role: "user",
-        content: [
-          {
-            type: "text",
-            text: "Based on the above analysis, can you provide financial advice?\n",
-          },
-        ],
+        content: "Based on the above image analysis, can you provide financial advice?",
       },
     ];
 
-    // Step 3: Interact with the Moola-Matic assistant using the updated messages
-    const finalResponse = await interactWithMoolaMaticAssistant(updatedMessages);
+    // Step 3: Interact with Moola-Matic Assistant
+    const assistantResponse = await interactWithMoolaMaticAssistant(updatedMessages);
 
-    return finalResponse;
+    // Step 4: Return only the assistant's response
+    return {
+      assistantResponse: assistantResponse
+    };
   } catch (error) {
     console.error("Error during image analysis integration:", error);
     throw error;
@@ -211,18 +207,22 @@ router.post('/analyze-image', upload.single('image'), async (req, res) => {
     const base64Image = imageFile.buffer.toString('base64');
 
     // Call the analyzeImage function to process the image and get financial advice
-    const financialAdvice = await analyzeImage(base64Image, parsedMessages);
+    const result = await analyzeImage(base64Image, parsedMessages);
 
-    // Optionally, you can delete the image after processing to save space
-    // fs.unlinkSync(imagePath);
-    // Remove the image reference from the session if deleted
-    // session.draftImages = session.draftImages.filter(img => img.id !== imageId);
+    // Save the updated context to the session
+    //req.session.messages = result.context;
 
-    // Send the financial advice back to the client
-    res.json({ advice: financialAdvice });
+    // Only send the assistant's response to the frontend
+    res.json({ 
+      advice: result.assistantResponse,
+      status: 'completed'
+    });
   } catch (error) {
     console.error('Error processing image analysis:', error);
-    res.status(500).json({ error: 'Image analysis failed.' });
+    res.status(500).json({ 
+      error: 'Image analysis failed.',
+      status: 'error'
+    });
   }
 });
 

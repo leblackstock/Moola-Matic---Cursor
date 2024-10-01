@@ -45,6 +45,7 @@ router.use(bodyParser.json());
  */
 const createThread = async (messages) => {
   try {
+    console.log('Creating thread with messages:', JSON.stringify(messages, null, 2));
     let thread;
     if (messages && messages.length > 0) {
       // Remove the 'source' field from each message
@@ -107,19 +108,20 @@ const createRun = async (threadId, assistantId) => {
  * @param {String} runId - ID of the run
  * @returns {Promise<Object>} - Run object
  */
-const waitForRunCompletion = async (threadId, runId) => {
+const waitForRunCompletion = async (threadId, runId, timeout = 60000) => { // 60 seconds timeout
   try {
-    let run = await client.beta.threads.runs.retrieve(
-      threadId,
-      runId
-    );
+    const interval = 1000; // 1 second
+    let elapsed = 0;
+
+    let run = await client.beta.threads.runs.retrieve(threadId, runId);
 
     while (run.status === 'queued' || run.status === 'in_progress') {
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait for 1 second
-      run = await client.beta.threads.runs.retrieve(
-        threadId,
-        runId
-      );
+      if (elapsed >= timeout) {
+        throw new Error('Run timed out while waiting for completion.');
+      }
+      await new Promise((resolve) => setTimeout(resolve, interval)); // Wait for 1 second
+      run = await client.beta.threads.runs.retrieve(threadId, runId);
+      elapsed += interval;
     }
 
     if (run.status === 'completed') {
@@ -279,26 +281,21 @@ const interactWithMoolaMaticAssistant = async (messages) => {
     // Retrieve the Moola-Matic assistant first
     const assistant = await retrieveMoolaMaticAssistant();
 
-    // Step 1: Create a new thread with messages
+    // Create a new thread with messages
     const threadId = await createThread(messages);
-    console.log('Created thread with ID:', threadId);
+    console.log('Creating thread with messages:', JSON.stringify(messages, null, 2));
 
     // Step 2: Create a run using the retrieved assistant
     const runId = await createRun(threadId, assistant.id);
     console.log('Created run with ID:', runId);
 
-    // Step 3: Wait for run completion
-    let run = await waitForRunCompletion(threadId, runId);
-
-    // Handle required actions if any
-    if (run.required_action) {
-      await handleRequiredAction(threadId, runId, run.required_action);
-      // Wait for the run to complete after submitting tool outputs
-      run = await waitForRunCompletion(threadId, runId);
-    }
+    // Wait for the run to complete
+    const completedRun = await waitForRunCompletion(threadId, runId);
+    console.log('Run completed:');
 
     // Step 4: Retrieve assistant response
     const assistantResponse = await getAssistantResponse(threadId);
+    console.log('Assistant response:', assistantResponse);
 
     return assistantResponse;
   } catch (error) {
@@ -350,6 +347,5 @@ router.post('/analyze-image', (req, res) => {
 
 export default router;
 
-// Add this export at the end of the file
-export { interactWithMoolaMaticAssistant, retrieveMoolaMaticAssistant };
-
+// Export the necessary functions
+export { interactWithMoolaMaticAssistant, waitForRunCompletion, getAssistantResponse };

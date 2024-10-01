@@ -123,17 +123,26 @@ function CompChat() {
       let responseContent;
 
       if (imageFile) {
+        console.log('Sending image for analysis...');
         responseContent = await analyzeImageWithGPT4Turbo(imageFile, [...messages, newMessage]);
+        console.log('Received image analysis response:', responseContent);
       } else {
         responseContent = await handleChatWithAssistant([...messages, newMessage]);
       }
+
+      console.log('Response content before adding to messages:', responseContent);
 
       const assistantMessage = {
         role: 'assistant',
         content: responseContent,
       };
 
-      setMessages(prevMessages => [...prevMessages, assistantMessage]);
+      setMessages(prevMessages => {
+        console.log('Adding new message to chat:', assistantMessage);
+        return [...prevMessages, assistantMessage];
+      });
+
+      console.log('Messages state after update:', messages);
     } catch (error) {
       console.error('Error in sendMessage:', error);
       setMessages(prevMessages => [

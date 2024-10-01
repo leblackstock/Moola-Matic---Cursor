@@ -103,6 +103,9 @@ export const manageContext = async (messages) => {
 // Update the handleMoolaMaticChat function to use interactWithMoolaMaticAssistant
 export const handleMoolaMaticChat = async (messages, assistantId) => {
   try {
+    // Add this console.log statement here
+    console.log('Messages received in handleMoolaMaticChat:', JSON.stringify(messages, null, 2));
+
     const response = await interactWithMoolaMaticAssistant(messages);
     return response;
   } catch (error) {

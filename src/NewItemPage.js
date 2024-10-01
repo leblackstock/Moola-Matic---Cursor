@@ -55,6 +55,43 @@ const ImageInputContainer = styled(InputContainer)`
   margin-top: 10px;
 `;
 
+const renderContent = (content) => {
+  let parsedContent;
+  
+  if (typeof content === 'string') {
+    try {
+      parsedContent = JSON.parse(content).assistantResponse;
+    } catch (e) {
+      parsedContent = content;
+    }
+  } else if (typeof content === 'object' && content.assistantResponse) {
+    parsedContent = content.assistantResponse;
+  } else {
+    parsedContent = JSON.stringify(content);
+  }
+
+  if (typeof parsedContent === 'string') {
+    const lines = parsedContent.split('\n').filter(line => line.trim() !== '');
+    return lines.map((line, i) => (
+      <React.Fragment key={i}>
+        {line.startsWith('###') ? (
+          <h3 style={{marginBottom: '0.5em', marginTop: '0.5em'}}>{line.replace('###', '').trim()}</h3>
+        ) : line.startsWith('##') ? (
+          <h4 style={{marginBottom: '0.3em', marginTop: '0.3em'}}>{line.replace('##', '').trim()}</h4>
+        ) : line.startsWith('#') ? (
+          <h5 style={{marginBottom: '0.2em', marginTop: '0.2em'}}>{line.replace('#', '').trim()}</h5>
+        ) : line.startsWith('-') ? (
+          <li style={{marginBottom: '0.1em'}}>{line.replace('-', '').trim()}</li>
+        ) : (
+          <p style={{marginBottom: '0.1em', marginTop: '0.1em'}}>{line}</p>
+        )}
+      </React.Fragment>
+    ));
+  } else {
+    return <p>{JSON.stringify(parsedContent)}</p>;
+  }
+};
+
 function NewItemPage() {
   const { itemId } = useParams();
 
@@ -147,28 +184,24 @@ function NewItemPage() {
       // Summarize messages if necessary
       updatedMessages = await summarizeMessages(updatedMessages);
 
-      // Initialize variable to hold response
-      let assistantResponses = [];
+      let assistantResponse;
 
       if (imageFile && (isImageQuestion || messages.length === 0)) {
-        // **Step 1:** Analyze the image with GPT-4 Turbo
-        const analysisContent = await analyzeImageWithGPT4Turbo(imageFile, updatedMessages);
-        const gptResponse = { role: 'assistant', content: analysisContent, source: 'gpt-4-turbo' };
-        assistantResponses.push(gptResponse);
-
-        // **Step 2:** Send GPT-4 Turbo's analysis to Moola-Matic Assistant
-        const moolaMaticResponseContent = await handleChatWithAssistant([...updatedMessages, gptResponse]);
-        const moolaMaticResponse = { role: 'assistant', content: moolaMaticResponseContent, source: 'moola-matic' };
-        assistantResponses.push(moolaMaticResponse);
+        // Step 1: Analyze the image with GPT-4 Turbo and get Moola-Matic advice
+        const result = await analyzeImageWithGPT4Turbo(imageFile, updatedMessages);
+        assistantResponse = result.assistantResponse;
       } else {
         // Handle Text-Only Messages
-        const chatContent = await handleChatWithAssistant(updatedMessages);
-        const moolaMaticResponse = { role: 'assistant', content: chatContent, source: 'moola-matic' };
-        assistantResponses.push(moolaMaticResponse);
+        assistantResponse = await handleChatWithAssistant(updatedMessages);
       }
 
-      // Update messages state with assistant responses
-      setMessages(prevMessages => [...prevMessages, ...assistantResponses]);
+      // Ensure assistantResponse is a string
+      const responseContent = typeof assistantResponse === 'object' ? JSON.stringify(assistantResponse) : assistantResponse;
+
+      setMessages(prevMessages => [
+        ...prevMessages,
+        { role: 'assistant', content: responseContent, source: 'moola-matic' }
+      ]);
     } catch (error) {
       console.error('Error in sendMessage:', error);
       setMessages(prevMessages => [
@@ -224,11 +257,18 @@ function NewItemPage() {
       // Immediately analyze the image
       setIsLoading(true);
       try {
-        const analysisContent = await analyzeImageWithGPT4Turbo(image, []);
-        setImageAnalysis(analysisContent);
+        const assistantResponse = await analyzeImageWithGPT4Turbo(image, []);
+        // Add only the assistant's response to the chat context
+        setMessages(prevMessages => [
+          ...prevMessages,
+          { role: 'assistant', content: assistantResponse }
+        ]);
       } catch (error) {
         console.error('Error analyzing image:', error);
-        setImageAnalysis('Failed to analyze image. Please try again.');
+        setMessages(prevMessages => [
+          ...prevMessages,
+          { role: 'assistant', content: 'Sorry, an error occurred while analyzing the image. Please try again.' }
+        ]);
       }
       setIsLoading(false);
     }
@@ -295,10 +335,11 @@ function NewItemPage() {
           {messages.map((msg, index) => (
             <MessageContainer key={index} $isUser={msg.role === 'user'}>
               <MessageBubble $isUser={msg.role === 'user'}>
-                <p>
-                  {msg.role === 'user' ? 'You: ' : msg.source === 'moola-matic' ? 'Moola-Matic: ' : 'AI: '}
-                  {msg.content}
-                </p>
+                {msg.role === 'user' ? (
+                  <p>{msg.content}</p>
+                ) : (
+                  <div>{renderContent(msg.content)}</div>
+                )}
                 {msg.image && (
                   <img 
                     src={msg.image} 
