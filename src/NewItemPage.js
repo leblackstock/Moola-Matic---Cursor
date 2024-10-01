@@ -171,7 +171,7 @@ function NewItemPage() {
 
     const newMessage = {
       content: input || 'Image uploaded',
-      role: 'user', // Explicitly set the role to 'user'
+      role: 'user',
     };
 
     setTextInput('');
@@ -184,29 +184,40 @@ function NewItemPage() {
       // Summarize messages if necessary
       updatedMessages = await summarizeMessages(updatedMessages);
 
-      let assistantResponse;
+      let response;
 
       if (imageFile && (isImageQuestion || messages.length === 0)) {
         // Step 1: Analyze the image with GPT-4 Turbo and get Moola-Matic advice
         const result = await analyzeImageWithGPT4Turbo(imageFile, updatedMessages);
-        assistantResponse = result.assistantResponse;
+        response = { content: result.assistantResponse, status: 'completed' };
       } else {
         // Handle Text-Only Messages
-        assistantResponse = await handleChatWithAssistant(updatedMessages);
+        console.log('Sending messages to handleChatWithAssistant:', updatedMessages);
+        response = await handleChatWithAssistant(updatedMessages);
+        console.log('Received response from handleChatWithAssistant:', response);
       }
 
-      // Ensure assistantResponse is a string
-      const responseContent = typeof assistantResponse === 'object' ? JSON.stringify(assistantResponse) : assistantResponse;
-
       setMessages(prevMessages => [
         ...prevMessages,
-        { role: 'assistant', content: responseContent, source: 'moola-matic' }
+        { 
+          role: 'assistant', 
+          content: response.content, 
+          source: 'moola-matic',
+          status: response.status
+        }
       ]);
+
+      console.log('Message processed successfully');
     } catch (error) {
       console.error('Error in sendMessage:', error);
+      console.error('Error stack:', error.stack);
       setMessages(prevMessages => [
         ...prevMessages,
-        { role: 'assistant', content: 'Sorry, an error occurred. Please try again.' },
+        { 
+          role: 'assistant', 
+          content: `I apologize, but I encountered an error while processing your request. Please try again or contact support if the issue persists.`,
+          status: 'error'
+        },
       ]);
     } finally {
       setIsLoading(false);

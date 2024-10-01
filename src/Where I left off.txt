@@ -1,0 +1,6 @@
+Text input box needs to be fixed.
+check context contents
+streamline assistant questions
+create variables for each question
+add ability to add another image
+autofill variables from assistant

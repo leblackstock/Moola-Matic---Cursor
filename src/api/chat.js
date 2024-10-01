@@ -8,7 +8,7 @@ const API_URL = process.env.NODE_ENV === 'production'
 /**
  * Function to handle chat with the Moola-Matic Assistant
  * @param {Array} messages - Array of message objects { role: 'user' | 'assistant', content: '...' }
- * @returns {Promise<String>} - Assistant's response content
+ * @returns {Promise<Object>} - Assistant's response content and status
  */
 export const handleChatWithAssistant = async (messages) => {
   try {
@@ -24,19 +24,27 @@ export const handleChatWithAssistant = async (messages) => {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to get response from assistant');
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
 
     const data = await response.json();
+    console.log('Received response from server:', data);
 
-    if (data.status === 'completed') {
-      return data.content;
-    } else {
-      throw new Error('Chat response failed or is incomplete');
+    // Check if the response is a string (likely the assistant's message)
+    if (typeof data === 'string') {
+      return { content: data, status: 'completed' };
     }
+
+    // If it's an object, process it as before
+    const content = data.content || data.message || 'No content received from the server';
+    const status = data.status || 'completed';
+
+    console.log(`Processed response - Status: ${status}, Content: ${content}`);
+
+    return { content, status };
   } catch (error) {
     console.error('Error in handleChatWithAssistant:', error);
-    throw error;
+    return { content: error.message, status: 'error' };
   }
 };
 
