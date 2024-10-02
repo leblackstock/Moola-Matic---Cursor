@@ -3,6 +3,7 @@
 import axios from 'axios';
 import { processTextChat } from './chatService.js'; // Import the text chat processing function
 import { processImageChat, processImageQuestion } from './chatService.js'; // Import image-related functions
+import { createUserMessage, createAssistantMessage } from './chatAssistant.js';
 
 /**
  * Configuration for API URLs
@@ -26,19 +27,21 @@ export const handleUserMessage = async (userMessage, session) => {
       session.messages = [];
     }
 
-    // Add user message to session
-    session.messages.push({ role: 'user', content: userMessage });
+    // Add user message to session using helper
+    const userMsg = createUserMessage(userMessage);
+    session.messages.push(userMsg);
 
     // Manage context: summarize if necessary
     const managedMessages = await processTextChat(session.messages);
 
     // Get assistant response
-    const assistantResponse = await processTextChat(managedMessages);
+    const assistantResponseContent = await interactWithMoolaMaticAssistant(managedMessages, session);
 
-    // Add assistant response to session
-    session.messages.push({ role: 'assistant', content: assistantResponse });
+    // Create assistant message using helper
+    const assistantMsg = createAssistantMessage(assistantResponseContent);
+    session.messages.push(assistantMsg);
 
-    return assistantResponse;
+    return assistantResponseContent;
   } catch (error) {
     console.error('Error in handleUserMessage:', error);
     throw new Error('Failed to handle user message. Please try again later.');

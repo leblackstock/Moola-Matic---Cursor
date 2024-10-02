@@ -15,15 +15,12 @@ import chatImagesRouter from './chat/chatImages.js';
 // Import the assistant module functions
 import { handleMoolaMaticChat, manageContext } from './chat/chatService.js';
 
-
 // Resolve __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Load environment variables from .env file
 dotenv.config({ path: path.resolve(__dirname, '.env') });
-
-
 
 // Define ports for backend and frontend
 const BACKEND_PORT = process.env.BACKEND_PORT || 3001;
@@ -60,6 +57,7 @@ app.use(
       secure: process.env.NODE_ENV === 'production', // Set to true in production with HTTPS
       httpOnly: true, // Prevents client-side JavaScript from accessing the cookie
       maxAge: 24 * 60 * 60 * 1000, // 1 day
+      sameSite: 'lax', // Helps protect against CSRF attacks
     },
   })
 );
@@ -99,34 +97,26 @@ app.get('/', (req, res) => {
  */
 app.post('/api/chat', async (req, res) => {
   const { messages } = req.body;
-
-  if (!Array.isArray(messages)) {
-    console.error('Invalid messages format received:', messages);
-    return res.status(400).json({ error: 'Invalid messages format. Expected an array.' });
-  }
+  const contextData = req.session; // or whatever relevant data you want to pass
 
   try {
-    console.log('Received text-only chat request with messages:', messages);
-
-    // Manage and possibly summarize the context before processing
+    // Manage context if necessary
     const managedMessages = await manageContext(messages);
 
-    // Handle chat with the assistant exclusively using the predefined Assistant ID
-    const assistantResponse = await handleMoolaMaticChat(managedMessages, assistantId);
+    // Interact with the assistant, passing the managed messages and context data
+    const assistantResponse = await handleMoolaMaticChat(managedMessages, contextData);
 
-    // Update context in session
-    const updatedMessages = [...managedMessages, { role: 'assistant', content: assistantResponse }];
-
-    req.session.context = updatedMessages;
-
-    res.json({ content: assistantResponse, context: updatedMessages });
+    // Just send the response content
+    return res.json({ content: assistantResponse });
   } catch (error) {
-    console.error('Error in /api/chat:', error);
-    res.status(500).json({ error: 'An error occurred while processing your message.' });
+    console.error('Error in /chat:', error);
+    return res.status(500).json({
+      error: 'Failed to process chat with Moola-Matic. Please try again later.',
+    });
   }
 });
 
-// Add this line to use the chatImages router
+// Use the chatImages router
 app.use('/api', chatImagesRouter);
 
 /**

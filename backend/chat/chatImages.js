@@ -1,7 +1,6 @@
 // backend/chat/chatImages.js
 
 import express from 'express';
-import bodyParser from 'body-parser';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -9,8 +8,13 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid'; // For generating unique identifiers
 import multer from 'multer';
-import session from 'express-session';
-import { interactWithMoolaMaticAssistant, waitForRunCompletion, getAssistantResponse } from './chatAssistant.js';
+import { 
+  interactWithMoolaMaticAssistant, 
+  waitForRunCompletion, 
+  getAssistantResponse, 
+  createUserMessage, 
+  createAssistantMessage 
+} from './chatAssistant.js';
 
 // Resolve __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -45,18 +49,10 @@ const openai = new OpenAI({
 // Initialize Express Router
 const router = express.Router();
 
-// Configure session middleware
-router.use(session({
-  secret: SESSION_SECRET,
-  resave: false,
-  saveUninitialized: true,
-  cookie: { secure: false }, // Set to true if using HTTPS
-}));
-
 // Parse JSON bodies
-router.use(bodyParser.json({ limit: '10mb' })); // Increased limit for large images
+router.use(express.json({ limit: '10mb' })); // Increased limit for large images
 
-// Setup multer for handling file uploads
+// Setup multer for handling file uploads using memoryStorage
 const storage = multer.memoryStorage();
 const upload = multer({
   storage: storage,
@@ -75,12 +71,27 @@ if (!fs.existsSync(DRAFT_IMAGES_DIR)) {
 }
 
 /**
+ * Function to delete a file
+ * @param {string} filePath - Path to the file to be deleted
+ */
+const deleteFile = (filePath) => {
+  fs.unlink(filePath, (err) => {
+    if (err) {
+      console.error(`Failed to delete file ${filePath}:`, err);
+    } else {
+      console.log(`File ${filePath} deleted successfully.`);
+    }
+  });
+};
+
+/**
  * Analyzes an image and retrieves financial advice based on the analysis.
  * @param {string} imageBase64 - The base64 encoded image string.
  * @param {Array} originalMessages - The original array of chat messages.
+ * @param {Object} session - The Express session object.
  * @returns {Promise<string>} - The final response from the Moola-Matic assistant.
  */
-async function analyzeImage(imageBase64, originalMessages) {
+async function analyzeImage(imageBase64, message, contextData, session) {
   try {
     // Step 1: Analyze the image using OpenAI's GPT-4-Turbo model
     const openAIResponse = await openai.chat.completions.create({
@@ -97,7 +108,7 @@ async function analyzeImage(imageBase64, originalMessages) {
             },
             {
               type: "text",
-              text: "What is this?\n",
+              text: message || "What is this?",
             },
           ],
         },
@@ -115,29 +126,15 @@ async function analyzeImage(imageBase64, originalMessages) {
     // Extract the image analysis result
     const imageAnalysis = openAIResponse.choices[0].message.content.trim();
     
-    // Add logging for the image analysis result
     console.log('Image analysis result:', imageAnalysis);
 
-    // Step 2: Create a new array of messages including the analysis
-    const updatedMessages = [
-      ...originalMessages,
-      {
-        role: "user",
-        content: "Image Analysis: " + imageAnalysis,
-      },
-      {
-        role: "user",
-        content: "Based on the above image analysis, can you provide financial advice?",
-      },
-    ];
+    // Step 2: Interact with Moola-Matic Assistant
+    const assistantResponse = await interactWithMoolaMaticAssistant(
+      `Image Analysis: ${imageAnalysis}\nBased on the above image analysis, can you provide financial advice?`,
+      contextData
+    );
 
-    // Step 3: Interact with Moola-Matic Assistant
-    const assistantResponse = await interactWithMoolaMaticAssistant(updatedMessages);
-
-    // Step 4: Return only the assistant's response
-    return {
-      assistantResponse: assistantResponse
-    };
+    return assistantResponse;
   } catch (error) {
     console.error("Error during image analysis integration:", error);
     throw error;
@@ -150,7 +147,8 @@ async function analyzeImage(imageBase64, originalMessages) {
  * Expects multipart/form-data with 'image' and 'messages' fields
  */
 router.post('/analyze-image', upload.single('image'), async (req, res) => {
-  const { messages } = req.body;
+  const { message } = req.body;
+  let contextData = req.body.contextData;
   const imageFile = req.file;
 
   // Access session data
@@ -166,16 +164,14 @@ router.post('/analyze-image', upload.single('image'), async (req, res) => {
     return res.status(400).json({ error: 'No image file uploaded.' });
   }
 
-  // Error handling for invalid messages
-  let parsedMessages;
-  try {
-    parsedMessages = JSON.parse(messages);
-    if (!Array.isArray(parsedMessages)) {
-      throw new Error('Messages should be an array.');
+  // Parse contextData if it's a string
+  if (typeof contextData === 'string') {
+    try {
+      contextData = JSON.parse(contextData);
+    } catch (err) {
+      console.error('Invalid contextData format received:', err);
+      return res.status(400).json({ error: 'Invalid contextData format. Expected a valid JSON string.' });
     }
-  } catch (err) {
-    console.error('Invalid messages format received. Expected a JSON array.', err);
-    return res.status(400).json({ error: 'Invalid messages format. Expected a JSON array.' });
   }
 
   try {
@@ -207,22 +203,17 @@ router.post('/analyze-image', upload.single('image'), async (req, res) => {
     const base64Image = imageFile.buffer.toString('base64');
 
     // Call the analyzeImage function to process the image and get financial advice
-    const result = await analyzeImage(base64Image, parsedMessages);
+    const assistantResponse = await analyzeImage(base64Image, message, contextData, session);
 
-    // Save the updated context to the session
-    //req.session.messages = result.context;
-
-    // Only send the assistant's response to the frontend
-    res.json({ 
-      advice: result.assistantResponse,
-      status: 'completed'
+    // Send the assistant's response and updated contextData to the frontend
+    res.json({
+      advice: assistantResponse,
+      status: 'completed',
+      contextData: contextData,
     });
   } catch (error) {
-    console.error('Error processing image analysis:', error);
-    res.status(500).json({ 
-      error: 'Image analysis failed.',
-      status: 'error'
-    });
+    console.error('Error processing image upload:', error);
+    res.status(500).json({ error: 'Internal Server Error: Failed to process image upload.' });
   }
 });
 

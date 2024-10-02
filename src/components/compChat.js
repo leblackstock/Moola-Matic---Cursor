@@ -1,7 +1,7 @@
-// frontend/src/components/compChat.js
+// frontend/src/components/CompChat.js
 
 import React, { useState, useEffect, useRef } from 'react';
-import { handleChatWithAssistant, analyzeImageWithGPT4Turbo, askQuestionAboutImage } from '../api/chat';
+import { handleChatWithAssistant, analyzeImageWithGPT4Turbo } from '../api/chat';
 import styled from 'styled-components';
 
 // Styled components for the chat UI
@@ -9,6 +9,9 @@ const ChatContainer = styled.div`
   max-width: 800px;
   margin: 0 auto;
   padding: 20px;
+  background-color: #1a001a;
+  color: #F5DEB3;
+  border-radius: 10px;
 `;
 
 const MessagesContainer = styled.div`
@@ -17,7 +20,7 @@ const MessagesContainer = styled.div`
   border: 1px solid #4A0E4E;
   border-radius: 10px;
   padding: 10px;
-  background-color: #1a001a;
+  background-color: #330033;
 `;
 
 const Message = styled.div`
@@ -93,7 +96,8 @@ const ImagePreview = styled.img`
 
 function CompChat() {
   const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
+  const [message, setMessage] = useState('');
+  const [contextData, setContextData] = useState(null);
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -108,52 +112,27 @@ function CompChat() {
 
   // Function to send a message
   const sendMessage = async () => {
-    if (!input.trim() && !imageFile) return;
+    const input = message.trim();
+    if (!input && !imageFile) return;
 
-    const newMessage = {
-      role: 'user',
-      content: input.trim() || 'Image uploaded',
-    };
-
-    setMessages(prevMessages => [...prevMessages, newMessage]);
-    setInput('');
+    setMessage('');
     setIsLoading(true);
 
     try {
-      let responseContent;
-
-      if (imageFile) {
-        console.log('Sending image for analysis...');
-        responseContent = await analyzeImageWithGPT4Turbo(imageFile, [...messages, newMessage]);
-        console.log('Received image analysis response:', responseContent);
-      } else {
-        responseContent = await handleChatWithAssistant([...messages, newMessage]);
-      }
-
-      console.log('Response content before adding to messages:', responseContent);
-
-      const assistantMessage = {
-        role: 'assistant',
-        content: responseContent,
-      };
-
-      setMessages(prevMessages => {
-        console.log('Adding new message to chat:', assistantMessage);
-        return [...prevMessages, assistantMessage];
-      });
-
-      console.log('Messages state after update:', messages);
-    } catch (error) {
-      console.error('Error in sendMessage:', error);
+      const response = await handleChatWithAssistant([...messages, { role: 'user', content: input }]);
+      
       setMessages(prevMessages => [
         ...prevMessages,
-        { role: 'assistant', content: 'Sorry, an error occurred. Please try again.' },
+        { role: 'user', content: input },
+        { role: 'assistant', content: response.content }
       ]);
-    } finally {
-      setIsLoading(false);
-      setImageFile(null);
-      setImagePreview(null);
+    } catch (error) {
+      console.error('Error interacting with Moola-Matic assistant:', error);
+      // Handle error (e.g., show an error message to the user)
     }
+
+    // Update contextData
+    setContextData(response.contextData);
   };
 
   // Handle image upload
@@ -186,8 +165,8 @@ function CompChat() {
         </ImageButton>
         <StyledInput
           type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
           placeholder="Type your message..."
           onKeyPress={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {

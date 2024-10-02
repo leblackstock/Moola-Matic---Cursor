@@ -1,7 +1,5 @@
 // backend/chat/chatAssistant.js
 
-import express from 'express';
-import bodyParser from 'body-parser';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -32,31 +30,53 @@ const client = new OpenAI({
   apiKey: OPENAI_API_KEY,
 });
 
-// Initialize Express Router
-const router = express.Router();
-
-// Parse JSON bodies
-router.use(bodyParser.json());
+/**
+ * Creates a user message object.
+ * @param {string} content - The content of the message.
+ * @returns {Object} - Message object with role 'user'.
+ */
+const createUserMessage = (content) => ({
+  role: 'user',
+  content,
+});
 
 /**
- * Function to create a new thread
- * @param {Array} messages - Array of message objects
- * @returns {Promise<String>} - Thread ID
+ * Creates an assistant message object.
+ * @param {string} content - The content of the message.
+ * @returns {Object} - Message object with role 'assistant'.
+ */
+const createAssistantMessage = (content) => ({
+  role: 'assistant',
+  content,
+});
+
+/**
+ * Validates all messages to ensure they contain 'role' and 'content'.
+ * @param {Array} messages - Array of message objects.
+ * @throws Will throw an error if any message is missing 'role' or 'content'.
+ */
+const validateMessages = (messages) => {
+  messages.forEach((msg, index) => {
+    if (!msg.role || !msg.content) {
+      throw new Error(`Message at index ${index} is missing 'role' or 'content'.`);
+    }
+  });
+};
+
+/**
+ * Creates a new thread with validated messages.
+ * @param {Array} messages - Array of message objects.
+ * @returns {Promise<String>} - Thread ID.
  */
 const createThread = async (messages) => {
   try {
-    console.log('Creating thread with messages:', JSON.stringify(messages, null, 2));
-    let thread;
-    if (messages && messages.length > 0) {
-      // Remove the 'source' field from each message
-      const cleanedMessages = messages.map(({ role, content }) => ({ role, content }));
-      thread = await client.beta.threads.create({
-        messages: cleanedMessages,
-      });
-    } else {
-      thread = await client.beta.threads.create();
-    }
-    console.log('Created thread:', thread);
+    const formattedMessages = messages.map(msg => ({
+      role: msg.role,
+      content: msg.content
+    }));
+
+    const thread = await client.beta.threads.create({ messages: formattedMessages });
+    console.log('Thread created:', thread);
     return thread.id;
   } catch (error) {
     console.error('Error creating thread:', error);
@@ -65,18 +85,18 @@ const createThread = async (messages) => {
 };
 
 /**
- * Function to add a message to a thread
- * @param {String} threadId - ID of the thread
- * @param {String} role - 'user' or 'assistant'
- * @param {String} content - Message content
+ * Adds a message to a thread with validation.
+ * @param {String} threadId - ID of the thread.
+ * @param {String} role - 'user' or 'assistant'.
+ * @param {String} content - Message content.
  */
 const addMessageToThread = async (threadId, role, content) => {
   try {
-    await client.beta.threads.messages.create({
-      thread_id: threadId,
-      role: role === 'user' ? 'user' : 'assistant', // Ensure role is either 'user' or 'assistant'
-      content: content,
+    await client.beta.threads.messages.create(threadId, {
+      role: role,
+      content: content
     });
+    console.log(`Message added to thread ${threadId}: { role: '${role}', content: '${content.substring(0, 50)}...' }`);
   } catch (error) {
     console.error('Error adding message to thread:', error);
     throw error;
@@ -91,10 +111,10 @@ const addMessageToThread = async (threadId, role, content) => {
  */
 const createRun = async (threadId, assistantId) => {
   try {
-    const run = await client.beta.threads.runs.create(
-      threadId,
-      { assistant_id: assistantId }
-    );
+    const run = await client.beta.threads.runs.create(threadId, {
+      assistant_id: assistantId
+    });
+    console.log('Run created:', run);
     return run.id;
   } catch (error) {
     console.error('Error creating run:', error);
@@ -138,122 +158,28 @@ const waitForRunCompletion = async (threadId, runId, timeout = 60000) => { // 60
 /**
  * Function to get assistant response from a thread
  * @param {String} threadId - ID of the thread
+ * @param {String} runId - ID of the run
  * @returns {Promise<String>} - Assistant response content
  */
-const getAssistantResponse = async (threadId) => {
+const getAssistantResponse = async (threadId, runId) => {
   try {
+    console.log(`Retrieving assistant response for thread ${threadId} and run ${runId}`);
     const messages = await client.beta.threads.messages.list(threadId);
+    const lastMessage = messages.data
+      .filter(message => message.run_id === runId && message.role === 'assistant')
+      .pop();
 
-    // Find the latest assistant message
-    const assistantMessage = messages.data.reverse().find(
-      (message) => message.role === 'assistant'
-    );
-
-    if (assistantMessage && assistantMessage.content) {
-      return assistantMessage.content[0].text.value.trim();
-    } else {
-      throw new Error('No assistant response found.');
-    }
-  } catch (error) {
-    console.error('Error retrieving assistant response:', error);
-    throw error;
-  }
-};
-
-/**
- * Function to update assistant with tools
- * @param {String} assistantId - ID of the assistant
- * @param {Array} tools - Array of tools
- * @returns {Promise<Object>} - Updated assistant object
- */
-const updateAssistantWithTools = async (assistantId, tools) => {
-  try {
-    const updatedAssistant = await client.beta.assistants.update(assistantId, {
-      tools: tools, // Array of tools
-    });
-    return updatedAssistant;
-  } catch (error) {
-    console.error('Error updating assistant with tools:', error);
-    throw error;
-  }
-};
-
-/**
- * Function to handle required actions
- * @param {String} threadId - ID of the thread
- * @param {String} runId - ID of the run
- * @param {Object} requiredAction - Required action object
- */
-const handleRequiredAction = async (threadId, runId, requiredAction) => {
-  try {
-    if (requiredAction && requiredAction.submit_tool_outputs) {
-      const toolCalls = requiredAction.submit_tool_outputs.tool_calls;
-
-      const toolOutputs = [];
-
-      for (const toolCall of toolCalls) {
-        if (toolCall.type === 'function') {
-          const functionName = toolCall.function.name;
-          const args = JSON.parse(toolCall.function.arguments);
-
-          let output;
-          // Call your custom function based on functionName
-          if (functionName === 'display_quiz') {
-            output = displayQuiz(args.title, args.questions);
-          }
-          // Add more function handlers as needed
-
-          toolOutputs.push({
-            tool_call_id: toolCall.id,
-            output: JSON.stringify(output),
-          });
-        }
-        // Handle other tool types if necessary
-      }
-
-      // Submit tool outputs back to the run
-      await client.beta.threads.runs.submit_tool_outputs({
-        thread_id: threadId,
-        run_id: runId,
-        tool_outputs: toolOutputs,
-      });
-    }
-  } catch (error) {
-    console.error('Error handling required action:', error);
-    throw error;
-  }
-};
-
-/**
- * Mock function to display a quiz (replace with actual implementation)
- * @param {String} title - Title of the quiz
- * @param {Array} questions - Array of question objects
- * @returns {Array} - User responses
- */
-const displayQuiz = (title, questions) => {
-  console.log(`Quiz: ${title}\n`);
-  const responses = [];
-
-  for (const question of questions) {
-    console.log(question.question_text);
-    let response = '';
-
-    if (question.question_type === 'MULTIPLE_CHOICE') {
-      question.choices.forEach((choice, index) => {
-        console.log(`${index}. ${choice}`);
-      });
-      // Mock user response (replace with actual user input)
-      response = '0'; // Example choice
-    } else if (question.question_type === 'FREE_RESPONSE') {
-      // Mock user response (replace with actual user input)
-      response = "I don't know.";
+    if (!lastMessage) {
+      console.log(`No assistant message found for run ${runId}`);
+      return null;
     }
 
-    responses.push(response);
-    console.log('');
+    console.log('Assistant response retrieved:', lastMessage.content[0].text.value);
+    return lastMessage.content[0].text.value;
+  } catch (error) {
+    console.error('Error in getAssistantResponse:', error);
+    throw error;
   }
-
-  return responses;
 };
 
 /**
@@ -272,80 +198,86 @@ const retrieveMoolaMaticAssistant = async () => {
 };
 
 /**
- * Function to interact with the Moola-Matic Assistant API
- * @param {Array} messages - Array of message objects { role: 'user' | 'assistant', content: '...' }
- * @returns {Promise<String>} - Moola-Matic's response content
+ * Helper function to format context data for the thread
+ * @param {Object} contextData - The context data to be formatted
+ * @returns {Object|null} - Formatted message object for the thread or null if no valid data
  */
-const interactWithMoolaMaticAssistant = async (messages) => {
+const formatContextData = (contextData) => {
+  if (!contextData) return null;
+
+  // Extract relevant information from contextData
+  const relevantData = {
+    lastInteraction: contextData.lastInteraction,
+    userPreferences: contextData.userPreferences,
+    // Add other relevant properties here
+  };
+
+  // Filter out undefined or null values
+  const filteredData = Object.fromEntries(
+    Object.entries(relevantData).filter(([_, v]) => v != null)
+  );
+
+  // Only return a message if there's actual content
+  if (Object.keys(filteredData).length > 0) {
+    return {
+      role: 'assistant', // Changed from 'system' to 'assistant'
+      content: JSON.stringify(filteredData)
+    };
+  }
+
+  return null; // Return null if there's no valid data to send
+};
+
+/**
+ * Interacts with the Moola-Matic Assistant API.
+ * @param {Array} messages - Array of message objects { role: 'user' | 'assistant', content: '...' }
+ * @param {Object} session - Express session object
+ * @returns {Promise<string>} - Moola-Matic's response content
+ */
+const interactWithMoolaMaticAssistant = async (messages, contextData) => {
   try {
     // Retrieve the Moola-Matic assistant first
     const assistant = await retrieveMoolaMaticAssistant();
 
-    // Create a new thread with messages
-    const threadId = await createThread(messages);
-    console.log('Creating thread with messages:', JSON.stringify(messages, null, 2));
+    // Ensure messages is an array and only contains user messages
+    const userMessages = Array.isArray(messages) 
+      ? messages.filter(msg => msg.role === 'user').map(({ content }) => ({ role: 'user', content }))
+      : [{ role: 'user', content: messages }];
 
-    // Step 2: Create a run using the retrieved assistant
+    const threadId = await createThread(userMessages);
+
+    // Add context data as a system message
+    const formattedContextData = formatContextData(contextData);
+    if (formattedContextData) {
+      await addMessageToThread(threadId, formattedContextData.role, formattedContextData.content);
+    }
+
+    // Create a run using the retrieved assistant
     const runId = await createRun(threadId, assistant.id);
-    console.log('Created run with ID:', runId);
+    await waitForRunCompletion(threadId, runId);
 
-    // Wait for the run to complete
-    const completedRun = await waitForRunCompletion(threadId, runId);
-    console.log('Run completed:');
+    // Pass both threadId and runId to getAssistantResponse
+    const assistantResponse = await getAssistantResponse(threadId, runId);
 
-    // Step 4: Retrieve assistant response
-    const assistantResponse = await getAssistantResponse(threadId);
-    console.log('Assistant response:', assistantResponse);
+    // Update contextData directly here
+    if (contextData) {
+      contextData.lastInteraction = new Date().toISOString();
+      // Add any other context updates here
+    }
 
-    return assistantResponse;
+    return assistantResponse; // Just return the response content
   } catch (error) {
     console.error('Error interacting with Moola-Matic assistant:', error);
     throw new Error('Failed to interact with Moola-Matic Assistant.');
   }
 };
 
-/**
- * Route to handle text-only chat interactions
- * POST /api/chat
- * Body: { messages: Array }
- */
-router.post('/chat', async (req, res) => {
-  const { messages } = req.body;
-
-  // Error handling for invalid message format
-  if (!messages || !Array.isArray(messages)) {
-    console.error('Invalid messages format received.');
-    return res.status(400).json({
-      error: 'Invalid messages format. Expected an array of messages.',
-    });
-  }
-
-  try {
-    // Interact with the assistant
-    const assistantResponse = await interactWithMoolaMaticAssistant(messages);
-
-    // Optionally, save conversation history here
-
-    return res.json({ content: assistantResponse });
-  } catch (error) {
-    console.error('Error in /chat:', error);
-    return res.status(500).json({
-      error: 'Failed to process chat with Moola-Matic. Please try again later.',
-    });
-  }
-});
-
-/**
- * Route to handle image-based chat interactions
- * POST /api/analyze-image
- * This route is intentionally disabled to prevent any image data from being processed or sent.
- */
-router.post('/analyze-image', (req, res) => {
-  console.error('Attempted to send image data to /api/analyze-image. This operation is not allowed.');
-  return res.status(400).json({ error: 'Image processing is not allowed. Only text-based interactions are supported.' });
-});
-
-export default router;
-
-// Export the necessary functions
-export { interactWithMoolaMaticAssistant, waitForRunCompletion, getAssistantResponse };
+// Consolidated export at the bottom
+export { 
+  interactWithMoolaMaticAssistant, 
+  createUserMessage, 
+  createAssistantMessage, 
+  waitForRunCompletion, 
+  getAssistantResponse,
+  formatContextData  // Add this line
+};
