@@ -1,13 +1,14 @@
 // frontend/src/NewItemPage.js
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 import treasureSpecs from './Images/Treasure_Specs01.jpeg';
 import { handleChatWithAssistant, analyzeImageWithGPT4Turbo, createUserMessage, createAssistantMessage } from './api/chat.js';
 import styled from 'styled-components';
 import axios from 'axios';
+import { v4 as uuidv4 } from 'uuid';
 
 // Styled components for the UI
 const StyledTextarea = styled.textarea`
@@ -135,31 +136,44 @@ const renderContent = (content) => {
   }
 };
 function NewItemPage() {
-  const { itemId } = useParams();
+  const location = useLocation();
+  const draftItem = location.state?.draft;
 
-  // State for the item details
+  console.log("Received draft item:", draftItem);
+
   const [item, setItem] = useState({
-    id: itemId,
     name: '',
-    description: '',
-    purchasePrice: 0,
-    estimatedValue: 0,
-    category: '',
+    brand: '',
     condition: '',
-    images: [],  // Add this line
-    purchaseDate: new Date().toISOString().split('T')[0],
-    listingDate: new Date().toISOString().split('T')[0],
-    sellerNotes: ''
+    description: '',
+    uniqueFeatures: '',
+    accessories: '',
+    purchasePrice: 0,
+    salesTax: 0,
+    cleaningNeeded: false,
+    cleaningTime: 0,
+    cleaningMaterialsCost: 0,
+    estimatedValue: 0,
+    shippingCost: 0,
+    platformFees: 0,
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [contextData, setContextData] = useState({
-    itemId: itemId,
-    lastImageAnalysis: null,
-    lastAssistantResponse: null,
-    lastUserMessage: null,
-    // ... other context data
+  const [contextData, setContextData] = useState(() => {
+    if (draftItem && draftItem.contextData) {
+      console.log("Loading contextData from draft:", draftItem.contextData);
+      return draftItem.contextData;
+    } else {
+      const savedContextData = localStorage.getItem(`contextData_${item.id}`);
+      console.log("Loading contextData from localStorage:", savedContextData);
+      return savedContextData ? JSON.parse(savedContextData) : {
+        itemId: item.id,
+        lastImageAnalysis: null,
+        lastAssistantResponse: null,
+        lastUserMessage: null,
+      };
+    }
   });
 
   // Update item state
@@ -171,11 +185,15 @@ function NewItemPage() {
   };
 
   const updateContextData = (newData) => {
-    setContextData(prevData => ({
-      ...prevData,
-      ...newData,
-      itemId: itemId // Ensure itemId is always present
-    }));
+    setContextData(prevData => {
+      const updatedData = {
+        ...prevData,
+        ...newData,
+        itemId: item.id
+      };
+      localStorage.setItem(`contextData_${item.id}`, JSON.stringify(updatedData));
+      return updatedData;
+    });
   };
 
   // Handle form submission
@@ -194,7 +212,19 @@ function NewItemPage() {
   };
 
   // State for chat messages and AI interaction
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState(() => {
+    if (draftItem && draftItem.messages) {
+      console.log("Loading messages from draft:", draftItem.messages);
+      return draftItem.messages;
+    } else {
+      const savedMessages = localStorage.getItem(`messages_${draftItem?.id || 'new'}`);
+      console.log("Loading messages from localStorage:", savedMessages);
+      return savedMessages ? JSON.parse(savedMessages) : [];
+    }
+  });
+
+  console.log("Initial messages state:", messages);
+
   const [message, setMessage] = useState('');
   const [imageFile, setImageFile] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -245,7 +275,7 @@ function NewItemPage() {
       if (imageFile) {
         // Handle image-based messages
         const messageToSend = imageAnalyzed ? imageSpecificInput : imageAnalysisPrompt;
-        const result = await analyzeImageWithGPT4Turbo(imageFile, messageToSend, itemId);
+        const result = await analyzeImageWithGPT4Turbo(imageFile, messageToSend, item.id);
         response = { content: result.assistantResponse, status: 'completed', contextData: result.contextData };
         
         if (!imageAnalyzed) {
@@ -253,17 +283,21 @@ function NewItemPage() {
         }
       } else {
         // Handle text-only messages
-        response = await handleChatWithAssistant([...messages, { role: 'user', content: generalInput }], itemId);
+        response = await handleChatWithAssistant([...messages, { role: 'user', content: generalInput }], item.id);
       }
 
       console.log('Assistant response:', response);
 
       // Update the UI with the new message and response
-      setMessages(prevMessages => [
-        ...prevMessages,
-        { role: 'user', content: imageFile ? imageSpecificInput : generalInput },
-        { role: 'assistant', content: response.content, source: 'moola-matic', status: response.status }
-      ]);
+      setMessages(prevMessages => {
+        const newMessages = [
+          ...prevMessages,
+          { role: 'user', content: imageFile ? imageSpecificInput : generalInput },
+          { role: 'assistant', content: response.content, source: 'moola-matic', status: response.status }
+        ];
+        localStorage.setItem(`messages_${item.id}`, JSON.stringify(newMessages));
+        return newMessages;
+      });
 
       // Update contextData
       updateContextData({
@@ -324,10 +358,14 @@ function NewItemPage() {
       setImagePreview(imagePreviewUrl);
 
       // Add the image to the item.images array
-      setItem(prevItem => ({
-        ...prevItem,
-        images: [...prevItem.images, image]
-      }));
+      setItem(prevItem => {
+        const newItem = {
+          ...prevItem,
+          images: [...prevItem.images, image]
+        };
+        localStorage.setItem(`item_${item.id}`, JSON.stringify(newItem));
+        return newItem;
+      });
 
       // Immediately analyze the image
       setIsLoading(true);
@@ -379,8 +417,12 @@ function NewItemPage() {
   };
 
   const analyzeImageWithGPT4Turbo = async (file, message, isInitialAnalysis = true) => {
+    // Convert the file to base64
+    const base64Image = await fileToBase64(file);
+
     const formData = new FormData();
     formData.append('image', file);
+    formData.append('base64Image', base64Image);  // Add base64 image
     formData.append('message', isInitialAnalysis ? imageAnalysisPrompt : message);
     formData.append('isInitialAnalysis', isInitialAnalysis);
     formData.append('itemId', item.id);
@@ -402,6 +444,16 @@ function NewItemPage() {
       console.error('Error analyzing image:', error);
       throw error;
     }
+  };
+
+  // Helper function to convert File to base64
+  const fileToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = error => reject(error);
+    });
   };
 
   const sendImageMessage = async () => {
@@ -474,6 +526,13 @@ function NewItemPage() {
       console.log('Draft saved successfully:', savedDraft);
       setShowNotification(true);
       setTimeout(() => setShowNotification(false), 3000);
+
+      if (response.status === 200) {
+        // Clear localStorage after successful save
+        localStorage.removeItem(`item_${item.id}`);
+        localStorage.removeItem(`contextData_${item.id}`);
+        localStorage.removeItem(`messages_${item.id}`);
+      }
     } catch (error) {
       console.error('Error saving draft:', error);
       // Optionally, you can show an error message to the user here
@@ -489,6 +548,147 @@ function NewItemPage() {
       100% { opacity: 0; }
     }
   `;
+
+  useEffect(() => {
+    if (!draftItem) {
+      localStorage.setItem(`item_${item.id}`, JSON.stringify(item));
+    }
+  }, [item, draftItem]);
+
+  useEffect(() => {
+    if (!draftItem) {
+      localStorage.setItem(`contextData_${item.id}`, JSON.stringify(contextData));
+    }
+  }, [contextData, item.id, draftItem]);
+
+  useEffect(() => {
+    if (!draftItem) {
+      localStorage.setItem(`messages_${item.id}`, JSON.stringify(messages));
+    }
+  }, [messages, item.id, draftItem]);
+
+  useEffect(() => {
+    // ... existing code ...
+
+    return () => {
+      localStorage.removeItem(`item_${item.id}`);
+      localStorage.removeItem(`contextData_${item.id}`);
+      localStorage.removeItem(`messages_${item.id}`);
+    };
+  }, [item.id]);
+
+  const [lastAutoSave, setLastAutoSave] = useState(null);
+
+  // Update the saveDraftAutomatically function
+  const saveDraftAutomatically = async () => {
+    try {
+      const formData = new FormData();
+      const itemCopy = { ...item };
+      delete itemCopy.images; // Remove images from the JSON data
+      const draftData = {
+        ...itemCopy,
+        id: item.id,
+        messages: messages,
+        contextData: contextData
+      };
+      console.log("Saving draft data:", draftData);
+      formData.append('draftData', JSON.stringify(draftData));
+
+      console.log('Item before saving:', item);
+      console.log('Images before saving:', item.images);
+      console.log('Messages before saving:', messages);
+      console.log('ContextData before saving:', contextData);
+
+      if (item.images && item.images.length > 0) {
+        item.images.forEach((image, index) => {
+          console.log(`Appending image ${index}:`, image);
+          formData.append('images', image);
+        });
+      } else {
+        console.log('No images to append');
+      }
+
+      const response = await axios.post('/api/save-draft', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      if (response.status !== 200) {
+        throw new Error('Failed to save draft');
+      }
+
+      const savedDraft = response.data.item;
+      console.log('Draft saved successfully:', savedDraft);
+      setLastAutoSave(new Date());
+
+      // Update the local item state with the saved draft data
+      setItem(prevItem => ({
+        ...prevItem,
+        ...savedDraft,
+      }));
+
+      // Set hasUnsavedChanges to false after successful save
+      setHasUnsavedChanges(false);
+
+    } catch (error) {
+      console.error('Error saving draft automatically:', error);
+      if (error.response) {
+        console.error('Error response:', error.response.data);
+      }
+    }
+  };
+
+  useEffect(() => {
+    const autoSaveInterval = setInterval(() => {
+      saveDraftAutomatically();
+    }, 30000); // Auto-save every 30 seconds
+
+    return () => clearInterval(autoSaveInterval);
+  }, [item, messages, contextData]);
+
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  // Update this useEffect to track changes
+  useEffect(() => {
+    setHasUnsavedChanges(true);
+  }, [item, messages, contextData]);
+
+  // Add a separate function for the manual save button
+  const handleManualSave = async () => {
+    await saveDraftAutomatically();
+    // Double-check that hasUnsavedChanges is set to false
+    setHasUnsavedChanges(false);
+  };
+
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (hasUnsavedChanges) {
+        const message = "You have unsaved changes. Are you sure you want to leave?";
+        e.returnValue = message;
+        return message;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [hasUnsavedChanges]);
+
+  // Add this useEffect for debugging
+  useEffect(() => {
+    console.log("Current item state:", item);
+  }, [item]);
+
+  const chatContainerRef = useRef(null);
+
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [messages]);
 
   return (
     <div className="container">
@@ -526,20 +726,19 @@ function NewItemPage() {
       <div className="ai-chat-box mb-5">
         <h3 className="text-center mb-4" style={{color: '#F5DEB3'}}>Moola-Matic Wizard</h3>
         <div className="messages" ref={messagesContainerRef}>
-          {messages.map((msg, index) => (
-            <MessageContainer key={index} $isUser={msg.role === 'user'}>
-              <MessageBubble $isUser={msg.role === 'user'}>
-                {msg.role === 'user' ? (
-                  <>
-                    <p>{msg.content}</p>
-                    {msg.image && <img src={msg.image} alt="Uploaded" style={{maxWidth: '100%', marginTop: '10px'}} />}
-                  </>
-                ) : (
-                  <div>{renderContent(msg.content)}</div>
-                )}
-              </MessageBubble>
-            </MessageContainer>
-          ))}
+          <div ref={chatContainerRef} className="chat-history" style={{maxHeight: '400px', overflowY: 'auto'}}>
+            {messages.length > 0 ? (
+              messages.map((message, index) => (
+                <MessageContainer key={index} $isUser={message.role === 'user'}>
+                  <MessageBubble $isUser={message.role === 'user'}>
+                    {message.role === 'assistant' ? renderContent(message.content) : message.content}
+                  </MessageBubble>
+                </MessageContainer>
+              ))
+            ) : (
+              <p>No chat history available.</p>
+            )}
+          </div>
           {isLoading && <div className="ai-typing">AI is typing...</div>}
         </div>
 
@@ -642,40 +841,20 @@ function NewItemPage() {
 
       {/* Item Details Form */}
       <form onSubmit={handleSubmit}>
-        {/* Item Name */}
+        {/* Basic Item Information */}
         <div className="mb-3">
-          <label htmlFor="name" className="form-label">Item Name</label>
-          <input
-            type="text"
-            className="form-control"
-            id="name"
-            value={item.name}
-            onChange={(e) => updateItem('name', e.target.value)}
-            required
-          />
+          <label htmlFor="itemName" className="form-label">Item Name</label>
+          <input type="text" className="form-control" id="itemName" value={item.name} onChange={(e) => updateItem('name', e.target.value)} required />
         </div>
 
-        {/* Description */}
         <div className="mb-3">
-          <label htmlFor="description" className="form-label">Description</label>
-          <textarea
-            className="form-control"
-            id="description"
-            rows="3"
-            value={item.description}
-            onChange={(e) => updateItem('description', e.target.value)}
-          ></textarea>
+          <label htmlFor="brand" className="form-label">Brand</label>
+          <input type="text" className="form-control" id="brand" value={item.brand} onChange={(e) => updateItem('brand', e.target.value)} />
         </div>
 
-        {/* Condition */}
         <div className="mb-3">
           <label htmlFor="condition" className="form-label">Condition</label>
-          <select
-            className="form-select"
-            id="condition"
-            value={item.condition}
-            onChange={(e) => updateItem('condition', e.target.value)}
-          >
+          <select className="form-select" id="condition" value={item.condition} onChange={(e) => updateItem('condition', e.target.value)} required>
             <option value="">Select condition</option>
             <option value="new">New</option>
             <option value="like-new">Like New</option>
@@ -685,18 +864,89 @@ function NewItemPage() {
           </select>
         </div>
 
+        {/* Detailed Item Information */}
+        <div className="mb-3">
+          <label htmlFor="description" className="form-label">Description</label>
+          <textarea className="form-control" id="description" rows="3" value={item.description} onChange={(e) => updateItem('description', e.target.value)}></textarea>
+        </div>
+
+        <div className="mb-3">
+          <label htmlFor="uniqueFeatures" className="form-label">Unique Features</label>
+          <input type="text" className="form-control" id="uniqueFeatures" value={item.uniqueFeatures} onChange={(e) => updateItem('uniqueFeatures', e.target.value)} />
+        </div>
+
+        <div className="mb-3">
+          <label htmlFor="accessories" className="form-label">Accessories</label>
+          <input type="text" className="form-control" id="accessories" value={item.accessories} onChange={(e) => updateItem('accessories', e.target.value)} />
+        </div>
+
+        {/* Purchase Information */}
+        <div className="mb-3">
+          <label htmlFor="purchasePrice" className="form-label">Purchase Price</label>
+          <input type="number" className="form-control" id="purchasePrice" value={item.purchasePrice} onChange={(e) => updateItem('purchasePrice', parseFloat(e.target.value))} required />
+        </div>
+
+        <div className="mb-3">
+          <label htmlFor="salesTax" className="form-label">Sales Tax</label>
+          <input type="number" className="form-control" id="salesTax" value={item.salesTax} onChange={(e) => updateItem('salesTax', parseFloat(e.target.value))} />
+        </div>
+
+        {/* Repair and Cleaning */}
+        <div className="mb-3">
+          <label htmlFor="cleaningNeeded" className="form-label">Cleaning Needed?</label>
+          <select className="form-select" id="cleaningNeeded" value={item.cleaningNeeded} onChange={(e) => updateItem('cleaningNeeded', e.target.value === 'true')}>
+            <option value="false">No</option>
+            <option value="true">Yes</option>
+          </select>
+        </div>
+
+        {item.cleaningNeeded && (
+          <>
+            <div className="mb-3">
+              <label htmlFor="cleaningTime" className="form-label">Cleaning Time (hours)</label>
+              <input type="number" className="form-control" id="cleaningTime" value={item.cleaningTime} onChange={(e) => updateItem('cleaningTime', parseFloat(e.target.value))} />
+            </div>
+            <div className="mb-3">
+              <label htmlFor="cleaningMaterialsCost" className="form-label">Cleaning Materials Cost</label>
+              <input type="number" className="form-control" id="cleaningMaterialsCost" value={item.cleaningMaterialsCost} onChange={(e) => updateItem('cleaningMaterialsCost', parseFloat(e.target.value))} />
+            </div>
+          </>
+        )}
+
+        {/* Resale Information */}
+        <div className="mb-3">
+          <label htmlFor="estimatedValue" className="form-label">Estimated Resale Value</label>
+          <input type="number" className="form-control" id="estimatedValue" value={item.estimatedValue} onChange={(e) => updateItem('estimatedValue', parseFloat(e.target.value))} required />
+        </div>
+
+        <div className="mb-3">
+          <label htmlFor="shippingCost" className="form-label">Estimated Shipping Cost</label>
+          <input type="number" className="form-control" id="shippingCost" value={item.shippingCost} onChange={(e) => updateItem('shippingCost', parseFloat(e.target.value))} />
+        </div>
+
+        <div className="mb-3">
+          <label htmlFor="platformFees" className="form-label">Platform Fees</label>
+          <input type="number" className="form-control" id="platformFees" value={item.platformFees} onChange={(e) => updateItem('platformFees', parseFloat(e.target.value))} />
+        </div>
+
         {/* Submit Button */}
-        <button type="submit" className="btn btn-primary mb-4" disabled={isSubmitting}>
-          {isSubmitting ? 'Submitting...' : 'Add Item'}
-        </button>
+        <button type="submit" className="btn btn-primary">Evaluate Item</button>
       </form>
 
-      <button onClick={saveAsDraft} className="btn btn-secondary mb-4">
-        Save as Draft
+      <button onClick={handleManualSave} className="btn btn-primary mb-4">
+        Save Draft
       </button>
+
+      {lastAutoSave && (
+        <div className="text-muted small">
+          Last auto-save: {lastAutoSave.toLocaleTimeString()}
+        </div>
+      )}
 
       {/* Add the CSS animation */}
       <style>{fadeInOutAnimation}</style>
+
+      {hasUnsavedChanges && <span className="text-warning">Unsaved changes</span>}
     </div>
   );
 }

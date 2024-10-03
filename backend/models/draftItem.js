@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 const draftItemSchema = new mongoose.Schema({
-  itemId: { type: String, required: true, unique: true },
+  itemId: { type: String, unique: true, required: true },
   name: String,
   description: String,
   purchasePrice: Number,
@@ -13,7 +13,8 @@ const draftItemSchema = new mongoose.Schema({
   listingDate: Date,
   sellerNotes: String,
   contextData: Object,
-  isDraft: { type: Boolean, default: true }
+  isDraft: { type: Boolean, default: true },
+  messages: [{ role: String, content: String }]
 }, { timestamps: true });
 
 export const DraftItem = mongoose.model('DraftItem', draftItemSchema);

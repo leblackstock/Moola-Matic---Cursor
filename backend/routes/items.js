@@ -33,8 +33,9 @@ router.post('/save-draft', upload.array('images', 5), async (req, res) => {
         const draftData = JSON.parse(req.body.draftData);
         console.log('Parsed draftData:', draftData);
 
-        const uniqueId = uuidv4();
-        draftData.itemId = draftData.itemId || `draft-${uniqueId}`;
+        // Use the existing itemId if provided, otherwise generate a new one
+        const itemId = draftData.id || `draft-${uuidv4()}`;
+        draftData.itemId = itemId;
 
         if (req.files && req.files.length > 0) {
             console.log('Processing files...');
@@ -52,10 +53,13 @@ router.post('/save-draft', upload.array('images', 5), async (req, res) => {
 
         console.log('Final draftData to be saved:', draftData);
 
+        // Remove _id from draftData if it exists
+        delete draftData._id;
+
         const savedDraft = await DraftItem.findOneAndUpdate(
-            { itemId: draftData.itemId },
-            draftData,
-            { upsert: true, new: true }
+            { itemId: itemId },
+            { $set: draftData },
+            { upsert: true, new: true, setDefaultsOnInsert: true }
         );
 
         console.log('Saved draft:', savedDraft);
@@ -63,7 +67,7 @@ router.post('/save-draft', upload.array('images', 5), async (req, res) => {
         res.status(200).json({ message: 'Draft saved successfully', item: savedDraft });
     } catch (error) {
         console.error('Error saving draft:', error);
-        res.status(500).json({ error: 'Failed to save draft', details: error.message });
+        res.status(500).json({ error: 'Failed to save draft', details: error.message, stack: error.stack });
     }
 });
 

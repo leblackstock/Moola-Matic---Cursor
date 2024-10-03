@@ -68,20 +68,10 @@ function ViewItemsPage() {
         }
     };
 
-    const handleDraftClick = async (draft) => {
-        // Check if there's an unsaved item in the current session
-        const currentItem = JSON.parse(localStorage.getItem('currentItem'));
-        if (currentItem && !currentItem.id) {
-            try {
-                await saveDraft(currentItem);
-            } catch (error) {
-                console.error('Error saving current item as draft:', error);
-                // You might want to show an error message to the user here
-            }
-        }
-
-        // Navigate to the NewItemPage with the draft item
-        navigate(`/new-item/${draft.itemId}`, { state: { draft } });
+    const handleDraftClick = (draft) => {
+        console.log("Clicking draft:", draft);
+        console.log("Draft messages:", draft.messages);
+        navigate('/new-item', { state: { draft } });
     };
 
     const saveDraft = async (item) => {
@@ -145,7 +135,9 @@ function ViewItemsPage() {
                       }}
                     >
                       <div className="draft-item-overlay">
-                        <span>{draft.name || 'Unnamed Item'}</span>
+                        <span>
+                          {draft.name || `Item ${(draft.itemId || draft._id).slice(-4)}`}
+                        </span>
                       </div>
                       <DeleteButton 
                         className="delete-button"

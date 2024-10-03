@@ -169,14 +169,16 @@ router.post('/analyze-image', upload.single('image'), async (req, res) => {
     return res.status(401).json({ error: 'Unauthorized: No active session.' });
   }
 
-  // Error handling for missing image file
-  if (!req.file) {
-    console.error('No image file uploaded.');
-    return res.status(400).json({ error: 'No image file uploaded.' });
+  // Use the base64Image from the request body if available, otherwise use the uploaded file
+  let base64Image;
+  if (req.body.base64Image) {
+    base64Image = req.body.base64Image;
+  } else if (req.file) {
+    base64Image = req.file.buffer.toString('base64');
+  } else {
+    console.error('No image data provided.');
+    return res.status(400).json({ error: 'No image data provided.' });
   }
-
-  // Convert image to base64 for OpenAI API
-  const base64Image = req.file.buffer.toString('base64');
 
   // Call the analyzeImage function to process the image and get financial advice
   try {
