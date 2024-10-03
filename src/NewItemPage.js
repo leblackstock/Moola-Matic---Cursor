@@ -7,6 +7,7 @@ import './App.css';
 import treasureSpecs from './Images/Treasure_Specs01.jpeg';
 import { handleChatWithAssistant, analyzeImageWithGPT4Turbo, createUserMessage, createAssistantMessage } from './api/chat.js';
 import styled from 'styled-components';
+import axios from 'axios';
 
 // Styled components for the UI
 const StyledTextarea = styled.textarea`
@@ -145,7 +146,7 @@ function NewItemPage() {
     estimatedValue: 0,
     category: '',
     condition: '',
-    images: [],
+    images: [],  // Add this line
     purchaseDate: new Date().toISOString().split('T')[0],
     listingDate: new Date().toISOString().split('T')[0],
     sellerNotes: ''
@@ -153,11 +154,27 @@ function NewItemPage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [contextData, setContextData] = useState({
+    itemId: itemId,
+    lastImageAnalysis: null,
+    lastAssistantResponse: null,
+    lastUserMessage: null,
+    // ... other context data
+  });
+
   // Update item state
   const updateItem = (field, value) => {
     setItem(prevItem => ({
       ...prevItem,
       [field]: value
+    }));
+  };
+
+  const updateContextData = (newData) => {
+    setContextData(prevData => ({
+      ...prevData,
+      ...newData,
+      itemId: itemId // Ensure itemId is always present
     }));
   };
 
@@ -179,7 +196,6 @@ function NewItemPage() {
   // State for chat messages and AI interaction
   const [messages, setMessages] = useState([]);
   const [message, setMessage] = useState('');
-  const [contextData, setContextData] = useState(null);
   const [imageFile, setImageFile] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [imagePreview, setImagePreview] = useState('');
@@ -187,6 +203,12 @@ function NewItemPage() {
   // New state variables for image input and analysis
   const [imageInput, setImageInput] = useState('');
   const [imageAnalysis, setImageAnalysis] = useState(null);
+
+  // New state variable to track whether an image has been analyzed
+  const [imageAnalyzed, setImageAnalyzed] = useState(false);
+
+  const [imageAnalysisPrompt, setImageAnalysisPrompt] = useState('');
+  const [isPromptLoaded, setIsPromptLoaded] = useState(false);
 
   // Function to summarize messages to optimize token usage
   const summarizeMessages = async (msgs) => {
@@ -207,23 +229,31 @@ function NewItemPage() {
   };
 
   // Updated sendMessage function
-  const sendMessage = async (isImageQuestion = false) => {
-    const input = message.trim();
-    if (!input && !imageFile) return;
+  const sendMessage = async () => {
+    const generalInput = message.trim();
+    const imageSpecificInput = imageInput.trim();
+    
+    if (!generalInput && !imageSpecificInput && !imageFile) return;
 
     setMessage('');
+    setImageInput('');
     setIsLoading(true);
 
     try {
       let response;
 
-      if (imageFile && (isImageQuestion || !contextData)) {
+      if (imageFile) {
         // Handle image-based messages
-        const result = await analyzeImageWithGPT4Turbo(imageFile, input);
+        const messageToSend = imageAnalyzed ? imageSpecificInput : imageAnalysisPrompt;
+        const result = await analyzeImageWithGPT4Turbo(imageFile, messageToSend, itemId);
         response = { content: result.assistantResponse, status: 'completed', contextData: result.contextData };
+        
+        if (!imageAnalyzed) {
+          setImageAnalyzed(true);
+        }
       } else {
         // Handle text-only messages
-        response = await handleChatWithAssistant([...messages, { role: 'user', content: input }]);
+        response = await handleChatWithAssistant([...messages, { role: 'user', content: generalInput }], itemId);
       }
 
       console.log('Assistant response:', response);
@@ -231,12 +261,16 @@ function NewItemPage() {
       // Update the UI with the new message and response
       setMessages(prevMessages => [
         ...prevMessages,
-        { role: 'user', content: input },
+        { role: 'user', content: imageFile ? imageSpecificInput : generalInput },
         { role: 'assistant', content: response.content, source: 'moola-matic', status: response.status }
       ]);
 
       // Update contextData
-      setContextData(response.contextData);
+      updateContextData({
+        lastAssistantResponse: response.content,
+        lastUserMessage: imageFile ? imageSpecificInput : generalInput,
+        // ... any other context updates
+      });
     } catch (error) {
       console.error('Error interacting with Moola-Matic assistant:', error);
       setMessages(prevMessages => [
@@ -284,27 +318,89 @@ function NewItemPage() {
     if (files && files.length > 0) {
       const image = files[0];
       setImageFile(image);
+      setImageAnalyzed(false);  // Reset the flag when a new image is uploaded
 
       const imagePreviewUrl = URL.createObjectURL(image);
       setImagePreview(imagePreviewUrl);
 
+      // Add the image to the item.images array
+      setItem(prevItem => ({
+        ...prevItem,
+        images: [...prevItem.images, image]
+      }));
+
       // Immediately analyze the image
       setIsLoading(true);
       try {
-        const assistantResponse = await analyzeImageWithGPT4Turbo(image, []);
-        // Add only the assistant's response to the chat context
+        const assistantResponse = await analyzeImageWithGPT4Turbo(image, imageAnalysisPrompt);
+        // Add both the image and the assistant's response to the chat context
         setMessages(prevMessages => [
           ...prevMessages,
+          { role: 'user', content: 'Image uploaded', image: imagePreviewUrl },
           { role: 'assistant', content: assistantResponse }
         ]);
+        setImageAnalyzed(true);
       } catch (error) {
         console.error('Error analyzing image:', error);
         setMessages(prevMessages => [
           ...prevMessages,
+          { role: 'user', content: 'Image upload failed', image: imagePreviewUrl },
           { role: 'assistant', content: 'Sorry, an error occurred while analyzing the image. Please try again.' }
         ]);
       }
       setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const fetchImageAnalysisPrompt = async () => {
+      try {
+        const response = await fetch('/api/image-analysis-prompt');
+        if (!response.ok) {
+          throw new Error('Failed to fetch IMAGE_ANALYSIS_PROMPT');
+        }
+        const data = await response.json();
+        setImageAnalysisPrompt(data.IMAGE_ANALYSIS_PROMPT);
+        setIsPromptLoaded(true);
+      } catch (error) {
+        console.error('Error fetching IMAGE_ANALYSIS_PROMPT:', error);
+        // Optionally, set some error state here
+      }
+    };
+
+    fetchImageAnalysisPrompt();
+  }, []);
+
+  // When you need to use the prompt:
+  const analyzeImage = async (file) => {
+    // ... other code ...
+    const response = await analyzeImageWithGPT4Turbo(file, imageAnalysisPrompt);
+    // ... other code ...
+  };
+
+  const analyzeImageWithGPT4Turbo = async (file, message, isInitialAnalysis = true) => {
+    const formData = new FormData();
+    formData.append('image', file);
+    formData.append('message', isInitialAnalysis ? imageAnalysisPrompt : message);
+    formData.append('isInitialAnalysis', isInitialAnalysis);
+    formData.append('itemId', item.id);
+    formData.append('contextData', JSON.stringify(contextData));
+
+    try {
+      const response = await fetch('/api/analyze-image', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await response.json();
+      // Update your local contextData with the response
+      setContextData(prevContextData => ({
+        ...prevContextData,
+        ...data.contextData
+      }));
+      return data.advice;
+    } catch (error) {
+      console.error('Error analyzing image:', error);
+      throw error;
     }
   };
 
@@ -321,13 +417,12 @@ function NewItemPage() {
     setIsLoading(true);
 
     try {
-      const result = await analyzeImageWithGPT4Turbo(imageFile, imageInput.trim());
+      const assistantResponse = await analyzeImageWithGPT4Turbo(imageFile, imageInput.trim(), false);
       
       setMessages(prevMessages => [
         ...prevMessages,
-        { role: 'assistant', content: result.assistantResponse },
+        { role: 'assistant', content: assistantResponse },
       ]);
-      setContextData(result.contextData);
     } catch (error) {
       console.error('Error in sendImageMessage:', error);
       setMessages(prevMessages => [
@@ -342,8 +437,78 @@ function NewItemPage() {
     }
   };
 
+  // Add this new state variable for the notification
+  const [showNotification, setShowNotification] = useState(false);
+
+  // Update the saveAsDraft function
+  const saveAsDraft = async () => {
+    try {
+      const formData = new FormData();
+      const itemCopy = { ...item };
+      delete itemCopy.images; // Remove images from the JSON data
+      formData.append('draftData', JSON.stringify(itemCopy));
+
+      console.log('Item before saving:', item);
+      console.log('Images before saving:', item.images);
+
+      if (item.images && item.images.length > 0) {
+        item.images.forEach((image, index) => {
+          console.log(`Appending image ${index}:`, image);
+          formData.append('images', image);
+        });
+      } else {
+        console.log('No images to append');
+      }
+
+      const response = await axios.post('/api/save-draft', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      if (response.status !== 200) {
+        throw new Error('Failed to save draft');
+      }
+
+      const savedDraft = response.data.item;
+      console.log('Draft saved successfully:', savedDraft);
+      setShowNotification(true);
+      setTimeout(() => setShowNotification(false), 3000);
+    } catch (error) {
+      console.error('Error saving draft:', error);
+      // Optionally, you can show an error message to the user here
+    }
+  };
+
+  // Add this CSS animation
+  const fadeInOutAnimation = `
+    @keyframes fadeInOut {
+      0% { opacity: 0; }
+      10% { opacity: 1; }
+      90% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+  `;
+
   return (
     <div className="container">
+      {showNotification && (
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          backgroundColor: 'rgba(0, 128, 0, 0.8)',
+          color: 'white',
+          padding: '10px 20px',
+          borderRadius: '5px',
+          zIndex: 1000,
+          animation: 'fadeInOut 3s ease-in-out'
+        }}>
+          Item successfully saved as draft
+        </div>
+      )}
+
       {/* Header and introduction */}
       <div className="row justify-content-center">
         <div className="col-md-8 text-center">
@@ -365,17 +530,12 @@ function NewItemPage() {
             <MessageContainer key={index} $isUser={msg.role === 'user'}>
               <MessageBubble $isUser={msg.role === 'user'}>
                 {msg.role === 'user' ? (
-                  <p>{msg.content}</p>
+                  <>
+                    <p>{msg.content}</p>
+                    {msg.image && <img src={msg.image} alt="Uploaded" style={{maxWidth: '100%', marginTop: '10px'}} />}
+                  </>
                 ) : (
                   <div>{renderContent(msg.content)}</div>
-                )}
-                {msg.image && (
-                  <img 
-                    src={msg.image} 
-                    alt="Uploaded" 
-                    className="uploaded-image" 
-                    style={{maxWidth: '100%', marginTop: '10px'}} 
-                  />
                 )}
               </MessageBubble>
             </MessageContainer>
@@ -408,7 +568,6 @@ function NewItemPage() {
 
         {/* Original Text Input Box */}
         <InputContainer>
-          {/* Replace ImagePreview with TextIcon */}
           <TextIcon className="fas fa-comment"></TextIcon>
           <StyledTextarea
             className="chat-input"
@@ -421,14 +580,14 @@ function NewItemPage() {
             onKeyPress={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                sendMessage(imageFile != null);
+                sendMessage();
               }
             }}
             placeholder="Type your message here..."
             rows="1"
             style={{display: 'flex', alignItems: 'center'}}
           />
-          <IconButton onClick={() => sendMessage(imageFile != null)} disabled={isLoading}>
+          <IconButton onClick={sendMessage} disabled={isLoading}>
             <i className="fas fa-paper-plane"></i>
           </IconButton>
         </InputContainer>
@@ -436,7 +595,11 @@ function NewItemPage() {
 
       {/* Add Images Button */}
       <div className="mb-4 text-center">
-        <button className="btn btn-primary-theme" onClick={handleImageButtonClick}>
+        <button 
+          className="btn btn-primary-theme" 
+          onClick={handleImageButtonClick}
+          disabled={!isPromptLoaded || isLoading}
+        >
           <i className="fas fa-image me-2"></i>Add Images
         </button>
       </div>
@@ -527,6 +690,13 @@ function NewItemPage() {
           {isSubmitting ? 'Submitting...' : 'Add Item'}
         </button>
       </form>
+
+      <button onClick={saveAsDraft} className="btn btn-secondary mb-4">
+        Save as Draft
+      </button>
+
+      {/* Add the CSS animation */}
+      <style>{fadeInOutAnimation}</style>
     </div>
   );
 }

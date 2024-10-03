@@ -11,6 +11,8 @@ import helmet from 'helmet';
 import session from 'express-session';
 import { fileURLToPath } from 'url';
 import chatImagesRouter from './chat/chatImages.js';
+import itemsRouter from './routes/items.js';
+import connectDB from './config/database.js';  // Import the database connection function
 
 // Import the assistant module functions
 import { handleMoolaMaticChat, manageContext } from './chat/chatService.js';
@@ -36,14 +38,23 @@ if (!assistantId) {
 
 // Initialize Express app
 const app = express();
+app.set('trust proxy', 1);
+
+// Connect to MongoDB
+connectDB();
 
 // Middleware setup
 app.use(express.json()); // Parse JSON bodies
 
+// Enable CORS for all routes
+const frontendUrl = `http://localhost:${process.env.FRONTEND_PORT}`;
 app.use(cors({
-  origin: `http://localhost:${FRONTEND_PORT}`, // Adjust as needed for production
-  credentials: true, // Allow credentials (cookies) to be sent
+  origin: frontendUrl,
+  credentials: true,
 }));
+
+// Serve static files from the uploads directory
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 app.use(helmet()); // Secure HTTP headers
 
@@ -83,6 +94,9 @@ const upload = multer({
     }
   },
 });
+
+// Use the items router with the '/api' prefix
+app.use('/api', itemsRouter);
 
 // Test route to check server status
 app.get('/', (req, res) => {

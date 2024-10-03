@@ -86,18 +86,18 @@ export const handleChatWithAssistant = async (messageInput) => {
  * @param {Array} messages - Array of message objects { role: 'user' | 'assistant', content: '...' }
  * @returns {Promise<Object>} - Object containing image analysis and financial advice
  */
-export const analyzeImageWithGPT4Turbo = async (imageFile, message) => {
+export const analyzeImageWithGPT4Turbo = async (imageFile, message, itemId) => {
   try {
     console.log('Analyzing image with GPT-4 Turbo...');
     const formData = new FormData();
     formData.append('image', imageFile);
     formData.append('message', message);
-    formData.append('contextData', JSON.stringify(contextData));
+    formData.append('itemId', itemId);
 
     const response = await fetch(`${API_URL}/analyze-image`, {
       method: 'POST',
       body: formData,
-      credentials: 'include', // Include cookies for session management
+      credentials: 'include',
     });
 
     if (!response.ok) {

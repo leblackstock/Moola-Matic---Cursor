@@ -15,6 +15,7 @@ import {
   createUserMessage, 
   createAssistantMessage 
 } from './chatAssistant.js';
+import { IMAGE_ANALYSIS_PROMPT } from '../routes/constants.js';
 
 // Resolve __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -91,7 +92,7 @@ const deleteFile = (filePath) => {
  * @param {Object} session - The Express session object.
  * @returns {Promise<string>} - The final response from the Moola-Matic assistant.
  */
-async function analyzeImage(imageBase64, message, contextData, session) {
+async function analyzeImage(imageBase64, message, contextData = {}, session, isInitialAnalysis, itemId) {
   try {
     // Step 1: Analyze the image using OpenAI's GPT-4-Turbo model
     const openAIResponse = await openai.chat.completions.create({
@@ -108,7 +109,7 @@ async function analyzeImage(imageBase64, message, contextData, session) {
             },
             {
               type: "text",
-              text: message || "What is this?",
+              text: isInitialAnalysis ? IMAGE_ANALYSIS_PROMPT : message,
             },
           ],
         },
@@ -129,12 +130,23 @@ async function analyzeImage(imageBase64, message, contextData, session) {
     console.log('Image analysis result:', imageAnalysis);
 
     // Step 2: Interact with Moola-Matic Assistant
-    const assistantResponse = await interactWithMoolaMaticAssistant(
-      `Image Analysis: ${imageAnalysis}\nBased on the above image analysis, can you provide financial advice?`,
-      contextData
-    );
+    let assistantPrompt;
+    if (isInitialAnalysis) {
+      assistantPrompt = `Image Analysis: ${imageAnalysis}\nBased on the above image analysis, can you provide financial advice and potential resale value for this item?`;
+    } else {
+      assistantPrompt = `User Question: ${message}\nPlease provide a relevant response.`;
+    }
 
-    return assistantResponse;
+    const assistantResponse = await interactWithMoolaMaticAssistant(assistantPrompt);
+
+    // Update contextData with the latest image analysis and assistant response
+    if (isInitialAnalysis) {
+      contextData.lastImageAnalysis = imageAnalysis;
+    }
+    contextData.lastAssistantResponse = assistantResponse;
+    contextData.lastInteraction = new Date().toISOString();
+
+    return { assistantResponse, contextData };
   } catch (error) {
     console.error("Error during image analysis integration:", error);
     throw error;
@@ -147,9 +159,8 @@ async function analyzeImage(imageBase64, message, contextData, session) {
  * Expects multipart/form-data with 'image' and 'messages' fields
  */
 router.post('/analyze-image', upload.single('image'), async (req, res) => {
-  const { message } = req.body;
-  let contextData = req.body.contextData;
-  const imageFile = req.file;
+  const { message, isInitialAnalysis, itemId } = req.body;
+  let contextData = req.body.contextData ? JSON.parse(req.body.contextData) : {};
 
   // Access session data
   const session = req.session;
@@ -159,57 +170,30 @@ router.post('/analyze-image', upload.single('image'), async (req, res) => {
   }
 
   // Error handling for missing image file
-  if (!imageFile) {
+  if (!req.file) {
     console.error('No image file uploaded.');
     return res.status(400).json({ error: 'No image file uploaded.' });
   }
 
-  // Parse contextData if it's a string
-  if (typeof contextData === 'string') {
-    try {
-      contextData = JSON.parse(contextData);
-    } catch (err) {
-      console.error('Invalid contextData format received:', err);
-      return res.status(400).json({ error: 'Invalid contextData format. Expected a valid JSON string.' });
-    }
-  }
+  // Convert image to base64 for OpenAI API
+  const base64Image = req.file.buffer.toString('base64');
 
+  // Call the analyzeImage function to process the image and get financial advice
   try {
-    console.log('Processing image-based chat with uploaded image file.');
-
-    // Generate a unique identifier for the draft image
-    const imageId = uuidv4();
-    const imageExtension = path.extname(imageFile.originalname) || '.png';
-    const imageFilename = `draft_${imageId}${imageExtension}`;
-    const imagePath = path.join(DRAFT_IMAGES_DIR, imageFilename);
-
-    // Save the image file to the drafts directory
-    fs.writeFileSync(imagePath, imageFile.buffer);
-    console.log(`Draft image saved as ${imageFilename} at ${imagePath}.`);
-
-    // Store the draft image reference in the session
-    if (!session.draftImages) {
-      session.draftImages = [];
-    }
-    session.draftImages.push({
-      id: imageId,
-      filename: imageFilename,
-      path: imagePath,
-      uploadedAt: new Date(),
-    });
-    console.log('Draft image reference added to the session.');
-
-    // Convert image to base64 for OpenAI API
-    const base64Image = imageFile.buffer.toString('base64');
-
-    // Call the analyzeImage function to process the image and get financial advice
-    const assistantResponse = await analyzeImage(base64Image, message, contextData, session);
+    const { assistantResponse, contextData: updatedContextData } = await analyzeImage(
+      base64Image, 
+      message, 
+      contextData, 
+      req.session, 
+      isInitialAnalysis === 'true',
+      itemId
+    );
 
     // Send the assistant's response and updated contextData to the frontend
     res.json({
       advice: assistantResponse,
       status: 'completed',
-      contextData: contextData,
+      contextData: updatedContextData,
     });
   } catch (error) {
     console.error('Error processing image upload:', error);
