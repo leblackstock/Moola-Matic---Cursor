@@ -9,12 +9,13 @@ import '@fortawesome/fontawesome-free/css/all.min.css';
 import moolaMaticLogo from './Images/Moola-Matic Logo 01.jpeg';
 import NewItemPage from './NewItemPage.js'; // Ensure correct path and extension
 import ViewItemsPage from './ViewItemsPage.js'; // Ensure correct path and extension
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Sidebar Component
  * Renders the navigation sidebar with links to different routes.
  */
-function Sidebar({ handleLogout }) {
+function Sidebar({ handleLogout, handleChangeItem }) {
   return (
     <nav className="sidebar">
       <ul className="nav flex-column">
@@ -27,10 +28,10 @@ function Sidebar({ handleLogout }) {
         </li>
         {/* New Item Link */}
         <li className="nav-item">
-          <NavLink to="/new-item" className="nav-link" title="Change Item">
+          <button onClick={handleChangeItem} className="nav-link btn btn-link" title="Change Item">
             <i className="fas fa-plus-circle icon-cyan"></i>
             <span className="ms-2">Change Item</span>
-          </NavLink>
+          </button>
         </li>
         {/* View Items Link */}
         <li className="nav-item">
@@ -54,6 +55,7 @@ function Sidebar({ handleLogout }) {
 // Define PropTypes for Sidebar
 Sidebar.propTypes = {
   handleLogout: PropTypes.func.isRequired,
+  handleChangeItem: PropTypes.func.isRequired,
 };
 
 /**
@@ -88,10 +90,9 @@ WarningBox.propTypes = {
  * LandingPage Component
  * The home page of the application where users can start adding new items or view existing ones.
  * 
- * @param {Function} setNewItemCreated - Function to update the newItemCreated state.
- * @param {Function} setItemId - Function to update the itemId state.
+ * @param {Function} handleNewItem - Function to handle new item creation.
  */
-function LandingPage({ setNewItemCreated, setItemId }) {
+function LandingPage({ handleNewItem }) {
   const [showWarning, setShowWarning] = useState(false);
   const navigate = useNavigate();
 
@@ -113,11 +114,7 @@ function LandingPage({ setNewItemCreated, setItemId }) {
    */
   const handleProceed = () => {
     setShowWarning(false);
-    setNewItemCreated(true);
-    const newItemId = Math.floor(Math.random() * 1000000).toString();
-    setItemId(newItemId);
-    console.log(`Navigating to /new-item with itemId: ${newItemId}`);
-    navigate('/new-item');
+    handleNewItem();
   };
 
   /**
@@ -163,8 +160,7 @@ function LandingPage({ setNewItemCreated, setItemId }) {
 
 // Define PropTypes for LandingPage
 LandingPage.propTypes = {
-  setNewItemCreated: PropTypes.func.isRequired,
-  setItemId: PropTypes.func.isRequired,
+  handleNewItem: PropTypes.func.isRequired,
 };
 
 /**
@@ -221,101 +217,44 @@ ErrorBoundary.propTypes = {
  * The root component of the application that sets up routing, state management, and context persistence.
  */
 function App() {
-  // State to track if a new item has been created
-  const [newItemCreated, setNewItemCreated] = useState(() => {
-    // Initialize from localStorage, default to false if not set
-    const storedValue = localStorage.getItem('newItemCreated');
-    return storedValue ? JSON.parse(storedValue) : false;
+  const [currentItemId, setCurrentItemId] = useState(null);
+  const [mostRecentItemId, setMostRecentItemId] = useState(() => {
+    return localStorage.getItem('mostRecentItemId') || null;
   });
+  const navigate = useNavigate();
 
-  // State to store the current item ID
-  const [itemId, setItemId] = useState(() => {
-    // Initialize from localStorage, default to '0' if not set
-    return localStorage.getItem('itemId') || '0';
-  });
+  // Add this function to handle logout
+  const handleLogout = () => {
+    // Implement your logout logic here
+    // For example:
+    // Clear any user-related data from localStorage
+    localStorage.removeItem('mostRecentItemId');
+    // Reset state
+    setCurrentItemId(null);
+    setMostRecentItemId(null);
+    // Navigate to the home page or login page
+    navigate('/');
+  };
 
-  const navigate = useNavigate(); // Now inside Router context
-
-  /**
-   * Effect to synchronize newItemCreated state with localStorage.
-   */
   useEffect(() => {
-    try {
-      localStorage.setItem('newItemCreated', JSON.stringify(newItemCreated));
-      console.log(`newItemCreated updated to: ${newItemCreated}`);
-    } catch (error) {
-      console.error('Failed to update newItemCreated in localStorage:', error);
+    if (mostRecentItemId) {
+      localStorage.setItem('mostRecentItemId', mostRecentItemId);
     }
-  }, [newItemCreated]);
+  }, [mostRecentItemId]);
 
-  /**
-   * Effect to synchronize itemId state with localStorage.
-   */
-  useEffect(() => {
-    try {
-      localStorage.setItem('itemId', itemId);
-      console.log(`itemId updated to: ${itemId}`);
-    } catch (error) {
-      console.error('Failed to update itemId in localStorage:', error);
-    }
-  }, [itemId]);
+  const handleNewItem = () => {
+    const newItemId = `draft-${uuidv4()}`;
+    setCurrentItemId(newItemId);
+    setMostRecentItemId(newItemId);
+    navigate(`/new-item/${newItemId}`);
+  };
 
-  /**
-   * Effect for debugging: Logs whether essential styles are loaded.
-   * You can remove this in production.
-   */
-  useEffect(() => {
-    try {
-      const stylesLoaded = {
-        bootstrap: !!document.querySelector('link[href*="bootstrap"]'),
-        fontawesome: !!document.querySelector('link[href*="fontawesome"]'),
-        appCss: !!document.querySelector('link[href*="App.css"]')
-      };
-      console.log('Styles loaded:', stylesLoaded);
-    } catch (error) {
-      console.error('Error checking loaded styles:', error);
-    }
-  }, []);
-
-  /**
-   * Effect for debugging: Logs when the App component renders.
-   * You can remove or comment this out in production.
-   */
-  useEffect(() => {
-    console.log('App component is rendering');
-  });
-
-  /**
-   * Handles user logout by calling the backend logout endpoint
-   * and resetting frontend state as necessary.
-   */
-  const handleLogout = async () => {
-    try {
-      const response = await fetch(`http://localhost:${process.env.REACT_APP_BACKEND_PORT || 3001}/api/logout`, {
-        method: 'POST',
-        credentials: 'include', // Include cookies
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Logout failed');
-      }
-
-      const data = await response.json();
-      console.log(data.message);
-
-      // Reset frontend state if necessary
-      setNewItemCreated(false);
-      setItemId('0');
-
-      // Redirect to Landing Page
-      navigate('/');
-    } catch (error) {
-      console.error('Error during logout:', error);
-      alert('Failed to logout. Please try again.');
+  const handleChangeItem = () => {
+    if (mostRecentItemId) {
+      setCurrentItemId(mostRecentItemId);
+      navigate(`/new-item/${mostRecentItemId}`);
+    } else {
+      handleNewItem();
     }
   };
 
@@ -323,18 +262,26 @@ function App() {
     <ErrorBoundary>
       <div className="app d-flex">
         {/* Sidebar Navigation */}
-        <Sidebar handleLogout={handleLogout} />
+        <Sidebar handleLogout={handleLogout} handleChangeItem={handleChangeItem} />
         {/* Main Content Area */}
         <main className="flex-grow-1 p-3">
           <Routes>
             {/* Home/Landing Page Route */}
-            <Route path="/" element={<LandingPage setNewItemCreated={setNewItemCreated} setItemId={setItemId} />} />
+            <Route path="/" element={<LandingPage handleNewItem={handleNewItem} />} />
             {/* New Item Page Route */}
-            <Route path="/new-item" element={<NewItemPage setNewItemCreated={setNewItemCreated} itemId={itemId} />} />
+            <Route 
+              path="/new-item/:itemId" 
+              element={
+                <NewItemPage 
+                  setMostRecentItemId={setMostRecentItemId}
+                  currentItemId={currentItemId}
+                />
+              } 
+            />
             {/* View Items Page Route */}
-            <Route path="/view-items" element={<ViewItemsPage newItemCreated={newItemCreated} setNewItemCreated={setNewItemCreated} />} />
+            <Route path="/view-items" element={<ViewItemsPage />} />
             {/* Fallback Route - Redirects to LandingPage */}
-            <Route path="*" element={<LandingPage setNewItemCreated={setNewItemCreated} setItemId={setItemId} />} />
+            <Route path="*" element={<LandingPage handleNewItem={handleNewItem} />} />
           </Routes>
         </main>
       </div>

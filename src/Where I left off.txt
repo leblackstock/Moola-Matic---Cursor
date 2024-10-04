@@ -1,14 +1,21 @@
-~ Change assistant Prompts
+Fix Errors!
+
 Text input box needs to be fixed.
 Image input box needs to be fixed.
-~Image preview in chat needs to be fixed.
-~add prompttext to image analysis
 check context contents
 streamline assistant questions
-~create variables for each question
 add ability to add another image
 autofill variables from assistant
-~Add chatbox memory
 add clear button?
 Improve drafts
 Double check database fields
+Split newitempage into components (chatbox, image upload and gallery, css, etc.)
+
+
+
+
+~Change assistant Prompts
+~Image preview in chat needs to be fixed.
+~add prompttext to image analysis
+~create variables for each question
+~Add chatbox memory

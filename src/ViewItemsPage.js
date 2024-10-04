@@ -71,7 +71,7 @@ function ViewItemsPage() {
     const handleDraftClick = (draft) => {
         console.log("Clicking draft:", draft);
         console.log("Draft messages:", draft.messages);
-        navigate('/new-item', { state: { draft } });
+        navigate(`/new-item/${draft.itemId || draft._id}`);
     };
 
     const saveDraft = async (item) => {

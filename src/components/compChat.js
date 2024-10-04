@@ -12,15 +12,28 @@ const ChatContainer = styled.div`
   background-color: #1a001a;
   color: #F5DEB3;
   border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  height: 80vh; // Increased height
 `;
 
 const MessagesContainer = styled.div`
-  height: 400px;
+  flex-grow: 1;
   overflow-y: auto;
   border: 1px solid #4A0E4E;
   border-radius: 10px;
   padding: 10px;
   background-color: #330033;
+  resize: vertical; // Allow vertical resizing
+  min-height: 300px; // Set a minimum height
+  max-height: calc(100vh - 200px); // Set a maximum height
+`;
+
+const ResizeHandle = styled.div`
+  height: 10px;
+  background-color: #4A0E4E;
+  cursor: ns-resize;
+  border-radius: 0 0 10px 10px;
 `;
 
 const Message = styled.div`
@@ -102,12 +115,11 @@ function CompChat() {
   const [imagePreview, setImagePreview] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
+  const resizeRef = useRef(null);
 
   // Scroll to the bottom when messages update
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   // Function to send a message
@@ -144,6 +156,36 @@ function CompChat() {
     }
   };
 
+  // Resize functionality
+  useEffect(() => {
+    const resizeElement = resizeRef.current;
+    let startY;
+    let startHeight;
+
+    const resize = (e) => {
+      const newHeight = startHeight + e.clientY - startY;
+      resizeElement.parentNode.style.height = `${newHeight}px`;
+    };
+
+    const stopResize = () => {
+      window.removeEventListener('mousemove', resize);
+      window.removeEventListener('mouseup', stopResize);
+    };
+
+    const initResize = (e) => {
+      startY = e.clientY;
+      startHeight = parseInt(document.defaultView.getComputedStyle(resizeElement.parentNode).height, 10);
+      window.addEventListener('mousemove', resize);
+      window.addEventListener('mouseup', stopResize);
+    };
+
+    resizeElement.addEventListener('mousedown', initResize);
+
+    return () => {
+      resizeElement.removeEventListener('mousedown', initResize);
+    };
+  }, []);
+
   return (
     <ChatContainer>
       <h2>Moola-Matic Chat</h2>
@@ -159,6 +201,7 @@ function CompChat() {
         {isLoading && <MessageBubble>AI is typing...</MessageBubble>}
         <div ref={messagesEndRef} />
       </MessagesContainer>
+      <ResizeHandle ref={resizeRef} />
       <InputArea>
         <ImageButton onClick={() => document.getElementById('image-upload').click()}>
           📷

@@ -30,12 +30,20 @@ router.post('/save-draft', upload.array('images', 5), async (req, res) => {
         console.log('Received files:', req.files);
         console.log('Received body:', req.body);
 
-        const draftData = JSON.parse(req.body.draftData);
+        let draftData;
+        try {
+            draftData = JSON.parse(req.body.draftData);
+        } catch (e) {
+            draftData = req.body;
+        }
         console.log('Parsed draftData:', draftData);
 
-        // Use the existing itemId if provided, otherwise generate a new one
-        const itemId = draftData.id || `draft-${uuidv4()}`;
+        const itemId = draftData.itemId || draftData.id || `draft-${uuidv4()}`;
         draftData.itemId = itemId;
+
+        if (!itemId) {
+            return res.status(400).json({ error: 'No itemId provided' });
+        }
 
         if (req.files && req.files.length > 0) {
             console.log('Processing files...');
@@ -67,7 +75,7 @@ router.post('/save-draft', upload.array('images', 5), async (req, res) => {
         res.status(200).json({ message: 'Draft saved successfully', item: savedDraft });
     } catch (error) {
         console.error('Error saving draft:', error);
-        res.status(500).json({ error: 'Failed to save draft', details: error.message, stack: error.stack });
+        res.status(500).json({ error: 'Failed to save draft' });
     }
 });
 
@@ -78,6 +86,24 @@ router.get('/drafts', async (req, res) => {
         res.json(drafts);
     } catch (error) {
         console.error('Error fetching drafts:', error);
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Add this new route to fetch a single draft item
+router.get('/drafts/:itemId', async (req, res) => {
+    try {
+        const { itemId } = req.params;
+        const draft = await DraftItem.findOne({ itemId: itemId });
+        
+        if (!draft) {
+            return res.status(404).json({ message: 'Draft not found' });
+        }
+        
+        console.log('Fetched draft:', draft); // Add this line for debugging
+        res.json(draft);
+    } catch (error) {
+        console.error('Error fetching draft:', error);
         res.status(500).json({ message: error.message });
     }
 });
