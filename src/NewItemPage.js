@@ -135,6 +135,7 @@ const getBase64 = (file) => {
 // Add these new styled components
 const GlowingButton = styled(StyledButton)`
   transition: box-shadow 0.3s ease, transform 0.3s ease;
+  margin-bottom: 20px; // Add this line
 
   &:hover {
     box-shadow: 0 0 15px rgba(138, 43, 226, 0.7); // BlueViolet glow
@@ -178,6 +179,8 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
   const [isLoading, setIsLoading] = useState(false);
   const [imageUploaded, setImageUploaded] = useState(false);
   const [imagePreview, setImagePreview] = useState('');
+  const [uploadedImages, setUploadedImages] = useState([]);
+  const [selectedImage, setSelectedImage] = useState(null);
 
   useEffect(() => {
     if (itemId !== currentItemId) {
@@ -460,13 +463,25 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
       const imagePreviewUrl = URL.createObjectURL(image);
       setImagePreview(imagePreviewUrl);  // Set the image preview
 
+      // Create the new image object
+      const newImage = {
+        id: Date.now().toString(),
+        url: imagePreviewUrl,
+        file: image
+      };
+
+      // Add the new image to the gallery and set it as selected immediately
+      setUploadedImages(prevImages => [...prevImages, newImage]);
+      setSelectedImage(newImage);
+      setImageUploaded(true);
+
       // Safely update the item.images array
       setItem(prevItem => ({
         ...prevItem,
         images: Array.isArray(prevItem.images) ? [...prevItem.images, image] : [image]
       }));
 
-      // Immediately analyze the image
+      // Analyze the image
       setIsLoading(true);
       try {
         const assistantResponse = await analyzeImageWithGPT4Turbo(image, imageAnalysisPrompt);
@@ -476,6 +491,11 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
           { role: 'assistant', content: assistantResponse }
         ]);
         setImageAnalyzed(true);
+
+        // If you need the base64 version, you can add it here
+        // newImage.base64 = await getBase64(image);
+        // setUploadedImages(prevImages => prevImages.map(img => img.id === newImage.id ? {...img, base64: newImage.base64} : img));
+
       } catch (error) {
         console.error('Error analyzing image:', error);
         setMessages(prevMessages => [
@@ -485,15 +505,6 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
         ]);
       }
       setIsLoading(false);
-
-      const newImage = {
-        url: imagePreviewUrl,
-        base64: await getBase64(image),
-        file: image
-      };
-
-      setUploadedImages(prevImages => [...prevImages, newImage]);
-      setImageUploaded(true);
     }
   };
 
@@ -700,15 +711,9 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
     }
   }, [messages]);
 
-  const [uploadedImages, setUploadedImages] = useState([]);
-  const [selectedImage, setSelectedImage] = useState(null);
-
-  // Add this function to handle image selection from the gallery
+  // Function to handle image selection from the gallery
   const handleImageSelect = (image) => {
     setSelectedImage(image);
-    setImagePreview(image.preview);
-    setImageFile(image.file);
-    setImageAnalyzed(false);
   };
 
   useEffect(() => {
@@ -728,6 +733,12 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
   const handleEndLoading = () => {
     setIsLoading(false);
   };
+
+  useEffect(() => {
+    if (uploadedImages.length > 0 && !selectedImage) {
+      setSelectedImage(uploadedImages[uploadedImages.length - 1]);
+    }
+  }, [uploadedImages, selectedImage]);
 
   return (
     <StyledContainer>
@@ -756,6 +767,8 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
         imageUploaded={imageUploaded}
         setImageUploaded={setImageUploaded}
         imagePreview={imagePreview}  // Pass the imagePreview to ChatComp
+        selectedImage={selectedImage}
+        setSelectedImage={setSelectedImage}
       />
 
       <GlowingButton 

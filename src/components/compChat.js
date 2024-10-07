@@ -264,7 +264,7 @@ const StyledButton = styled.button`
   }
 `;
 
-function ChatComp({ item, updateItem, messages, setMessages, currentItemId, isLoading, onStartLoading, onEndLoading, imageUploaded, setImageUploaded, imagePreview: propImagePreview }) {
+function ChatComp({ item, updateItem, messages, setMessages, currentItemId, isLoading, onStartLoading, onEndLoading, imageUploaded, setImageUploaded, imagePreview: propImagePreview, selectedImage, setSelectedImage }) {
   const [message, setMessage] = useState('');
   const [imageFile, setImageFile] = useState(null);
   const [localImagePreview, setLocalImagePreview] = useState(propImagePreview || '');
@@ -433,22 +433,21 @@ function ChatComp({ item, updateItem, messages, setMessages, currentItemId, isLo
   };
 
   const sendImageMessage = async () => {
-    if (!imageInput.trim() || !imageFile) return;
+    if (!imageInput.trim() || !selectedImage) return;
 
     onStartLoading();
 
     try {
-      const base64Image = await getBase64(imageFile);
+      const base64Image = await getBase64(selectedImage.file);
       const response = await handleImageChat(imageInput.trim(), base64Image, currentItemId, false);
       
       setMessages(prevMessages => [
         ...prevMessages,
-        { role: 'user', content: imageInput.trim(), image: currentImagePreview },
+        { role: 'user', content: imageInput.trim(), image: selectedImage.url },
         { role: 'assistant', content: response.advice }
       ]);
 
       if (response.contextData) {
-        // Handle contextData if needed
         console.log('Updated context data:', response.contextData);
       }
     } catch (error) {
@@ -480,10 +479,10 @@ function ChatComp({ item, updateItem, messages, setMessages, currentItemId, isLo
         )}
       </ChatHistory>
       {isLoading && <LoadingIndicator>Processing your request...</LoadingIndicator>}
-      {imageUploaded && currentImagePreview && (  // Check if currentImagePreview exists
+      {selectedImage && (
         <ImageInputContainer>
           <ImagePreviewContainer>
-            <ImagePreview src={currentImagePreview} alt="Preview" />
+            <ImagePreview src={selectedImage.url} alt="Selected" />
           </ImagePreviewContainer>
           <StyledTextarea
             value={imageInput}
