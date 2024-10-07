@@ -9,7 +9,7 @@ autofill variables from assistant
 add clear button?
 Improve drafts
 Double check database fields
-Split newitempage into components (chatbox, image upload and gallery, css, etc.)
+Split newitempage into components (image upload and gallery, saves and drafts, etc.)
 
 
 
@@ -19,3 +19,4 @@ Split newitempage into components (chatbox, image upload and gallery, css, etc.)
 ~add prompttext to image analysis
 ~create variables for each question
 ~Add chatbox memory
+~Split newitempage into components (chatbox & css)

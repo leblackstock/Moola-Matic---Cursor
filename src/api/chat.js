@@ -153,3 +153,7 @@ export const askQuestionAboutImage = async (question) => {
     throw error;
   }
 };
+
+export const handleImageChat = async (message, base64Image, itemId, isInitialAnalysis) => {
+  // ... implementation of handleImageChat (formerly chatImages)
+};

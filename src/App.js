@@ -22,28 +22,28 @@ function Sidebar({ handleLogout, handleChangeItem }) {
         {/* Home Link */}
         <li className="nav-item">
           <NavLink to="/" end className="nav-link" title="Home">
-            <i className="fas fa-home icon-cyan"></i>
+            <i className="fas fa-home icon-teal"></i>
             <span className="ms-2">Home</span>
           </NavLink>
         </li>
         {/* New Item Link */}
         <li className="nav-item">
           <button onClick={handleChangeItem} className="nav-link btn btn-link" title="Change Item">
-            <i className="fas fa-plus-circle icon-cyan"></i>
+            <i className="fas fa-plus-circle icon-teal"></i>
             <span className="ms-2">Change Item</span>
           </button>
         </li>
         {/* View Items Link */}
         <li className="nav-item">
           <NavLink to="/view-items" className="nav-link" title="View Items">
-            <i className="fas fa-list icon-cyan"></i>
+            <i className="fas fa-list icon-teal"></i>
             <span className="ms-2">View Items</span>
           </NavLink>
         </li>
         {/* Logout Button */}
         <li className="nav-item">
           <button onClick={handleLogout} className="nav-link btn btn-link" title="Logout">
-            <i className="fas fa-sign-out-alt icon-cyan"></i>
+            <i className="fas fa-sign-out-alt icon-teal"></i>
             <span className="ms-2">Logout</span>
           </button>
         </li>
@@ -131,11 +131,13 @@ function LandingPage({ handleNewItem }) {
       <div className="row justify-content-center">
         <div className="col-md-8 text-center">
           {/* Display the Moola-Matic Logo */}
-          <img 
-            src={moolaMaticLogo} 
-            alt="Moola-Matic Logo" 
-            className="img-fluid mb-4 square-to-circle" 
-          />
+          <div className="logo-container">
+            <img 
+              src={moolaMaticLogo} 
+              alt="Moola-Matic Logo" 
+              className="logo square-to-circle" 
+            />
+          </div>
           {/* Page Title */}
           <h1 className="display-4">Moola-Matic</h1>
           {/* Page Description */}

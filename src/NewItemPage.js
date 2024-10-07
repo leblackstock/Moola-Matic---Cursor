@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import styled from 'styled-components';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 import treasureSpecs from './Images/Treasure_Specs01.jpeg';
@@ -9,6 +10,117 @@ import { handleChatWithAssistant, analyzeImageWithGPT4Turbo, createUserMessage, 
 import axios from 'axios';
 import UploadedImagesGallery from './components/UploadedImagesGallery.js';
 import PropTypes from 'prop-types';
+import ChatComp from './components/compChat.js';
+
+// Styled components
+const StyledContainer = styled.div`
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+`;
+
+const StyledHeader = styled.div`
+  text-align: center;
+  margin-bottom: 2rem;
+`;
+
+const StyledLogo = styled.img`
+  max-width: 200px;
+  margin-bottom: 1rem;
+`;
+
+const StyledTitle = styled.h2`
+  color: #F5DEB3;
+  margin-bottom: 0.5rem;
+`;
+
+const StyledSubtitle = styled.p`
+  color: #D3D3D3;
+`;
+
+const StyledButton = styled.button`
+  background: linear-gradient(45deg, #2D0037, #4A0E4E);
+  color: #F5DEB3;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+
+  &:hover {
+    background: linear-gradient(45deg, #4A0E4E, #2D0037);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
+const StyledForm = styled.form`
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+`;
+
+const StyledFormGroup = styled.div`
+  display: flex;
+  flex-direction: column;
+`;
+
+const StyledLabel = styled.label`
+  color: #F5DEB3;
+  margin-bottom: 0.5rem;
+  display: block;
+`;
+
+const StyledInput = styled.input`
+  width: 100%;
+  padding: 10px;
+  border-radius: 5px;
+  border: 1px solid #4A0E4E;
+  background: rgba(13, 0, 26, 0.6);
+  color: #F5DEB3;
+`;
+
+const StyledSelect = styled.select`
+  width: 100%;
+  padding: 10px;
+  border-radius: 5px;
+  border: 1px solid #4A0E4E;
+  background: rgba(13, 0, 26, 0.6);
+  color: #F5DEB3;
+`;
+
+const StyledTextarea = styled.textarea`
+  width: 100%;
+  padding: 10px;
+  border-radius: 5px;
+  border: 1px solid #4A0E4E;
+  background: rgba(13, 0, 26, 0.6);
+  color: #F5DEB3;
+  resize: vertical;
+`;
+
+const StyledNotification = styled.div`
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(0, 128, 0, 0.8);
+  color: white;
+  padding: 10px 20px;
+  border-radius: 5px;
+  z-index: 1000;
+  animation: fadeInOut 3s ease-in-out;
+
+  @keyframes fadeInOut {
+    0% { opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+`;
 
 // Add this function near the top of your file, outside of the NewItemPage component
 const getBase64 = (file) => {
@@ -20,6 +132,41 @@ const getBase64 = (file) => {
   });
 };
 
+// Add these new styled components
+const GlowingButton = styled(StyledButton)`
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+
+  &:hover {
+    box-shadow: 0 0 15px rgba(138, 43, 226, 0.7); // BlueViolet glow
+    transform: translateY(-2px);
+  }
+`;
+
+const ModalOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+`;
+
+const ModalContent = styled.div`
+  background: rgba(13, 0, 26, 0.9);
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 0 20px rgba(138, 43, 226, 0.5);
+`;
+
+const ModalButton = styled(GlowingButton)`
+  margin: 10px;
+  width: 120px;
+`;
+
 function NewItemPage({ setMostRecentItemId, currentItemId }) {
   const { itemId } = useParams();
   const navigate = useNavigate();
@@ -28,6 +175,9 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [lastAutoSave, setLastAutoSave] = useState(null);
   const backendPort = process.env.REACT_APP_BACKEND_PORT || 3001;
+  const [isLoading, setIsLoading] = useState(false);
+  const [imageUploaded, setImageUploaded] = useState(false);
+  const [imagePreview, setImagePreview] = useState('');
 
   useEffect(() => {
     if (itemId !== currentItemId) {
@@ -168,8 +318,6 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
   // State for chat messages and AI interaction
   const [message, setMessage] = useState('');
   const [imageFile, setImageFile] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [imagePreview, setImagePreview] = useState('');
 
   // New state variables for image input and analysis
   const [imageInput, setImageInput] = useState('');
@@ -301,14 +449,16 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
 
   // Handle file selection
   const handleFileChange = async (event) => {
+    console.log("handleFileChange called in NewItemPage");
     const files = event.target.files;
     if (files && files.length > 0) {
       const image = files[0];
+      console.log("Image file selected:", image.name);
       setImageFile(image);
       setImageAnalyzed(false);
 
       const imagePreviewUrl = URL.createObjectURL(image);
-      setImagePreview(imagePreviewUrl);
+      setImagePreview(imagePreviewUrl);  // Set the image preview
 
       // Safely update the item.images array
       setItem(prevItem => ({
@@ -343,6 +493,7 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
       };
 
       setUploadedImages(prevImages => [...prevImages, newImage]);
+      setImageUploaded(true);
     }
   };
 
@@ -496,16 +647,6 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
     }
   };
 
-  // Add this CSS animation
-  const fadeInOutAnimation = `
-    @keyframes fadeInOut {
-      0% { opacity: 0; }
-      10% { opacity: 1; }
-      90% { opacity: 1; }
-      100% { opacity: 0; }
-    }
-  `;
-
   useEffect(() => {
     if (item) {
       localStorage.setItem(`item_${item.itemId}`, JSON.stringify(item));
@@ -580,107 +721,49 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
     }
   }, [itemId]);
 
+  const handleStartLoading = () => {
+    setIsLoading(true);
+  };
+
+  const handleEndLoading = () => {
+    setIsLoading(false);
+  };
+
   return (
-    <div className="container">
+    <StyledContainer>
       {showNotification && (
-        <div className="notification">
+        <StyledNotification>
           Item successfully saved as draft
-        </div>
+        </StyledNotification>
       )}
 
-      {/* Header and introduction */}
-      <div className="row justify-content-center">
-        <div className="col-md-8 text-center">
-          <img 
-            src={treasureSpecs} 
-            alt="Treasure Specs" 
-            className="img-fluid mb-4 accent-element page-image" 
-          />
-          <h2 className="mb-3">Add Your Thrifty Find</h2>
-          <p className="mb-4">Ready to turn that rusty gold into shiny cash? Let's get started!</p>
-        </div>
-      </div>
+      <StyledHeader>
+        <StyledLogo src={treasureSpecs} alt="Treasure Specs" />
+        <StyledTitle>Add Your Thrifty Find</StyledTitle>
+        <StyledSubtitle>Ready to turn that rusty gold into shiny cash? Let's get started!</StyledSubtitle>
+      </StyledHeader>
       
-      {/* AI Chat Box */}
-      <div className="ai-chat-box mb-5">
-        <h3 className="text-center mb-4">Moola-Matic Wizard</h3>
-        <div className="messages" ref={messagesContainerRef}>
-          <div ref={chatContainerRef} className="chat-history">
-            {messages.length > 0 ? (
-              messages.map((message, index) => (
-                <div key={index} className={`message-container ${message.role === 'user' ? 'user' : 'assistant'}`}>
-                  <div className="message-bubble">
-                    {message.role === 'assistant' ? renderContent(message.content) : message.content}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p>No chat history available.</p>
-            )}
-          </div>
-          {isLoading && <div className="ai-typing">AI is typing...</div>}
-        </div>
+      <ChatComp 
+        item={item}
+        updateItem={updateItem}
+        messages={messages}
+        setMessages={setMessagesAndSave}
+        currentItemId={item.id}
+        onFileChange={handleFileChange}  // Add this prop
+        isLoading={isLoading}
+        onStartLoading={handleStartLoading}
+        onEndLoading={handleEndLoading}
+        imageUploaded={imageUploaded}
+        setImageUploaded={setImageUploaded}
+        imagePreview={imagePreview}  // Pass the imagePreview to ChatComp
+      />
 
-        {/* Image Input Box (conditionally rendered) */}
-        {imageFile && (
-          <div className="image-input-container">
-            <img src={imagePreview} alt="Preview" className="image-preview" />
-            <textarea
-              className="chat-input"
-              value={imageInput}
-              onChange={(e) => setImageInput(e.target.value)}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  sendImageMessage();
-                }
-              }}
-              placeholder="Ask a question about the image..."
-              rows="1"
-            />
-            <button className="icon-button" onClick={sendImageMessage} disabled={isLoading}>
-              <i className="fas fa-paper-plane"></i>
-            </button>
-          </div>
-        )}
-
-        {/* Original Text Input Box */}
-        <div className="input-container">
-          <i className="fas fa-comment text-icon"></i>
-          <textarea
-            className="chat-input"
-            value={message}
-            onChange={(e) => {
-              setMessage(e.target.value);
-              e.target.style.height = 'auto';
-              e.target.style.height = e.target.scrollHeight + 'px';
-            }}
-            onKeyPress={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-              }
-            }}
-            placeholder="Type your message here..."
-            rows="1"
-            style={{display: 'flex', alignItems: 'center'}}
-          />
-          <button className="icon-button" onClick={sendMessage} disabled={isLoading}>
-            <i className="fas fa-paper-plane"></i>
-          </button>
-        </div>
-      </div>
-
-      {/* Add Images Button */}
-      <div className="mb-4 text-center">
-        <button 
-          className="btn btn-primary-theme" 
-          onClick={() => fileInputRef.current.click()}
-          disabled={!isPromptLoaded || isLoading}
-        >
-          <i className="fas fa-image me-2"></i>Add Images
-        </button>
-      </div>
+      <GlowingButton 
+        onClick={handleImageButtonClick}
+        disabled={!isPromptLoaded || isLoading}
+      >
+        <i className="fas fa-image"></i> Add Images
+      </GlowingButton>
 
       <UploadedImagesGallery
         images={uploadedImages}
@@ -690,20 +773,18 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
 
       {/* Image Selection Modal */}
       {showImageModal && (
-        <div className="select-box-overlay" onClick={() => setShowImageModal(false)}>
-          <div className="select-box" onClick={(e) => e.stopPropagation()}>
+        <ModalOverlay onClick={() => setShowImageModal(false)}>
+          <ModalContent onClick={(e) => e.stopPropagation()}>
             <h2>Add Images</h2>
             <p>Choose how you'd like to add images:</p>
-            <div className="select-box-buttons">
-              <button className="select-box-button select-box-primary" onClick={handleCameraClick}>
-                <i className="fas fa-camera me-2"></i>Camera
-              </button>
-              <button className="select-box-button select-box-secondary" onClick={handleMediaClick}>
-                <i className="fas fa-folder-open me-2"></i>Media
-              </button>
-            </div>
-          </div>
-        </div>
+            <ModalButton onClick={handleCameraClick}>
+              <i className="fas fa-camera"></i> Camera
+            </ModalButton>
+            <ModalButton onClick={handleMediaClick}>
+              <i className="fas fa-folder-open"></i> Media
+            </ModalButton>
+          </ModalContent>
+        </ModalOverlay>
       )}
 
       {/* Hidden File Inputs */}
@@ -724,36 +805,31 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
         onChange={handleFileChange}
       />
 
-      {/* Item Details Form */}
-      <form onSubmit={handleSubmit}>
-        {/* Basic Item Information */}
-        <div className="mb-3">
-          <label htmlFor="itemName" className="form-label">Item Name</label>
-          <input 
+      <StyledForm onSubmit={handleSubmit}>
+        <StyledFormGroup>
+          <StyledLabel htmlFor="itemName">Item Name</StyledLabel>
+          <StyledInput 
             type="text" 
-            className="form-control" 
             id="itemName" 
             value={item?.name || ''} 
             onChange={(e) => updateItem('name', e.target.value)} 
             required 
           />
-        </div>
+        </StyledFormGroup>
 
-        <div className="mb-3">
-          <label htmlFor="brand" className="form-label">Brand</label>
-          <input 
+        <StyledFormGroup>
+          <StyledLabel htmlFor="brand">Brand</StyledLabel>
+          <StyledInput 
             type="text" 
-            className="form-control" 
             id="brand" 
             value={item?.brand || ''} 
             onChange={(e) => updateItem('brand', e.target.value)} 
           />
-        </div>
+        </StyledFormGroup>
 
-        <div className="mb-3">
-          <label htmlFor="condition" className="form-label">Condition</label>
-          <select 
-            className="form-select" 
+        <StyledFormGroup>
+          <StyledLabel htmlFor="condition">Condition</StyledLabel>
+          <StyledSelect 
             id="condition" 
             value={item?.condition || ''} 
             onChange={(e) => updateItem('condition', e.target.value)} 
@@ -765,166 +841,40 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
             <option value="good">Good</option>
             <option value="fair">Fair</option>
             <option value="poor">Poor</option>
-          </select>
-        </div>
+          </StyledSelect>
+        </StyledFormGroup>
 
-        {/* Detailed Item Information */}
-        <div className="mb-3">
-          <label htmlFor="description" className="form-label">Description</label>
-          <textarea 
-            className="form-control" 
+        <StyledFormGroup>
+          <StyledLabel htmlFor="description">Description</StyledLabel>
+          <StyledTextarea 
             id="description" 
             rows="3" 
             value={item?.description || ''} 
             onChange={(e) => updateItem('description', e.target.value)} 
-          ></textarea>
-        </div>
+          ></StyledTextarea>
+        </StyledFormGroup>
 
-        <div className="mb-3">
-          <label htmlFor="uniqueFeatures" className="form-label">Unique Features</label>
-          <input 
-            type="text" 
-            className="form-control" 
-            id="uniqueFeatures" 
-            value={item?.uniqueFeatures || ''} 
-            onChange={(e) => updateItem('uniqueFeatures', e.target.value)} 
-          />
-        </div>
+        {/* Continue with the rest of your form fields using the styled components... */}
 
-        <div className="mb-3">
-          <label htmlFor="accessories" className="form-label">Accessories</label>
-          <input 
-            type="text" 
-            className="form-control" 
-            id="accessories" 
-            value={item?.accessories || ''} 
-            onChange={(e) => updateItem('accessories', e.target.value)} 
-          />
-        </div>
+        <StyledButton type="submit">Evaluate Item</StyledButton>
+      </StyledForm>
 
-        {/* Purchase Information */}
-        <div className="mb-3">
-          <label htmlFor="purchasePrice" className="form-label">Purchase Price</label>
-          <input 
-            type="number" 
-            className="form-control" 
-            id="purchasePrice" 
-            value={item?.purchasePrice || ''} 
-            onChange={(e) => updateItem('purchasePrice', e.target.value ? parseFloat(e.target.value) : '')} 
-            required 
-          />
-        </div>
-
-        <div className="mb-3">
-          <label htmlFor="salesTax" className="form-label">Sales Tax</label>
-          <input 
-            type="number" 
-            className="form-control" 
-            id="salesTax" 
-            value={item?.salesTax || ''} 
-            onChange={(e) => updateItem('salesTax', e.target.value ? parseFloat(e.target.value) : '')} 
-          />
-        </div>
-
-        {/* Repair and Cleaning */}
-        <div className="mb-3">
-          <label htmlFor="cleaningNeeded" className="form-label">Cleaning Needed?</label>
-          <select 
-            className="form-select" 
-            id="cleaningNeeded" 
-            value={item?.cleaningNeeded || false} 
-            onChange={(e) => updateItem('cleaningNeeded', e.target.value === 'true')} 
-          >
-            <option value="false">No</option>
-            <option value="true">Yes</option>
-          </select>
-        </div>
-
-        {item?.cleaningNeeded && (
-          <>
-            <div className="mb-3">
-              <label htmlFor="cleaningTime" className="form-label">Cleaning Time (hours)</label>
-              <input 
-                type="number" 
-                className="form-control" 
-                id="cleaningTime" 
-                value={item?.cleaningTime || ''} 
-                onChange={(e) => updateItem('cleaningTime', e.target.value ? parseFloat(e.target.value) : '')} 
-              />
-            </div>
-            <div className="mb-3">
-              <label htmlFor="cleaningMaterialsCost" className="form-label">Cleaning Materials Cost</label>
-              <input 
-                type="number" 
-                className="form-control" 
-                id="cleaningMaterialsCost" 
-                value={item?.cleaningMaterialsCost || ''} 
-                onChange={(e) => updateItem('cleaningMaterialsCost', e.target.value ? parseFloat(e.target.value) : '')} 
-              />
-            </div>
-          </>
-        )}
-
-        {/* Resale Information */}
-        <div className="mb-3">
-          <label htmlFor="estimatedValue" className="form-label">Estimated Resale Value</label>
-          <input 
-            type="number" 
-            className="form-control" 
-            id="estimatedValue" 
-            value={item?.estimatedValue || ''} 
-            onChange={(e) => updateItem('estimatedValue', e.target.value ? parseFloat(e.target.value) : '')} 
-            required 
-          />
-        </div>
-
-        <div className="mb-3">
-          <label htmlFor="shippingCost" className="form-label">Estimated Shipping Cost</label>
-          <input 
-            type="number" 
-            className="form-control" 
-            id="shippingCost" 
-            value={item?.shippingCost || ''} 
-            onChange={(e) => updateItem('shippingCost', e.target.value ? parseFloat(e.target.value) : '')} 
-          />
-        </div>
-
-        <div className="mb-3">
-          <label htmlFor="platformFees" className="form-label">Platform Fees</label>
-          <input 
-            type="number" 
-            className="form-control" 
-            id="platformFees" 
-            value={item?.platformFees || ''} 
-            onChange={(e) => updateItem('platformFees', e.target.value ? parseFloat(e.target.value) : '')} 
-          />
-        </div>
-
-        {/* Submit Button */}
-        <button type="submit" className="btn btn-primary">Evaluate Item</button>
-      </form>
-
-      <button onClick={handleManualSave} className="btn btn-primary mb-4">
+      <StyledButton onClick={handleManualSave}>
         Save Draft
-      </button>
+      </StyledButton>
 
       {lastAutoSave && (
-        <div className="text-muted small">
-          Last auto-save: {lastAutoSave.toLocaleTimeString()}
-        </div>
+        <p>Last auto-save: {lastAutoSave.toLocaleTimeString()}</p>
       )}
 
-      {/* Add the CSS animation */}
-      <style>{fadeInOutAnimation}</style>
-
-      {hasUnsavedChanges && <span className="text-warning">Unsaved changes</span>}
-    </div>
+      {hasUnsavedChanges && <span>Unsaved changes</span>}
+    </StyledContainer>
   );
 }
 
 NewItemPage.propTypes = {
   setMostRecentItemId: PropTypes.func.isRequired,
-  currentItemId: PropTypes.string.isRequired,
+  currentItemId: PropTypes.string
 };
 
 export default NewItemPage;
