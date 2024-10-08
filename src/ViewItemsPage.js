@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fetchItems, fetchDrafts, deleteDraft } from './components/compSave.js';
+import { 
+  fetchItems, 
+  fetchDrafts, 
+  deleteDraft, 
+  clearLocalData, 
+  saveToLocalStorage 
+} from './components/compSave.js';
 import {
   PageContainer,
   PageTitle,
@@ -48,7 +54,14 @@ function ViewItemsPage() {
 
   const handleDraftClick = (draft) => {
     console.log("Clicking draft:", draft);
-    console.log("Draft messages:", draft.messages);
+    
+    // Clear all local storage data
+    clearLocalData();
+    
+    // Save the clicked draft to local storage
+    saveToLocalStorage(draft);
+    
+    // Navigate to the NewItemPage with the draft's ID
     navigate(`/new-item/${draft.itemId || draft._id}`);
   };
 

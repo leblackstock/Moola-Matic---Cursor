@@ -23,7 +23,16 @@ import {
   clearLocalData, 
   updateContextData,
   createDefaultItem,
-  handleDraftSaveWithImages
+  handleDraftSaveWithImages,
+  updateItem,
+  handleFileUpload,
+  handleManualSave,
+  handleNewItem,
+  saveDraft,
+  deleteDraft,
+  fetchDrafts,
+  fetchItems,
+  saveToLocalStorage
 } from './components/compSave.js';
 
 // Import all styled components
@@ -61,15 +70,21 @@ const loadItemData = (itemId) => {
   return loadLocalData(itemId);
 };
 
+function generateDraftImageName(itemId, index) {
+  const last6 = itemId.slice(-6);
+  const paddedIndex = String(index + 1).padStart(2, '0');
+  return `Draft-${last6}-${paddedIndex}`;
+}
+
 function NewItemPage({ setMostRecentItemId, currentItemId }) {
-  const { itemId: paramItemId } = useParams();
+  const { itemId } = useParams();
   const navigate = useNavigate();
 
   // ----------------------------
   // Unconditionally declare Hooks
   // ----------------------------
   const [item, setItem] = useState(null);
-  const [contextData, setContextData] = useState(null);
+  const [contextData, setContextData] = useState({});
   const [messages, setMessages] = useState([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [lastAutoSave, setLastAutoSave] = useState(null);
@@ -89,49 +104,71 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
   const [imageAnalysisPrompt, setImageAnalysisPrompt] = useState('');
   const [isPromptLoaded, setIsPromptLoaded] = useState(false);
   const [showNotification, setShowNotification] = useState(false);
+  const [imageURL, setImageURL] = useState('');
 
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
   const messagesContainerRef = useRef(null);
 
-  console.log('NewItemPage: Rendered with itemId from params:', paramItemId, 'and currentItemId prop:', currentItemId);
+  console.log('NewItemPage: Rendered with itemId from params:', itemId, 'and currentItemId prop:', currentItemId);
 
   // ---------------------------------
   // useEffect Hook: Load or Create Item
   // ---------------------------------
   useEffect(() => {
-    const idToUse = paramItemId || currentItemId;
-    console.log('NewItemPage: Using itemId:', idToUse);
-
-    if (idToUse) {
-      const loadedItem = loadItemData(idToUse);
-      if (loadedItem && loadedItem.item) {
-        console.log('NewItemPage: Loaded existing item:', loadedItem.item);
-        setItem(loadedItem.item);
-        setContextData(loadedItem.contextData || {});
-        setMessages(loadedItem.messages || []);
-      } else {
-        console.log('NewItemPage: Creating new item with ID:', idToUse);
-        const newItem = createDefaultItem(idToUse);
-        setItem(newItem);
-        handleLocalSave(newItem, {}, []); // Save the new item immediately
-        console.log('NewItemPage: New item saved locally');
+    const loadDraft = async () => {
+      console.log('Loading draft for itemId:', itemId);
+      if (!itemId) {
+        console.error('No itemId provided');
+        return;
       }
-      setMostRecentItemId(idToUse);
-      console.log('NewItemPage: Set most recent item ID:', idToUse);
-    } else {
-      console.error('NewItemPage: No valid itemId available');
-      navigate('/'); // Redirect to home page if no valid ID
-    }
 
-    // Cleanup function to clear local data on unmount
-    return () => {
-      if (item?.itemId) {
-        console.log('NewItemPage: Cleanup - Clearing local data for itemId:', item.itemId);
-        clearLocalData(item.itemId);
+      const localData = loadLocalData(itemId);
+      if (localData.item) {
+        console.log('Found local data for item:', localData.item);
+        setItem(localData.item);
+        if (localData.item.images) {
+          console.log('Loading images from local storage:', localData.item.images);
+          setUploadedImages(localData.item.images.map(img => ({
+            url: typeof img === 'string' ? img : img.url,
+            file: null // Existing images have no file
+          })));
+        }
+        setMessages(localData.messages || []);
+        setContextData(localData.contextData || {});
+      } else {
+        try {
+          const response = await fetch(`http://localhost:${backendPort}/api/drafts/${itemId}`);
+          if (response.ok) {
+            const draftData = await response.json();
+            console.log('Fetched draft data:', draftData);
+            setItem(draftData);
+            if (draftData.images) {
+              console.log('Loading images from server:', draftData.images);
+              setUploadedImages(draftData.images.map(img => ({
+                url: typeof img === 'string' ? img : img.url,
+                file: null // Existing images have no file
+              })));
+            }
+            setMessages(draftData.messages || []);
+            setContextData(draftData.contextData || {});
+          } else if (response.status === 404) {
+            console.log('No existing draft found, creating new item');
+            const newItem = createDefaultItem(itemId);
+            setItem(newItem);
+            setUploadedImages([]);
+            setMessages([]);
+          } else {
+            console.error('Failed to fetch draft data');
+          }
+        } catch (error) {
+          console.error('Error fetching draft data:', error);
+        }
       }
     };
-  }, [paramItemId, currentItemId, setMostRecentItemId, navigate]);
+
+    loadDraft();
+  }, [itemId, backendPort]);
 
   // ----------------------------
   // useEffect Hook: Auto-Save
@@ -189,7 +226,6 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
         console.log('Fetched IMAGE_ANALYSIS_PROMPT:', data.IMAGE_ANALYSIS_PROMPT);
       } catch (error) {
         console.error('Error fetching IMAGE_ANALYSIS_PROMPT:', error);
-        // Optionally, set some error state here
       }
     };
 
@@ -205,47 +241,13 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
     }
   }, [uploadedImages, selectedImage]);
 
-  // ----------------------------
-  // Other Functions and Handlers
-  // ----------------------------
-
-  // Handle manual save
-  const handleManualSave = async () => {
-    try {
-      setIsSubmitting(true);
-      const savedDraft = await handleDraftSaveWithImages(item, messages, item.itemId, backendPort);
-      console.log('Manual save successful:', savedDraft);
-      setShowNotification(true);
-      setTimeout(() => setShowNotification(false), 3000);
-    } catch (error) {
-      console.error('Error during manual save:', error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Handle form submission
+  // Event handlers
   const handleSubmit = async (e) => {
     e.preventDefault();
     console.log('Submitting item:', item);
     // Add your submission logic here
-    // Ensure to handle submission without removing any existing functionality
   };
 
-  // Update item handler
-  const updateItem = (field, value) => {
-    setItem(prevItem => {
-      if (!prevItem) {
-        console.error('updateItem: prevItem is null');
-        return null;
-      }
-      const updatedItem = { ...prevItem, [field]: value };
-      console.log('updateItem: Updating item:', updatedItem);
-      handleLocalSave(updatedItem, contextData, messages); // Save after each update
-      setHasUnsavedChanges(true);
-      return updatedItem;
-    });
-  };
 
   // Handle sending messages
   const sendMessage = async () => {
@@ -305,83 +307,8 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
     }
   };
 
-  // Handle file changes
-  const handleFileChange = async (event) => {
-    console.log("handleFileChange called in NewItemPage");
-    const files = event.target.files;
-    if (files && files.length > 0) {
-      const image = files[0];
-      console.log("Image file selected:", image.name);
-      setImageFile(image);
-      setImageAnalyzed(false);
-
-      const imagePreviewUrl = URL.createObjectURL(image);
-      setImagePreview(imagePreviewUrl);  // Set the image preview
-
-      // Save the image to the temp directory
-      const tempImagePath = await saveTempImage(image);
-
-      // Create the new image object
-      const newImage = {
-        id: Date.now().toString(),
-        url: imagePreviewUrl,
-        file: image,
-        tempPath: tempImagePath
-      };
-
-      // Add the new image to the gallery and set it as selected immediately
-      setUploadedImages(prevImages => [...prevImages, newImage]);
-      setSelectedImage(newImage);
-      setImageUploaded(true);
-
-      // Safely update the item.images array
-      setItem(prevItem => ({
-        ...prevItem,
-        images: [...prevItem.images, { file: image, url: URL.createObjectURL(image) }]
-      }));
-
-      // Analyze the image
-      setIsLoading(true);
-      try {
-        const assistantResponse = await analyzeImageWithGPT4Turbo(image, imageAnalysisPrompt);
-        setMessages(prevMessages => [
-          ...prevMessages,
-          { role: 'user', content: 'Image uploaded', image: imagePreviewUrl },
-          { role: 'assistant', content: assistantResponse }
-        ]);
-        setImageAnalyzed(true);
-      } catch (error) {
-        console.error('Error analyzing image:', error);
-        setMessages(prevMessages => [
-          ...prevMessages,
-          { role: 'user', content: 'Image upload failed', image: imagePreviewUrl },
-          { role: 'assistant', content: 'Sorry, an error occurred while analyzing the image. Please try again.' }
-        ]);
-      }
-      setIsLoading(false);
-    }
-  };
-
-  // Function to save the image to the temp directory
-  const saveTempImage = async (file) => {
-    const formData = new FormData();
-    formData.append('image', file);
-
-    try {
-      const response = await axios.post(`http://localhost:${backendPort}/api/temp-image/upload`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Error saving temp image:', error);
-      throw error;
-    }
-  };
-
-  // Analyze Image Function
-  const analyzeImageWithGPT4Turbo = async (file, message, isInitialAnalysis = true) => {
+  // Rename this function to avoid conflict with the imported function
+  const analyzeImageLocally = async (file, message, isInitialAnalysis = true) => {
     // Convert the file to base64
     const base64Image = await fileToBase64(file);
 
@@ -419,6 +346,66 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
       reader.onload = () => resolve(reader.result.split(',')[1]);
       reader.onerror = error => reject(error);
     });
+  };
+
+  // Update the handleFileChange function to use the renamed function
+  const handleFileChange = async (event) => {
+    console.log("handleFileChange called in NewItemPage");
+    const files = event.target.files;
+    if (files && files.length > 0) {
+      const image = files[0];
+      console.log("Image file selected:", image.name);
+      console.log("Current itemId:", item.itemId);
+
+      if (!item.itemId) {
+        console.error("Error: itemId is undefined");
+        return;
+      }
+
+      try {
+        const { newImage, response } = await handleFileUpload(image, backendPort, item);
+
+        console.log("New image object:", newImage);
+
+        setItem(prevItem => ({
+          ...prevItem,
+          images: [...(prevItem.images || []), newImage]
+        }));
+
+        setUploadedImages(prevImages => [...prevImages, newImage]);
+
+        setHasUnsavedChanges(true);
+
+        // Image analysis code
+        setIsLoading(true);
+        try {
+          console.log("Starting image analysis");
+          const assistantResponse = await analyzeImageLocally(image, imageAnalysisPrompt, true);
+          console.log("Received response from analyzeImageLocally");
+
+          setMessages(prevMessages => [
+            ...prevMessages,
+            { role: 'user', content: 'Image uploaded', image: imageURL },
+            { role: 'assistant', content: assistantResponse }
+          ]);
+          setImageAnalyzed(true);
+        } catch (error) {
+          console.error('Error analyzing image:', error);
+          setMessages(prevMessages => [
+            ...prevMessages,
+            { role: 'user', content: 'Image upload failed', image: imageURL },
+            { role: 'assistant', content: 'Sorry, an error occurred while analyzing the image. Please try again.' }
+          ]);
+        } finally {
+          setIsLoading(false);
+        }
+      } catch (error) {
+        console.error('Error uploading image:', error);
+        if (error.response) {
+          console.error('Server responded with:', error.response.data);
+        }
+      }
+    }
   };
 
   // Send Image Message
@@ -630,7 +617,7 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
         <StyledButton type="submit">Evaluate Item</StyledButton>
       </StyledForm>
 
-      <StyledButton onClick={handleManualSave}>
+      <StyledButton onClick={() => handleManualSave(item, uploadedImages, backendPort, setItem, setUploadedImages, setHasUnsavedChanges, setLastAutoSave)}>
         Save Draft
       </StyledButton>
 

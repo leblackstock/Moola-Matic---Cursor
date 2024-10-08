@@ -411,10 +411,42 @@ export const DeleteButton = styled.button`
   align-items: center;
   cursor: pointer;
   font-size: 16px;
-  transition: background-color 0.3s ease;
+  transition: background-color 0.3s ease, opacity 0.3s ease;
+  opacity: 0;
 
   &:hover {
     background-color: rgba(255, 0, 0, 1);
+  }
+`;
+
+export const DraftItemOverlay = styled.div`
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.7);
+  color: #F5DEB3;
+  padding: 10px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+`;
+
+export const DraftItem = styled.div`
+  background-size: cover;
+  background-position: center;
+  height: 200px;
+  position: relative;
+  cursor: pointer;
+  border-radius: 10px;
+  overflow: hidden;
+  transition: transform 0.3s ease;
+
+  &:hover {
+    transform: scale(1.05);
+  }
+
+  &:hover ${DeleteButton}, &:hover ${DraftItemOverlay} {
+    opacity: 1;
   }
 `;
 
@@ -447,31 +479,6 @@ export const DraftGallery = styled.div`
   margin-bottom: 2rem;
 `;
 
-export const DraftItem = styled.div`
-  background-size: cover;
-  background-position: center;
-  height: 200px;
-  position: relative;
-  cursor: pointer;
-  border-radius: 10px;
-  overflow: hidden;
-  transition: transform 0.3s ease;
-
-  &:hover {
-    transform: scale(1.05);
-  }
-`;
-
-export const DraftItemOverlay = styled.div`
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: rgba(0, 0, 0, 0.7);
-  color: #F5DEB3;
-  padding: 10px;
-`;
-
 export const LoadingOverlay = styled.div`
   position: absolute;
   top: 0;
@@ -498,4 +505,37 @@ export const LoadingSpinner = styled.div`
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
   }
+`;
+
+// Add these new exports at the end of the file
+
+export const GalleryContainer = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 10px;
+  margin-bottom: 20px;
+`;
+
+export const ImageContainer = styled.div`
+  position: relative;
+  aspect-ratio: 1;
+  cursor: pointer;
+  border: ${props => props.$isSelected ? '2px solid #00FFFF' : '2px solid transparent'};
+  border-radius: 5px;
+  overflow: hidden;
+
+  &:hover ${DeleteButton} {
+    opacity: 1;
+  }
+`;
+
+export const StyledImage = styled.img`
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+`;
+
+export const HoverDeleteButton = styled(DeleteButton)`
+  opacity: 0;
+  transition: opacity 0.3s ease;
 `;

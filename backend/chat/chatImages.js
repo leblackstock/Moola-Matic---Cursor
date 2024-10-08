@@ -95,6 +95,9 @@ const deleteFile = (filePath) => {
 async function analyzeImage(imageBase64, message, contextData = {}, session, isInitialAnalysis, itemId) {
   console.log('analyzeImage: Analyzing image for item with ID:', itemId);
   try {
+    // Ensure contextData is an object
+    contextData = contextData || {};
+
     // Step 1: Analyze the image using OpenAI's GPT-4-Turbo model
     const openAIResponse = await openai.chat.completions.create({
       model: "gpt-4-turbo",
@@ -162,7 +165,14 @@ async function analyzeImage(imageBase64, message, contextData = {}, session, isI
 router.post('/analyze-image', upload.single('image'), async (req, res) => {
   console.log('analyze-image route: Received request for item with ID:', req.body.itemId);
   const { message, isInitialAnalysis, itemId } = req.body;
-  let contextData = req.body.contextData ? JSON.parse(req.body.contextData) : {};
+  let contextData;
+  
+  try {
+    contextData = req.body.contextData ? JSON.parse(req.body.contextData) : {};
+  } catch (error) {
+    console.error('Error parsing contextData:', error);
+    contextData = {};
+  }
 
   // Access session data
   const session = req.session;
