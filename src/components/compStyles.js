@@ -1,6 +1,116 @@
 // frontend\src\components\compStyles.js
 
-import styled from 'styled-components';
+import styled, { keyframes } from 'styled-components';
+
+// Keyframes
+const fadeInOut = keyframes`
+  0% { opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { opacity: 0; }
+`;
+
+const squareToCircle = keyframes`
+  0%, 16.66% {
+    border-radius: 10%;
+    background: coral;
+    transform: rotate(0deg) scale(0.7);
+  }
+  33.33% {
+    border-radius: 50% 10% 10% 10%;
+    background: darksalmon;
+    transform: rotate(90deg) scale(0.8);
+  }
+  50% {
+    border-radius: 50% 50% 10% 10%;
+    background: indianred;
+    transform: rotate(180deg) scale(0.9);
+  }
+  66.66% {
+    border-radius: 50% 50% 50% 10%;
+    background: lightcoral;
+    transform: rotate(270deg) scale(0.8);
+  }
+  83.33%, 100% {
+    border-radius: 50%;
+    background: darksalmon;
+    transform: rotate(360deg) scale(0.7);
+  }
+`;
+
+const popIn = keyframes`
+  0% { transform: scale(0.5); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+`;
+
+// Define a glow animation
+const glow = keyframes`
+  0% { box-shadow: 0 0 5px rgba(245, 222, 179, 0.5); }
+  50% { box-shadow: 0 0 20px rgba(245, 222, 179, 0.8); }
+  100% { box-shadow: 0 0 5px rgba(245, 222, 179, 0.5); }
+`;
+
+// Define a subtle float animation
+const float = keyframes`
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-5px); }
+  100% { transform: translateY(0px); }
+`;
+
+// Define a subtle pulse animation
+const pulse = keyframes`
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+`;
+
+// Add this keyframe animation at the top of your file
+const glowAnimation = keyframes`
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 100% 50%;
+  }
+`;
+
+// Layout Components
+export const AppContainer = styled.div`
+  min-height: 100vh;
+  display: flex;
+`;
+
+export const Content = styled.div`
+  flex-grow: 1;
+  padding: 20px;
+  padding-left: 80px;
+  width: 100%;
+`;
+
+export const PageContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  background: linear-gradient(45deg, #0D001A, #1A0022, #2D0037);
+  background-size: 400% 400%;
+  animation: gradientShift 15s ease infinite;
+  padding: 20px 10px; // Reduced side padding from 20px to 10px
+  width: 100%;
+  max-width: 1200px; // Add a max-width to prevent content from stretching too wide on large screens
+  margin: 0 auto; // Center the container
+`;
+
+export const MainContent = styled.main`
+  flex-grow: 1;
+  padding: 20px;
+  padding-left: 80px; // This ensures content doesn't get covered by the collapsed sidebar
+  width: 100%;
+  
+  @media (max-width: 768px) {
+    padding-left: 20px; // Adjust padding for mobile view
+  }
+`;
 
 export const StyledContainer = styled.div`
   max-width: 1200px;
@@ -8,6 +118,7 @@ export const StyledContainer = styled.div`
   padding: 20px;
 `;
 
+// Header Components
 export const StyledHeader = styled.div`
   text-align: center;
   margin-bottom: 2rem;
@@ -27,6 +138,19 @@ export const StyledSubtitle = styled.p`
   color: #D3D3D3;
 `;
 
+export const PageTitle = styled.h1`
+  color: #F5DEB3;
+  text-align: center;
+  margin-bottom: 1rem;
+`;
+
+export const PageSubtitle = styled.p`
+  color: #D3D3D3;
+  text-align: center;
+  margin-bottom: 2rem;
+`;
+
+// Button Components
 export const StyledButton = styled.button`
   background: linear-gradient(45deg, #2D0037, #4A0E4E);
   color: #F5DEB3;
@@ -46,6 +170,86 @@ export const StyledButton = styled.button`
   }
 `;
 
+export const GlowingButton = styled(StyledButton)`
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+  margin-bottom: 20px;
+
+  &:hover {
+    box-shadow: 0 0 15px rgba(138, 43, 226, 0.7); // BlueViolet glow
+    transform: translateY(-2px);
+  }
+`;
+
+export const ModalButton = styled(GlowingButton)`
+  margin: 10px;
+  width: 120px;
+`;
+
+export const SendButton = styled.button`
+  background: none;
+  border: none;
+  color: #F5DEB3;
+  cursor: pointer;
+  font-size: 1.2em;
+  transition: color 0.3s ease;
+
+  &:hover {
+    color: #00FFFF; /* Cyan color on hover */
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
+export const IconButton = styled.button`
+  background: none;
+  border: none;
+  color: #F5DEB3;
+  cursor: pointer;
+  font-size: 1.2em;
+  transition: color 0.3s ease;
+
+  &:hover {
+    color: #00FFFF;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
+export const DeleteButton = styled.button`
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background-color: rgba(255, 0, 0, 0.7);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 25px;
+  height: 25px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.3s ease, opacity 0.3s ease;
+  opacity: 0;
+
+  &:hover {
+    background-color: rgba(255, 0, 0, 1);
+  }
+`;
+
+export const HoverDeleteButton = styled(DeleteButton)`
+  opacity: 0;
+  transition: opacity 0.3s ease;
+`;
+
+// Form Components
 export const StyledForm = styled.form`
   display: flex;
   flex-direction: column;
@@ -91,6 +295,7 @@ export const StyledTextarea = styled.textarea`
   outline: none;
 `;
 
+// Notification Components
 export const StyledNotification = styled.div`
   position: fixed;
   top: 20px;
@@ -111,16 +316,19 @@ export const StyledNotification = styled.div`
   }
 `;
 
-export const GlowingButton = styled(StyledButton)`
-  transition: box-shadow 0.3s ease, transform 0.3s ease;
-  margin-bottom: 20px;
-
-  &:hover {
-    box-shadow: 0 0 15px rgba(138, 43, 226, 0.7); // BlueViolet glow
-    transform: translateY(-2px);
-  }
+export const Notification = styled.div`
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 10px 20px;
+  background-color: #4CAF50;
+  color: white;
+  border-radius: 5px;
+  z-index: 1000;
+  animation: ${fadeInOut} 3s ease-in-out;
 `;
 
+// Modal Components
 export const ModalOverlay = styled.div`
   position: fixed;
   top: 0;
@@ -141,11 +349,7 @@ export const ModalContent = styled.div`
   box-shadow: 0 0 20px rgba(138, 43, 226, 0.5);
 `;
 
-export const ModalButton = styled(GlowingButton)`
-  margin: 10px;
-  width: 120px;
-`;
-
+// Chat Components
 export const ChatContainer = styled.div`
   position: relative;
   // Add any other styles you want for the chat container
@@ -289,44 +493,8 @@ export const ChatInput = styled.textarea`
   outline: none;
 `;
 
-export const SendButton = styled.button`
-  background: none;
-  border: none;
-  color: #F5DEB3;
-  cursor: pointer;
-  font-size: 1.2em;
-  transition: color 0.3s ease;
-
-  &:hover {
-    color: #00FFFF; /* Cyan color on hover */
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-`;
-
 export const ImageInputContainer = styled(InputContainer)`
   margin-bottom: 10px;
-`;
-
-export const IconButton = styled.button`
-  background: none;
-  border: none;
-  color: #F5DEB3;
-  cursor: pointer;
-  font-size: 1.2em;
-  transition: color 0.3s ease;
-
-  &:hover {
-    color: #00FFFF;
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
 `;
 
 export const TextIcon = styled.i`
@@ -378,47 +546,209 @@ export const LoadingEllipsis = styled.span`
   }
 `;
 
-export const PageContainer = styled.div`
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 20px;
-`;
-
-export const PageTitle = styled.h1`
-  color: #F5DEB3;
-  text-align: center;
-  margin-bottom: 1rem;
-`;
-
-export const PageSubtitle = styled.p`
-  color: #D3D3D3;
-  text-align: center;
-  margin-bottom: 2rem;
-`;
-
-export const DeleteButton = styled.button`
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  background-color: rgba(255, 0, 0, 0.7);
-  color: white;
-  border: none;
-  border-radius: 50%;
-  width: 25px;
-  height: 25px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  cursor: pointer;
-  font-size: 16px;
-  transition: background-color 0.3s ease, opacity 0.3s ease;
-  opacity: 0;
+// Sidebar Components
+export const Sidebar = styled.nav`
+  width: 60px;
+  height: 100vh;
+  background: rgba(13, 0, 26, 0.8);
+  padding: 20px 10px;
+  transition: all 0.3s ease;
+  overflow: hidden;
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 1000;
+  box-shadow: 0 0 15px rgba(138, 43, 226, 0.3);
+  backdrop-filter: blur(4px);
 
   &:hover {
-    background-color: rgba(255, 0, 0, 1);
+    width: 250px;
+    box-shadow: 0 0 25px rgba(138, 43, 226, 0.5);
+  }
+
+  @media (max-width: 768px) {
+    width: 100%;
+    height: auto;
+    position: relative;
+    display: flex;
+    justify-content: space-around;
+    padding: 10px;
   }
 `;
 
+export const NavLink = styled.a`
+  color: #F5DEB3;
+  padding: 10px;
+  margin-bottom: 15px;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  width: 40px;
+  overflow: hidden;
+  position: relative;
+  text-transform: uppercase;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+
+  ${Sidebar}:hover & {
+    width: 100%;
+  }
+
+  i {
+    margin-right: 15px;
+    font-size: 1.2em;
+    min-width: 20px;
+    transition: all 0.3s ease;
+  }
+
+  span {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    white-space: nowrap;
+  }
+
+  ${Sidebar}:hover & span {
+    opacity: 1;
+  }
+
+  &.active {
+    font-weight: bold;
+    i {
+      color: #00FFFF;
+      text-shadow: 0 0 10px #00FFFF, 0 0 20px #00FFFF, 0 0 30px #00FFFF;
+    }
+  }
+
+  &:hover {
+    background: linear-gradient(90deg, rgba(138, 43, 226, 0.2) 0%, rgba(138, 43, 226, 0.1) 50%, transparent 100%);
+    background-size: 200% 100%;
+    animation: ${glowAnimation} 1s ease-in-out forwards;
+    
+    i {
+      color: #00FFFF;
+      text-shadow: 0 0 10px #00FFFF, 0 0 20px #00FFFF, 0 0 30px #00FFFF;
+    }
+  }
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 0;
+    padding: 5px;
+
+    i {
+      margin-bottom: 5px;
+      margin-right: 0;
+    }
+
+    span {
+      display: inline;
+      opacity: 1;
+      font-size: 0.8em;
+    }
+  }
+`;
+
+// Table Components
+export const Table = styled.table`
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+
+  th, td {
+    padding: 10px;
+    border: 1px solid #ddd;
+    text-align: left;
+  }
+
+  th {
+    background-color: #f2f2f2;
+    font-weight: bold;
+  }
+`;
+
+// Logo Components
+export const LogoContainer = styled.div`
+  width: 240px;
+  height: 240px;
+  margin: 0 auto;
+  overflow: hidden;
+  border-radius: 10%;
+  padding: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+`;
+
+export const Logo = styled.img`
+  width: 200px;
+  height: 200px;
+  object-fit: contain;
+  animation: ${squareToCircle} 6s infinite alternate ease-in-out;
+`;
+
+// Warning Box Components
+export const WarningBoxOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  animation: ${fadeInOut} 0.3s ease-out;
+`;
+
+export const WarningBox = styled.div`
+  position: relative;
+  background-color: #b92612e7;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3), 0 0 0 3px #6b0a04;
+  max-width: 80%;
+  text-align: center;
+  animation: ${popIn} 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+`;
+
+export const WarningBoxButtons = styled.div`
+  margin-top: 20px;
+  display: flex;
+  justify-content: space-around;
+`;
+
+// Gallery Components
+export const GalleryContainer = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 10px;
+  margin-bottom: 20px;
+`;
+
+export const ImageContainer = styled.div`
+  position: relative;
+  aspect-ratio: 1;
+  cursor: pointer;
+  border: ${props => props.$isSelected ? '2px solid #00FFFF' : '2px solid transparent'};
+  border-radius: 5px;
+  overflow: hidden;
+
+  &:hover ${DeleteButton} {
+    opacity: 1;
+  }
+`;
+
+export const StyledImage = styled.img`
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+`;
+
+// Move DraftItemOverlay definition before DraftItem
 export const DraftItemOverlay = styled.div`
   position: absolute;
   bottom: 0;
@@ -450,28 +780,6 @@ export const DraftItem = styled.div`
   }
 `;
 
-export const ItemList = styled.ul`
-  list-style-type: none;
-  padding: 0;
-`;
-
-export const ItemListItem = styled.li`
-  background: rgba(13, 0, 26, 0.6);
-  margin-bottom: 10px;
-  padding: 15px;
-  border-radius: 5px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-`;
-
-export const ItemPrice = styled.span`
-  background: #4A0E4E;
-  color: #F5DEB3;
-  padding: 5px 10px;
-  border-radius: 20px;
-`;
-
 export const DraftGallery = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -479,6 +787,7 @@ export const DraftGallery = styled.div`
   margin-bottom: 2rem;
 `;
 
+// Loading Components
 export const LoadingOverlay = styled.div`
   position: absolute;
   top: 0;
@@ -507,35 +816,31 @@ export const LoadingSpinner = styled.div`
   }
 `;
 
-// Add these new exports at the end of the file
-
-export const GalleryContainer = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  gap: 10px;
-  margin-bottom: 20px;
+// List Components
+export const ItemList = styled.ul`
+  list-style-type: none;
+  padding: 0;
 `;
 
-export const ImageContainer = styled.div`
-  position: relative;
-  aspect-ratio: 1;
-  cursor: pointer;
-  border: ${props => props.$isSelected ? '2px solid #00FFFF' : '2px solid transparent'};
+export const ItemListItem = styled.li`
+  background: rgba(13, 0, 26, 0.6);
+  margin-bottom: 10px;
+  padding: 15px;
   border-radius: 5px;
-  overflow: hidden;
-
-  &:hover ${DeleteButton} {
-    opacity: 1;
-  }
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 `;
 
-export const StyledImage = styled.img`
+export const ItemPrice = styled.span`
+  background: #4A0E4E;
+  color: #F5DEB3;
+  padding: 5px 10px;
+  border-radius: 20px;
+`;
+
+export const MainContentArea = styled.div`
   width: 100%;
-  height: 100%;
-  object-fit: cover;
-`;
-
-export const HoverDeleteButton = styled(DeleteButton)`
-  opacity: 0;
-  transition: opacity 0.3s ease;
+  max-width: 800px; // Adjust this value as needed
+  margin: 0 auto;
 `;

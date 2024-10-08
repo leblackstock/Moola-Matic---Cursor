@@ -2,15 +2,14 @@
 
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types'; // Import PropTypes
-import { Route, Routes, Link, NavLink, useNavigate } from 'react-router-dom'; // Removed BrowserRouter
+import { Route, Routes, useNavigate, Link } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import './App.css';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import moolaMaticLogo from './Images/Moola-Matic Logo 01.jpeg';
-import NewItemPage from './NewItemPage.js'; // Ensure correct path and extension
-import ViewItemsPage from './ViewItemsPage.js'; // Ensure correct path and extension
+import NewItemPage from './NewItemPage.js';
+import ViewItemsPage from './ViewItemsPage.js';
 import { v4 as uuidv4 } from 'uuid';
-import { handleNewItem, handleLocalSave } from './components/compSave.js'; // Import functions from compSave
+import { handleNewItem, handleLocalSave } from './components/compSave.js';
 import { 
   PageContainer, 
   StyledButton, 
@@ -21,7 +20,15 @@ import {
   StyledContainer,
   ModalOverlay,
   ModalContent,
-  ModalButton
+  ModalButton,
+  Sidebar as StyledSidebar,
+  NavLink,
+  WarningBoxOverlay,
+  WarningBox,
+  WarningBoxButtons,
+  LogoContainer,
+  Logo,
+  MainContent
 } from './components/compStyles.js';
 
 // Export the UUID generation function
@@ -33,38 +40,24 @@ export const generateItemId = () => `draft-${uuidv4()}`;
  */
 function Sidebar({ handleLogout, handleChangeItem }) {
   return (
-    <nav className="sidebar">
-      <ul className="nav flex-column">
-        {/* Home Link */}
-        <li className="nav-item">
-          <NavLink to="/" end className="nav-link" title="Home">
-            <i className="fas fa-home icon-teal"></i>
-            <span className="ms-2">Home</span>
-          </NavLink>
-        </li>
-        {/* New Item Link */}
-        <li className="nav-item">
-          <button onClick={handleChangeItem} className="nav-link btn btn-link" title="Change Item">
-            <i className="fas fa-plus-circle icon-teal"></i>
-            <span className="ms-2">Change Item</span>
-          </button>
-        </li>
-        {/* View Items Link */}
-        <li className="nav-item">
-          <NavLink to="/view-items" className="nav-link" title="View Items">
-            <i className="fas fa-list icon-teal"></i>
-            <span className="ms-2">View Items</span>
-          </NavLink>
-        </li>
-        {/* Logout Button */}
-        <li className="nav-item">
-          <button onClick={handleLogout} className="nav-link btn btn-link" title="Logout">
-            <i className="fas fa-sign-out-alt icon-teal"></i>
-            <span className="ms-2">Logout</span>
-          </button>
-        </li>
-      </ul>
-    </nav>
+    <StyledSidebar>
+      <NavLink as={Link} to="/" end="true" title="Home">
+        <i className="fas fa-home"></i>
+        <span>Home</span>
+      </NavLink>
+      <NavLink as="button" onClick={handleChangeItem} title="Change Item">
+        <i className="fas fa-plus-circle"></i>
+        <span>Change Item</span>
+      </NavLink>
+      <NavLink as={Link} to="/view-items" title="View Items">
+        <i className="fas fa-list"></i>
+        <span>View Items</span>
+      </NavLink>
+      <NavLink as="button" onClick={handleLogout} title="Logout">
+        <i className="fas fa-sign-out-alt"></i>
+        <span>Logout</span>
+      </NavLink>
+    </StyledSidebar>
   );
 }
 
@@ -75,29 +68,29 @@ Sidebar.propTypes = {
 };
 
 /**
- * WarningBox Component
+ * WarningBoxModal Component
  * Displays a modal overlay with a warning message before proceeding.
  * 
  * @param {Function} onProceed - Callback when user chooses to proceed.
  * @param {Function} onGoBack - Callback when user chooses to go back.
  */
-function WarningBox({ onProceed, onGoBack }) {
+function WarningBoxModal({ onProceed, onGoBack }) {
   return (
-    <ModalOverlay>
-      <ModalContent>
+    <WarningBoxOverlay>
+      <WarningBox>
         <StyledTitle>Whoa there, bargain hunter!</StyledTitle>
         <StyledSubtitle>Are you sure you want to embark on a new treasure hunt? Any unsaved progress on your current item will vanish faster than a yard sale deal!</StyledSubtitle>
-        <div>
+        <WarningBoxButtons>
           <ModalButton onClick={onProceed}>Let's do this!</ModalButton>
           <ModalButton onClick={onGoBack}>Oops, nevermind!</ModalButton>
-        </div>
-      </ModalContent>
-    </ModalOverlay>
+        </WarningBoxButtons>
+      </WarningBox>
+    </WarningBoxOverlay>
   );
 }
 
-// Define PropTypes for WarningBox
-WarningBox.propTypes = {
+// Define PropTypes for WarningBoxModal
+WarningBoxModal.propTypes = {
   onProceed: PropTypes.func.isRequired,
   onGoBack: PropTypes.func.isRequired,
 };
@@ -133,27 +126,28 @@ function LandingPage({ handleNewItem, setCurrentItemId, setMostRecentItemId }) {
 
   return (
     <StyledContainer>
-      <div className="row justify-content-center">
-        <div className="col-md-8 text-center">
-          {/* Display the Moola-Matic Logo */}
-          <StyledLogo 
+      <div>
+        <LogoContainer>
+          <Logo 
             src={moolaMaticLogo} 
-            alt="Moola-Matic Logo" 
-            className="square-to-circle" 
+            alt="Moola-Matic Logo"
           />
-          <StyledTitle>Moola-Matic</StyledTitle>
-          <StyledSubtitle>Turn your thrifty finds into a treasure trove of cold, hard cash!</StyledSubtitle>
-          <div className="mb-4">
-            <GlowingButton onClick={handleNewItemClick} className="me-2 dark-red-glow">New Item</GlowingButton>
-            <GlowingButton as={NavLink} to="/view-items" className="cyan-glow">View Items</GlowingButton>
-          </div>
-          {showWarning && (
-            <WarningBox onProceed={handleProceed} onGoBack={handleGoBack} />
-          )}
-          <div className="info-box">
-            <p>Are you sitting on a goldmine of garage sale goodies? Let Moola-Matic help you squeeze every last penny out of your dusty discoveries!</p>
-            <p className="fst-italic">We're like a money-making time machine for your junk drawer!</p>
-          </div>
+        </LogoContainer>
+        <StyledTitle>Moola-Matic</StyledTitle>
+        <StyledSubtitle>Turn your thrifty finds into a treasure trove of cold, hard cash!</StyledSubtitle>
+        <div>
+          <GlowingButton onClick={handleNewItemClick}>New Item</GlowingButton>
+          <GlowingButton as={Link} to="/view-items">View Items</GlowingButton>
+        </div>
+        {showWarning && (
+          <WarningBoxModal
+            onProceed={handleProceed}
+            onGoBack={handleGoBack}
+          />
+        )}
+        <div>
+          <p>Are you sitting on a goldmine of garage sale goodies? Let Moola-Matic help you squeeze every last penny out of your dusty discoveries!</p>
+          <p>We're like a money-making time machine for your junk drawer!</p>
         </div>
       </div>
     </StyledContainer>
@@ -215,6 +209,21 @@ class ErrorBoundary extends React.Component {
 ErrorBoundary.propTypes = {
   children: PropTypes.node.isRequired,
 };
+
+/**
+ * NotFound Component
+ * Displays a 404 error page when a route is not found.
+ */
+function NotFound() {
+  return (
+    <StyledContainer>
+      <StyledTitle>404 - Page Not Found</StyledTitle>
+      <StyledSubtitle>Oops! It looks like this page has vanished like a yard sale bargain.</StyledSubtitle>
+      <p>Don't worry, there are still plenty of treasures to be found!</p>
+      <GlowingButton as={Link} to="/">Return to Home</GlowingButton>
+    </StyledContainer>
+  );
+}
 
 /**
  * App Component
@@ -286,7 +295,7 @@ function AppContent() {
     <ErrorBoundary>
       <PageContainer>
         <Sidebar handleLogout={handleLogout} handleChangeItem={handleChangeItem} />
-        <main className="flex-grow-1 p-3">
+        <MainContent>
           <Routes>
             <Route path="/" element={
               <LandingPage 
@@ -314,8 +323,9 @@ function AppContent() {
               } 
             />
             <Route path="/view-items" element={<ViewItemsPage />} />
+            <Route path="*" element={<NotFound />} />
           </Routes>
-        </main>
+        </MainContent>
       </PageContainer>
     </ErrorBoundary>
   );

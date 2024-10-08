@@ -53,7 +53,8 @@ import {
   GlowingButton,
   ModalOverlay,
   ModalContent,
-  ModalButton
+  ModalButton,
+  MainContentArea
 } from './components/compStyles.js';
 
 // Helper functions
@@ -247,7 +248,6 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
     console.log('Submitting item:', item);
     // Add your submission logic here
   };
-
 
   // Handle sending messages
   const sendMessage = async () => {
@@ -498,134 +498,138 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
         <StyledSubtitle>Ready to turn that rusty gold into shiny cash? Let's get started!</StyledSubtitle>
       </StyledHeader>
       
-      <ChatComp 
-        item={item}
-        updateItem={updateItem}
-        messages={messages}
-        setMessages={setMessages}
-        currentItemId={item?.itemId} // Use optional chaining
-        onFileChange={handleFileChange}  // Add this prop
-        isLoading={isLoading}
-        onStartLoading={handleStartLoading}
-        onEndLoading={handleEndLoading}
-        imageUploaded={imageUploaded}
-        setImageUploaded={setImageUploaded}
-        imagePreview={imagePreview}  // Pass the imagePreview to ChatComp
-        selectedImage={selectedImage}
-        setSelectedImage={setSelectedImage}
-      />
-
-      <GlowingButton 
-        onClick={handleImageButtonClick}
-        disabled={!isPromptLoaded || isLoading}
-      >
-        <i className="fas fa-image"></i> Add Images
-      </GlowingButton>
-
-      <UploadedImagesGallery
-        images={uploadedImages}
-        onSelect={handleImageSelect}
-        selectedImage={selectedImage}
-        onDelete={handleDeleteImage}
-      />
-
-      {/* Image Selection Modal */}
-      {showImageModal && (
-        <ModalOverlay onClick={() => setShowImageModal(false)}>
-          <ModalContent onClick={(e) => e.stopPropagation()}>
-            <h2>Add Images</h2>
-            <p>Choose how you'd like to add images:</p>
-            <ModalButton onClick={handleCameraClick}>
-              <i className="fas fa-camera"></i> Camera
-            </ModalButton>
-            <ModalButton onClick={handleMediaClick}>
-              <i className="fas fa-folder-open"></i> Media
-            </ModalButton>
-          </ModalContent>
-        </ModalOverlay>
-      )}
-
-      {/* Hidden File Inputs */}
-      <input
-        type="file"
-        ref={cameraInputRef}
-        style={{ display: 'none' }}
-        accept="image/*"
-        capture="environment"
-        onChange={handleFileChange}
-      />
-
-      <input
-        type="file"
-        ref={fileInputRef}
-        style={{ display: 'none' }}
-        accept="image/*"
-        onChange={handleFileChange}
-      />
-
-      <StyledForm onSubmit={handleSubmit}>
-        <StyledFormGroup>
-          <StyledLabel htmlFor="itemName">Item Name</StyledLabel>
-          <StyledInput 
-            type="text" 
-            id="itemName" 
-            value={item?.name || ''} 
-            onChange={(e) => updateItem('name', e.target.value)} 
-            required 
+      <MainContentArea>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <ChatComp 
+            item={item}
+            updateItem={updateItem}
+            messages={messages}
+            setMessages={setMessages}
+            currentItemId={item?.itemId} // Use optional chaining
+            onFileChange={handleFileChange}  // Add this prop
+            isLoading={isLoading}
+            onStartLoading={handleStartLoading}
+            onEndLoading={handleEndLoading}
+            imageUploaded={imageUploaded}
+            setImageUploaded={setImageUploaded}
+            imagePreview={imagePreview}  // Pass the imagePreview to ChatComp
+            selectedImage={selectedImage}
+            setSelectedImage={setSelectedImage}
           />
-        </StyledFormGroup>
 
-        <StyledFormGroup>
-          <StyledLabel htmlFor="brand">Brand</StyledLabel>
-          <StyledInput 
-            type="text" 
-            id="brand" 
-            value={item?.brand || ''} 
-            onChange={(e) => updateItem('brand', e.target.value)} 
-          />
-        </StyledFormGroup>
-
-        <StyledFormGroup>
-          <StyledLabel htmlFor="condition">Condition</StyledLabel>
-          <StyledSelect 
-            id="condition" 
-            value={item?.condition || ''} 
-            onChange={(e) => updateItem('condition', e.target.value)} 
-            required 
+          <GlowingButton 
+            onClick={handleImageButtonClick}
+            disabled={!isPromptLoaded || isLoading}
           >
-            <option value="">Select condition</option>
-            <option value="new">New</option>
-            <option value="like-new">Like New</option>
-            <option value="good">Good</option>
-            <option value="fair">Fair</option>
-            <option value="poor">Poor</option>
-          </StyledSelect>
-        </StyledFormGroup>
+            <i className="fas fa-image"></i> Add Images
+          </GlowingButton>
 
-        <StyledFormGroup>
-          <StyledLabel htmlFor="description">Description</StyledLabel>
-          <StyledTextarea 
-            id="description" 
-            rows="3" 
-            value={item?.description || ''} 
-            onChange={(e) => updateItem('description', e.target.value)} 
-          ></StyledTextarea>
-        </StyledFormGroup>
+          <UploadedImagesGallery
+            images={uploadedImages}
+            onSelect={handleImageSelect}
+            selectedImage={selectedImage}
+            onDelete={handleDeleteImage}
+          />
 
-        {/* Continue with the rest of your form fields using the styled components... */}
+          {/* Image Selection Modal */}
+          {showImageModal && (
+            <ModalOverlay onClick={() => setShowImageModal(false)}>
+              <ModalContent onClick={(e) => e.stopPropagation()}>
+                <h2>Add Images</h2>
+                <p>Choose how you'd like to add images:</p>
+                <ModalButton onClick={handleCameraClick}>
+                  <i className="fas fa-camera"></i> Camera
+                </ModalButton>
+                <ModalButton onClick={handleMediaClick}>
+                  <i className="fas fa-folder-open"></i> Media
+                </ModalButton>
+              </ModalContent>
+            </ModalOverlay>
+          )}
 
-        <StyledButton type="submit">Evaluate Item</StyledButton>
-      </StyledForm>
+          {/* Hidden File Inputs */}
+          <input
+            type="file"
+            ref={cameraInputRef}
+            style={{ display: 'none' }}
+            accept="image/*"
+            capture="environment"
+            onChange={handleFileChange}
+          />
 
-      <StyledButton onClick={() => handleManualSave(item, uploadedImages, backendPort, setItem, setUploadedImages, setHasUnsavedChanges, setLastAutoSave)}>
-        Save Draft
-      </StyledButton>
+          <input
+            type="file"
+            ref={fileInputRef}
+            style={{ display: 'none' }}
+            accept="image/*"
+            onChange={handleFileChange}
+          />
 
-      {lastAutoSave && (
-        <p>Last auto-save: {lastAutoSave.toLocaleTimeString()}</p>
-      )}
+          <StyledForm onSubmit={handleSubmit}>
+            <StyledFormGroup>
+              <StyledLabel htmlFor="itemName">Item Name</StyledLabel>
+              <StyledInput 
+                type="text" 
+                id="itemName" 
+                value={item?.name || ''} 
+                onChange={(e) => updateItem('name', e.target.value)} 
+                required 
+              />
+            </StyledFormGroup>
 
-      {hasUnsavedChanges && <span>Unsaved changes</span>}
+            <StyledFormGroup>
+              <StyledLabel htmlFor="brand">Brand</StyledLabel>
+              <StyledInput 
+                type="text" 
+                id="brand" 
+                value={item?.brand || ''} 
+                onChange={(e) => updateItem('brand', e.target.value)} 
+              />
+            </StyledFormGroup>
+
+            <StyledFormGroup>
+              <StyledLabel htmlFor="condition">Condition</StyledLabel>
+              <StyledSelect 
+                id="condition" 
+                value={item?.condition || ''} 
+                onChange={(e) => updateItem('condition', e.target.value)} 
+                required 
+              >
+                <option value="">Select condition</option>
+                <option value="new">New</option>
+                <option value="like-new">Like New</option>
+                <option value="good">Good</option>
+                <option value="fair">Fair</option>
+                <option value="poor">Poor</option>
+              </StyledSelect>
+            </StyledFormGroup>
+
+            <StyledFormGroup>
+              <StyledLabel htmlFor="description">Description</StyledLabel>
+              <StyledTextarea 
+                id="description" 
+                rows="3" 
+                value={item?.description || ''} 
+                onChange={(e) => updateItem('description', e.target.value)} 
+              ></StyledTextarea>
+            </StyledFormGroup>
+
+            {/* Continue with the rest of your form fields using the styled components... */}
+
+            <StyledButton type="submit">Evaluate Item</StyledButton>
+          </StyledForm>
+
+          <StyledButton onClick={() => handleManualSave(item, uploadedImages, backendPort, setItem, setUploadedImages, setHasUnsavedChanges, setLastAutoSave)}>
+            Save Draft
+          </StyledButton>
+
+          {lastAutoSave && (
+            <p>Last auto-save: {lastAutoSave.toLocaleTimeString()}</p>
+          )}
+
+          {hasUnsavedChanges && <span>Unsaved changes</span>}
+        </div>
+      </MainContentArea>
     </PageContainer>
   );
 }

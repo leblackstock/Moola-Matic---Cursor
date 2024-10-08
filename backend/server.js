@@ -61,19 +61,47 @@ app.use(cors({
 // Serve static files from the uploads directory
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
-app.use(helmet()); // Secure HTTP headers
+// Replace the existing Helmet middleware with this more comprehensive configuration
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
+  },
+  referrerPolicy: {
+    policy: 'strict-origin-when-cross-origin',
+  },
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true
+  },
+  xssFilter: true,
+  noSniff: true,
+  frameguard: {
+    action: 'deny'
+  }
+}));
 
 // Session setup to manage conversation history and image references
+import MongoStore from 'connect-mongo';
 app.use(
   session({
     secret: process.env.SESSION_SECRET || 'default_secret', // Use the SESSION_SECRET from .env
     resave: false,                      // Don't save session if unmodified
-    saveUninitialized: true,            // Save uninitialized sessions
+    saveUninitialized: false,            // Save uninitialized sessions
+    store: MongoStore.create({
+      mongoUrl: process.env.MONGODB_URI,
+      ttl: 14 * 24 * 60 * 60 // = 14 days. Default
+    }),
     cookie: { 
       secure: process.env.NODE_ENV === 'production', // Set to true in production with HTTPS
       httpOnly: true, // Prevents client-side JavaScript from accessing the cookie
-      maxAge: 24 * 60 * 60 * 1000, // 1 day
-      sameSite: 'lax', // Helps protect against CSRF attacks
+      maxAge: 14 * 24 * 60 * 60 * 1000, // 14 days
+      sameSite: 'strict' // Helps protect against CSRF attacks
     },
   })
 );
