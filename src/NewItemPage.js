@@ -5,7 +5,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 import treasureSpecs from './Images/Treasure_Specs01.jpeg';
-import { handleChatWithAssistant, analyzeImageWithGPT4Turbo, createUserMessage, createAssistantMessage } from './api/chat.js';
+import { 
+  handleChatWithAssistant, 
+  analyzeImageWithGPT4Turbo, 
+  createUserMessage, 
+  createAssistantMessage 
+} from './api/chat.js';
 import axios from 'axios';
 import UploadedImagesGallery from './components/compGallery.js';
 import PropTypes from 'prop-types';
@@ -17,10 +22,9 @@ import {
   loadLocalData, 
   clearLocalData, 
   updateContextData,
-  createDefaultItem
+  createDefaultItem,
+  handleDraftSaveWithImages
 } from './components/compSave.js';
-
-// AI NOTE: Do not create new items in this file. New item creation should only be handled in App.js.
 
 // Import all styled components
 import {
@@ -43,7 +47,7 @@ import {
   ModalButton
 } from './components/compStyles.js';
 
-// Add this function near the top of your file, outside of the NewItemPage component
+// Helper functions
 const getBase64 = (file) => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -53,15 +57,18 @@ const getBase64 = (file) => {
   });
 };
 
-// Add this function at the top of your file
 const loadItemData = (itemId) => {
   return loadLocalData(itemId);
 };
 
 function NewItemPage({ setMostRecentItemId, currentItemId }) {
   const { itemId: paramItemId } = useParams();
-  const [item, setItem] = useState(null);
   const navigate = useNavigate();
+
+  // ----------------------------
+  // Unconditionally declare Hooks
+  // ----------------------------
+  const [item, setItem] = useState(null);
   const [contextData, setContextData] = useState(null);
   const [messages, setMessages] = useState([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -72,64 +79,63 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
   const [imagePreview, setImagePreview] = useState('');
   const [uploadedImages, setUploadedImages] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [message, setMessage] = useState('');
+  const [imageFile, setImageFile] = useState(null);
+  const [imageInput, setImageInput] = useState('');
+  const [imageAnalysis, setImageAnalysis] = useState(null);
+  const [imageAnalyzed, setImageAnalyzed] = useState(false);
+  const [imageAnalysisPrompt, setImageAnalysisPrompt] = useState('');
+  const [isPromptLoaded, setIsPromptLoaded] = useState(false);
+  const [showNotification, setShowNotification] = useState(false);
+
+  const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
+  const messagesContainerRef = useRef(null);
 
   console.log('NewItemPage: Rendered with itemId from params:', paramItemId, 'and currentItemId prop:', currentItemId);
 
+  // ---------------------------------
+  // useEffect Hook: Load or Create Item
+  // ---------------------------------
   useEffect(() => {
     const idToUse = paramItemId || currentItemId;
     console.log('NewItemPage: Using itemId:', idToUse);
 
     if (idToUse) {
       const loadedItem = loadItemData(idToUse);
-      if (loadedItem) {
-        console.log('NewItemPage: Loaded existing item:', loadedItem);
-        setItem(loadedItem);
+      if (loadedItem && loadedItem.item) {
+        console.log('NewItemPage: Loaded existing item:', loadedItem.item);
+        setItem(loadedItem.item);
+        setContextData(loadedItem.contextData || {});
+        setMessages(loadedItem.messages || []);
       } else {
         console.log('NewItemPage: Creating new item with ID:', idToUse);
         const newItem = createDefaultItem(idToUse);
         setItem(newItem);
         handleLocalSave(newItem, {}, []); // Save the new item immediately
+        console.log('NewItemPage: New item saved locally');
       }
       setMostRecentItemId(idToUse);
+      console.log('NewItemPage: Set most recent item ID:', idToUse);
     } else {
       console.error('NewItemPage: No valid itemId available');
+      navigate('/'); // Redirect to home page if no valid ID
     }
 
-    // Cleanup function
+    // Cleanup function to clear local data on unmount
     return () => {
-      console.log('NewItemPage: Cleanup - Not clearing local data');
-      // We're not clearing local data here anymore
+      if (item?.itemId) {
+        console.log('NewItemPage: Cleanup - Clearing local data for itemId:', item.itemId);
+        clearLocalData(item.itemId);
+      }
     };
-  }, [paramItemId, currentItemId, setMostRecentItemId]);
+  }, [paramItemId, currentItemId, setMostRecentItemId, navigate]);
 
-  // Prevent rendering until we have an item
-  if (!item) {
-    return <div>Loading...</div>;
-  }
-
-  const updateItem = (field, value) => {
-    setItem(prevItem => {
-      const updatedItem = { ...prevItem, [field]: value };
-      console.log('updateItem: Updating item:', updatedItem);
-      handleLocalSave(updatedItem, {}, []); // Save after each update
-      return updatedItem;
-    });
-  };
-
-  // Rename this function to avoid naming conflict
-  const handleManualSave = async () => {
-    try {
-      const savedDraft = await handleDraftSave(item, messages, item.itemId, backendPort);
-      setHasUnsavedChanges(false);
-      setLastAutoSave(new Date());
-      setShowNotification(true);
-      setTimeout(() => setShowNotification(false), 3000);
-    } catch (error) {
-      console.error('Error saving draft:', error);
-    }
-  };
-
-  // Auto-save functionality
+  // ----------------------------
+  // useEffect Hook: Auto-Save
+  // ----------------------------
   useEffect(() => {
     const timer = setTimeout(() => {
       if (item && item.itemId && hasUnsavedChanges) {
@@ -137,6 +143,7 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
           .then(() => {
             setHasUnsavedChanges(false);
             setLastAutoSave(new Date());
+            console.log('Auto-save successful for itemId:', item.itemId);
           })
           .catch(error => console.error('Error auto-saving:', error));
       }
@@ -145,78 +152,102 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
     return () => clearTimeout(timer);
   }, [item, hasUnsavedChanges, messages, backendPort]);
 
-  // Save to localStorage
+  // ----------------------------
+  // useEffect Hook: Save to localStorage
+  // ----------------------------
   useEffect(() => {
     if (item) {
       handleLocalSave(item, contextData, messages);
     }
   }, [item, contextData, messages]);
 
-  // Clear localStorage on unmount
+  // ----------------------------
+  // useEffect Hook: Clear localStorage on unmount
+  // ----------------------------
   useEffect(() => {
     return () => {
-      if (item) {
+      if (item && item.itemId) {
+        console.log('NewItemPage: Cleanup - Clearing local data for itemId:', item.itemId);
         clearLocalData(item.itemId);
       }
     };
   }, [item]);
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  // ----------------------------
+  // useEffect Hook: Fetch Image Analysis Prompt
+  // ----------------------------
+  useEffect(() => {
+    const fetchImageAnalysisPrompt = async () => {
+      try {
+        const response = await fetch('/api/image-analysis-prompt');
+        if (!response.ok) {
+          throw new Error('Failed to fetch IMAGE_ANALYSIS_PROMPT');
+        }
+        const data = await response.json();
+        setImageAnalysisPrompt(data.IMAGE_ANALYSIS_PROMPT);
+        setIsPromptLoaded(true);
+        console.log('Fetched IMAGE_ANALYSIS_PROMPT:', data.IMAGE_ANALYSIS_PROMPT);
+      } catch (error) {
+        console.error('Error fetching IMAGE_ANALYSIS_PROMPT:', error);
+        // Optionally, set some error state here
+      }
+    };
+
+    fetchImageAnalysisPrompt();
+  }, []);
+
+  // ----------------------------
+  // useEffect Hook: Set Selected Image if Needed
+  // ----------------------------
+  useEffect(() => {
+    if (uploadedImages.length > 0 && !selectedImage) {
+      setSelectedImage(uploadedImages[uploadedImages.length - 1]);
+    }
+  }, [uploadedImages, selectedImage]);
+
+  // ----------------------------
+  // Other Functions and Handlers
+  // ----------------------------
+
+  // Handle manual save
+  const handleManualSave = async () => {
+    try {
+      setIsSubmitting(true);
+      const savedDraft = await handleDraftSaveWithImages(item, messages, item.itemId, backendPort);
+      console.log('Manual save successful:', savedDraft);
+      setShowNotification(true);
+      setTimeout(() => setShowNotification(false), 3000);
+    } catch (error) {
+      console.error('Error during manual save:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // Your existing submit logic, using `item` instead of `draftItem`
     console.log('Submitting item:', item);
     // Add your submission logic here
+    // Ensure to handle submission without removing any existing functionality
   };
 
-  // State for chat messages and AI interaction
-  const [message, setMessage] = useState('');
-  const [imageFile, setImageFile] = useState(null);
-
-  // New state variables for image input and analysis
-  const [imageInput, setImageInput] = useState('');
-  const [imageAnalysis, setImageAnalysis] = useState(null);
-
-  // New state variable to track whether an image has been analyzed
-  const [imageAnalyzed, setImageAnalyzed] = useState(false);
-
-  const [imageAnalysisPrompt, setImageAnalysisPrompt] = useState('');
-  const [isPromptLoaded, setIsPromptLoaded] = useState(false);
-
-  // Function to summarize messages to optimize token usage
-  const summarizeMessages = async (msgs) => {
-    const MAX_MESSAGES = 10; // Define maximum number of messages to keep
-    if (msgs.length > MAX_MESSAGES) {
-      // Implement summarization by sending the first N messages to Moola-Matic for summarization
-      const messagesToSummarize = msgs.slice(0, msgs.length - MAX_MESSAGES);
-      const summary = await handleChatWithAssistant([
-        ...messagesToSummarize,
-        { role: 'user', content: 'Please summarize the above conversation.' }
-      ]);
-
-      // Replace the old messages with the summary and the recent messages
-      const recentMessages = msgs.slice(-MAX_MESSAGES);
-      return [{ role: 'system', content: summary }, ...recentMessages];
-    }
-    return msgs;
+  // Update item handler
+  const updateItem = (field, value) => {
+    setItem(prevItem => {
+      if (!prevItem) {
+        console.error('updateItem: prevItem is null');
+        return null;
+      }
+      const updatedItem = { ...prevItem, [field]: value };
+      console.log('updateItem: Updating item:', updatedItem);
+      handleLocalSave(updatedItem, contextData, messages); // Save after each update
+      setHasUnsavedChanges(true);
+      return updatedItem;
+    });
   };
 
-  // Add this function near the top of your component
-  const setMessagesAndSave = (newMessages) => {
-    setMessages(newMessages);
-    // If you want to save messages to localStorage or backend, do it here
-    localStorage.setItem(`messages_${item.itemId}`, JSON.stringify(newMessages));
-  };
-
-  // Add this function to render message content
-  const renderContent = (content) => {
-    // You can customize this function based on how you want to render different types of content
-    return <div>{content}</div>;
-  };
-
-  // Updated sendMessage function
+  // Handle sending messages
   const sendMessage = async () => {
     const generalInput = message.trim();
     const imageSpecificInput = imageInput.trim();
@@ -247,7 +278,7 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
       console.log('Assistant response:', response);
 
       // Update the UI with the new message and response
-      setMessagesAndSave(prevMessages => {
+      setMessages(prevMessages => {
         const newMessages = [
           ...prevMessages,
           { role: 'user', content: imageFile ? imageSpecificInput : generalInput },
@@ -265,7 +296,7 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
       setContextData(updatedContextData);
     } catch (error) {
       console.error('Error interacting with Moola-Matic assistant:', error);
-      setMessagesAndSave(prevMessages => [
+      setMessages(prevMessages => [
         ...prevMessages,
         { role: 'assistant', content: 'I apologize, but I encountered an error while processing your request. Please try again or contact support if the issue persists.' }
       ]);
@@ -274,37 +305,7 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
     }
   };
 
-  const messagesContainerRef = useRef(null);
-
-  // Scroll to the bottom of the messages container when messages update
-  useEffect(() => {
-    if (messagesContainerRef.current) {
-      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
-    }
-  }, [messages]);
-
-  const [showImageModal, setShowImageModal] = useState(false);
-  const fileInputRef = useRef(null);
-  const cameraInputRef = useRef(null);
-
-  // Handle image button click to show modal
-  const handleImageButtonClick = () => {
-    setShowImageModal(true);
-  };
-
-  // Handle camera input
-  const handleCameraClick = () => {
-    cameraInputRef.current.click();
-    setShowImageModal(false);
-  };
-
-  // Handle media input
-  const handleMediaClick = () => {
-    fileInputRef.current.click();
-    setShowImageModal(false);
-  };
-
-  // Handle file selection
+  // Handle file changes
   const handleFileChange = async (event) => {
     console.log("handleFileChange called in NewItemPage");
     const files = event.target.files;
@@ -317,11 +318,15 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
       const imagePreviewUrl = URL.createObjectURL(image);
       setImagePreview(imagePreviewUrl);  // Set the image preview
 
+      // Save the image to the temp directory
+      const tempImagePath = await saveTempImage(image);
+
       // Create the new image object
       const newImage = {
         id: Date.now().toString(),
         url: imagePreviewUrl,
-        file: image
+        file: image,
+        tempPath: tempImagePath
       };
 
       // Add the new image to the gallery and set it as selected immediately
@@ -332,7 +337,7 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
       // Safely update the item.images array
       setItem(prevItem => ({
         ...prevItem,
-        images: Array.isArray(prevItem.images) ? [...prevItem.images, image] : [image]
+        images: [...prevItem.images, { file: image, url: URL.createObjectURL(image) }]
       }));
 
       // Analyze the image
@@ -345,11 +350,6 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
           { role: 'assistant', content: assistantResponse }
         ]);
         setImageAnalyzed(true);
-
-        // If you need the base64 version, you can add it here
-        // newImage.base64 = await getBase64(image);
-        // setUploadedImages(prevImages => prevImages.map(img => img.id === newImage.id ? {...img, base64: newImage.base64} : img));
-
       } catch (error) {
         console.error('Error analyzing image:', error);
         setMessages(prevMessages => [
@@ -362,32 +362,25 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
     }
   };
 
-  useEffect(() => {
-    const fetchImageAnalysisPrompt = async () => {
-      try {
-        const response = await fetch('/api/image-analysis-prompt');
-        if (!response.ok) {
-          throw new Error('Failed to fetch IMAGE_ANALYSIS_PROMPT');
-        }
-        const data = await response.json();
-        setImageAnalysisPrompt(data.IMAGE_ANALYSIS_PROMPT);
-        setIsPromptLoaded(true);
-      } catch (error) {
-        console.error('Error fetching IMAGE_ANALYSIS_PROMPT:', error);
-        // Optionally, set some error state here
-      }
-    };
+  // Function to save the image to the temp directory
+  const saveTempImage = async (file) => {
+    const formData = new FormData();
+    formData.append('image', file);
 
-    fetchImageAnalysisPrompt();
-  }, []);
-
-  // When you need to use the prompt:
-  const analyzeImage = async (file) => {
-    // ... other code ...
-    const response = await analyzeImageWithGPT4Turbo(file, imageAnalysisPrompt);
-    // ... other code ...
+    try {
+      const response = await axios.post(`http://localhost:${backendPort}/api/temp-image/upload`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error saving temp image:', error);
+      throw error;
+    }
   };
 
+  // Analyze Image Function
   const analyzeImageWithGPT4Turbo = async (file, message, isInitialAnalysis = true) => {
     // Convert the file to base64
     const base64Image = await fileToBase64(file);
@@ -428,6 +421,7 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
     });
   };
 
+  // Send Image Message
   const sendImageMessage = async () => {
     if (!imageFile || !imageInput.trim()) return;
 
@@ -443,14 +437,14 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
     try {
       const assistantResponse = await analyzeImageWithGPT4Turbo(imageFile, imageInput.trim(), false);
       
-      setMessagesAndSave(prevMessages => [
+      setMessages(prevMessages => [
         ...prevMessages,
         { role: 'user', content: imageInput.trim(), image: imagePreview },
         { role: 'assistant', content: assistantResponse },
       ]);
     } catch (error) {
       console.error('Error in sendImageMessage:', error);
-      setMessagesAndSave(prevMessages => [
+      setMessages(prevMessages => [
         ...prevMessages,
         { role: 'assistant', content: 'Sorry, an error occurred. Please try again.' },
       ]);
@@ -462,18 +456,29 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
     }
   };
 
-  // Add this new state variable for the notification
-  const [showNotification, setShowNotification] = useState(false);
-
-  useEffect(() => {
-    if (item) {
-      return () => {
-        localStorage.removeItem(`item_${item.itemId}`);
-        localStorage.removeItem(`contextData_${item.itemId}`);
-        localStorage.removeItem(`messages_${item.itemId}`);
-      };
+  // Handle Image Selection
+  const handleImageSelect = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      setImageFile(file);
+      // You might want to add more logic here, like updating the item state
     }
-  }, [item]);
+  };
+
+  // Additional Handlers
+  const handleImageButtonClick = () => {
+    setShowImageModal(true);
+  };
+
+  const handleCameraClick = () => {
+    cameraInputRef.current.click();
+    setShowImageModal(false);
+  };
+
+  const handleMediaClick = () => {
+    fileInputRef.current.click();
+    setShowImageModal(false);
+  };
 
   const handleStartLoading = () => {
     setIsLoading(true);
@@ -483,19 +488,14 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
     setIsLoading(false);
   };
 
-  useEffect(() => {
-    if (uploadedImages.length > 0 && !selectedImage) {
-      setSelectedImage(uploadedImages[uploadedImages.length - 1]);
-    }
-  }, [uploadedImages, selectedImage]);
-
-  const handleImageSelect = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      setImageFile(file);
-      // You might want to add more logic here, like updating the item state
-    }
+  const handleDeleteImage = (imageToDelete) => {
+    setUploadedImages(prevImages => prevImages.filter(img => img.id !== imageToDelete.id));
   };
+
+  // Render loading state if item is null
+  if (!item) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <PageContainer>
@@ -515,8 +515,8 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
         item={item}
         updateItem={updateItem}
         messages={messages}
-        setMessages={setMessagesAndSave}
-        currentItemId={item.id}
+        setMessages={setMessages}
+        currentItemId={item?.itemId} // Use optional chaining
         onFileChange={handleFileChange}  // Add this prop
         isLoading={isLoading}
         onStartLoading={handleStartLoading}
@@ -539,6 +539,7 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
         images={uploadedImages}
         onSelect={handleImageSelect}
         selectedImage={selectedImage}
+        onDelete={handleDeleteImage}
       />
 
       {/* Image Selection Modal */}

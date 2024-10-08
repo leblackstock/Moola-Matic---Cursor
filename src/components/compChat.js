@@ -22,7 +22,9 @@ import {
   ImagePreviewContainer,
   ImagePreview,
   LoadingIndicator,
-  StyledButton
+  StyledButton,
+  LoadingOverlay,
+  LoadingSpinner
 } from './compStyles.js';
 
 function ChatComp({ item, updateItem, messages, setMessages, currentItemId, isLoading, onStartLoading, onEndLoading, imageUploaded, setImageUploaded, imagePreview: propImagePreview, selectedImage, setSelectedImage }) {
@@ -225,6 +227,11 @@ function ChatComp({ item, updateItem, messages, setMessages, currentItemId, isLo
 
   return (
     <AIChatBox>
+      {isLoading && (
+        <LoadingOverlay>
+          <LoadingSpinner />
+        </LoadingOverlay>
+      )}
       <h3>Moola-Matic Wizard</h3>
       <ChatHistory ref={messagesContainerRef}>
         {messages.length > 0 ? (

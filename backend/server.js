@@ -17,6 +17,11 @@ import connectDB from './config/database.js';  // Import the database connection
 // Import the assistant module functions
 import { handleMoolaMaticChat, manageContext } from './chat/chatService.js';
 
+// Import new routers
+import tempImageRouter from './api/apiTempImage.js';
+import draftImageRouter from './api/apiDraftImage.js';
+import purchaseImageRouter from './api/apiPurchaseImage.js';
+
 // Resolve __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -97,6 +102,11 @@ const upload = multer({
 
 // Use the items router with the '/api' prefix
 app.use('/api', itemsRouter);
+
+// Use the new image routers
+app.use('/api/temp-image', tempImageRouter);
+app.use('/api/draft-image', draftImageRouter);
+app.use('/api/purchase-image', purchaseImageRouter);
 
 // Test route to check server status
 app.get('/', (req, res) => {

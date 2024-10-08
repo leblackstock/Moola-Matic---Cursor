@@ -146,7 +146,12 @@ export const ModalButton = styled(GlowingButton)`
   width: 120px;
 `;
 
-export const AIChatBox = styled.div`
+export const ChatContainer = styled.div`
+  position: relative;
+  // Add any other styles you want for the chat container
+`;
+
+export const AIChatBox = styled(ChatContainer)`
   margin-bottom: 2rem;
   padding: 20px;
   background: rgba(13, 0, 26, 0.8);
@@ -357,22 +362,19 @@ export const LoadingIndicator = styled.div`
   background: rgba(13, 0, 26, 0.4);
   border-radius: 10px;
   box-shadow: 0 0 10px rgba(138, 43, 226, 0.3);
+`;
 
+export const LoadingEllipsis = styled.span`
   &:after {
     content: '...';
-    position: absolute;
-    width: 0;
-    height: 100%;
-    left: 0;
     animation: ellipsis 1.5s infinite;
     overflow: hidden;
   }
 
   @keyframes ellipsis {
-    0% { width: 0; }
-    33% { width: 10px; }
-    66% { width: 20px; }
-    100% { width: 30px; }
+    0% { content: '.'; }
+    33% { content: '..'; }
+    66% { content: '...'; }
   }
 `;
 
@@ -395,7 +397,25 @@ export const PageSubtitle = styled.p`
 `;
 
 export const DeleteButton = styled.button`
-  // ... (add appropriate styles)
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background-color: rgba(255, 0, 0, 0.7);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 25px;
+  height: 25px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.3s ease;
+
+  &:hover {
+    background-color: rgba(255, 0, 0, 1);
+  }
 `;
 
 export const ItemList = styled.ul`
@@ -452,4 +472,30 @@ export const DraftItemOverlay = styled.div`
   padding: 10px;
 `;
 
-// ... (other existing styled components)
+export const LoadingOverlay = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: transparent; // Changed to transparent
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10;
+`;
+
+export const LoadingSpinner = styled.div`
+  width: 60px;
+  height: 60px;
+  border: 4px solid rgba(245, 222, 179, 0.3); // Wheat color with transparency
+  border-top: 4px solid #F5DEB3; // Solid Wheat color for contrast
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  box-shadow: 0 0 15px rgba(138, 43, 226, 0.5); // Added glow effect
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;

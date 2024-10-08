@@ -25,41 +25,35 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-router.post('/save-draft', upload.array('images', 5), async (req, res) => {
+router.post('/save-draft', upload.array('images'), async (req, res) => {
     try {
         console.log('Received files:', req.files);
         console.log('Received body:', req.body);
 
-        let draftData;
-        try {
-            draftData = JSON.parse(req.body.draftData);
-        } catch (e) {
-            draftData = req.body;
-        }
+        let draftData = JSON.parse(req.body.draftData);
         console.log('Parsed draftData:', draftData);
 
-        const itemId = draftData.itemId || draftData.id || `draft-${uuidv4()}`;
+        const itemId = draftData.itemId || `draft-${uuidv4()}`;
         draftData.itemId = itemId;
 
-        if (!itemId) {
-            return res.status(400).json({ error: 'No itemId provided' });
-        }
-
         if (req.files && req.files.length > 0) {
-            console.log('Processing files...');
-            draftData.images = await Promise.all(req.files.map(async (file) => {
+            console.log('Processing new files...');
+            const newImages = await Promise.all(req.files.map(async (file) => {
                 const oldPath = file.path;
-                const newFilename = file.filename.replace('temp-', 'draft-');
+                const newFilename = `draft-${Date.now()}-${file.originalname}`;
                 const newPath = path.join(__dirname, '..', '..', 'uploads', 'drafts', newFilename);
                 await fs.promises.rename(oldPath, newPath);
                 console.log(`Moved file from ${oldPath} to ${newPath}`);
                 return `/uploads/drafts/${newFilename}`;
             }));
+            
+            // Combine existing image URLs with new ones
+            draftData.images = [...(draftData.images || []), ...newImages];
         } else {
-            console.log('No files received');
+            console.log('No new files received');
         }
 
-        console.log('Final draftData to be saved:', draftData);
+        console.log('Final draftData images to be saved:', draftData.images);
 
         // Remove _id from draftData if it exists
         delete draftData._id;
