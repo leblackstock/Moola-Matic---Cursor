@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types'; // Import PropTypes
-import { Routes, Route, NavLink, useNavigate } from 'react-router-dom'; // Removed BrowserRouter
+import { Route, Routes, Link, NavLink, useNavigate } from 'react-router-dom'; // Removed BrowserRouter
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 import '@fortawesome/fontawesome-free/css/all.min.css';
@@ -10,6 +10,22 @@ import moolaMaticLogo from './Images/Moola-Matic Logo 01.jpeg';
 import NewItemPage from './NewItemPage.js'; // Ensure correct path and extension
 import ViewItemsPage from './ViewItemsPage.js'; // Ensure correct path and extension
 import { v4 as uuidv4 } from 'uuid';
+import { handleNewItem, handleLocalSave } from './components/compSave.js'; // Import functions from compSave
+import { 
+  PageContainer, 
+  StyledButton, 
+  StyledLogo, 
+  StyledTitle, 
+  StyledSubtitle,
+  GlowingButton,
+  StyledContainer,
+  ModalOverlay,
+  ModalContent,
+  ModalButton
+} from './components/compStyles.js';
+
+// Export the UUID generation function
+export const generateItemId = () => `draft-${uuidv4()}`;
 
 /**
  * Sidebar Component
@@ -67,16 +83,16 @@ Sidebar.propTypes = {
  */
 function WarningBox({ onProceed, onGoBack }) {
   return (
-    <div className="warning-box-overlay">
-      <div className="warning-box">
-        <h2>Whoa there, bargain hunter!</h2>
-        <p>Are you sure you want to embark on a new treasure hunt? Any unsaved progress on your current item will vanish faster than a yard sale deal!</p>
-        <div className="warning-box-buttons">
-          <button className="warning-box-button proceed-button" onClick={onProceed}>Let's do this!</button>
-          <button className="warning-box-button go-back-button" onClick={onGoBack}>Oops, nevermind!</button>
+    <ModalOverlay>
+      <ModalContent>
+        <StyledTitle>Whoa there, bargain hunter!</StyledTitle>
+        <StyledSubtitle>Are you sure you want to embark on a new treasure hunt? Any unsaved progress on your current item will vanish faster than a yard sale deal!</StyledSubtitle>
+        <div>
+          <ModalButton onClick={onProceed}>Let's do this!</ModalButton>
+          <ModalButton onClick={onGoBack}>Oops, nevermind!</ModalButton>
         </div>
-      </div>
-    </div>
+      </ModalContent>
+    </ModalOverlay>
   );
 }
 
@@ -89,80 +105,66 @@ WarningBox.propTypes = {
 /**
  * LandingPage Component
  * The home page of the application where users can start adding new items or view existing ones.
- * 
- * @param {Function} handleNewItem - Function to handle new item creation.
  */
-function LandingPage({ handleNewItem }) {
-  const [showWarning, setShowWarning] = useState(false);
+function LandingPage({ handleNewItem, setCurrentItemId, setMostRecentItemId }) {
   const navigate = useNavigate();
+  const [showWarning, setShowWarning] = useState(false);
 
-  /**
-   * Handles the click event for creating a new item.
-   * Prevents default navigation and shows the warning modal instead.
-   * 
-   * @param {Object} e - Event object.
-   */
-  const handleNewItemClick = (e) => {
-    e.preventDefault();
-    setShowWarning(true);  // Show the warning modal
-    console.log('New Item button clicked. Showing warning modal.');
+  const handleNewItemClick = () => {
+    setShowWarning(true);
   };
 
-  /**
-   * Handles the user's decision to proceed with creating a new item.
-   * Generates a new item ID, updates state, and navigates to the NewItemPage.
-   */
   const handleProceed = () => {
     setShowWarning(false);
-    handleNewItem();
+    // Clear all unsaved variables
+    setCurrentItemId(null);
+    setMostRecentItemId(null);
+    localStorage.clear();
+    sessionStorage.clear();
+    
+    // Create a new itemId and navigate to NewItemPage
+    const newItemId = handleNewItem();
+    navigate(`/new-item/${newItemId}`);
   };
 
-  /**
-   * Handles the user's decision to cancel creating a new item.
-   * Closes the warning modal without making any changes.
-   */
   const handleGoBack = () => {
     setShowWarning(false);
-    console.log('User canceled creating a new item.');
   };
 
   return (
-    <div className="landing-page container">
+    <StyledContainer>
       <div className="row justify-content-center">
         <div className="col-md-8 text-center">
           {/* Display the Moola-Matic Logo */}
-          <div className="logo-container">
-            <img 
-              src={moolaMaticLogo} 
-              alt="Moola-Matic Logo" 
-              className="logo square-to-circle" 
-            />
-          </div>
-          {/* Page Title */}
-          <h1 className="display-4">Moola-Matic</h1>
-          {/* Page Description */}
-          <p className="lead mb-4">Turn your thrifty finds into a treasure trove of cold, hard cash!</p>
-          {/* Action Buttons */}
+          <StyledLogo 
+            src={moolaMaticLogo} 
+            alt="Moola-Matic Logo" 
+            className="square-to-circle" 
+          />
+          <StyledTitle>Moola-Matic</StyledTitle>
+          <StyledSubtitle>Turn your thrifty finds into a treasure trove of cold, hard cash!</StyledSubtitle>
           <div className="mb-4">
-            <button onClick={handleNewItemClick} className="btn btn-primary-theme me-2 dark-red-glow">New Item</button>
-            <NavLink to="/view-items" className="btn btn-secondary-theme cyan-glow">View Items</NavLink>
+            <GlowingButton onClick={handleNewItemClick} className="me-2 dark-red-glow">New Item</GlowingButton>
+            <GlowingButton as={NavLink} to="/view-items" className="cyan-glow">View Items</GlowingButton>
           </div>
-          {/* Conditionally render the WarningBox modal */}
-          {showWarning && <WarningBox onProceed={handleProceed} onGoBack={handleGoBack} />}
-          {/* Informational Box */}
+          {showWarning && (
+            <WarningBox onProceed={handleProceed} onGoBack={handleGoBack} />
+          )}
           <div className="info-box">
             <p>Are you sitting on a goldmine of garage sale goodies? Let Moola-Matic help you squeeze every last penny out of your dusty discoveries!</p>
             <p className="fst-italic">We're like a money-making time machine for your junk drawer!</p>
           </div>
         </div>
       </div>
-    </div>
+    </StyledContainer>
   );
 }
 
-// Define PropTypes for LandingPage
+// Update PropTypes
 LandingPage.propTypes = {
   handleNewItem: PropTypes.func.isRequired,
+  setCurrentItemId: PropTypes.func.isRequired,
+  setMostRecentItemId: PropTypes.func.isRequired,
 };
 
 /**
@@ -219,10 +221,12 @@ ErrorBoundary.propTypes = {
  * The root component of the application that sets up routing, state management, and context persistence.
  */
 function App() {
+  return <AppContent />;
+}
+
+function AppContent() {
   const [currentItemId, setCurrentItemId] = useState(null);
-  const [mostRecentItemId, setMostRecentItemId] = useState(() => {
-    return localStorage.getItem('mostRecentItemId') || null;
-  });
+  const [mostRecentItemId, setMostRecentItemId] = useState(null);
   const navigate = useNavigate();
 
   // Add this function to handle logout
@@ -244,11 +248,25 @@ function App() {
     }
   }, [mostRecentItemId]);
 
-  const handleNewItem = () => {
-    const newItemId = `draft-${uuidv4()}`;
+  const handleNewItemClick = () => {
+    console.log('handleNewItemClick: Creating new item');
+    // Clear all unsaved variables
+    setCurrentItemId(null);
+    setMostRecentItemId(null);
+    localStorage.clear(); // This clears all localStorage items
+    sessionStorage.clear(); // Clear any session storage as well
+    
+    // Create a new itemId
+    const newItemId = generateItemId();
     setCurrentItemId(newItemId);
     setMostRecentItemId(newItemId);
+    
+    // Navigate to the new item page
     navigate(`/new-item/${newItemId}`);
+    
+    console.log('handleNewItemClick: New item created with ID:', newItemId);
+    
+    return newItemId;
   };
 
   const handleChangeItem = () => {
@@ -256,37 +274,49 @@ function App() {
       setCurrentItemId(mostRecentItemId);
       navigate(`/new-item/${mostRecentItemId}`);
     } else {
-      handleNewItem();
+      handleNewItemClick();
     }
   };
 
+  useEffect(() => {
+    console.log('App: currentItemId changed to:', currentItemId);
+  }, [currentItemId]);
+
   return (
     <ErrorBoundary>
-      <div className="app d-flex">
-        {/* Sidebar Navigation */}
+      <PageContainer>
         <Sidebar handleLogout={handleLogout} handleChangeItem={handleChangeItem} />
-        {/* Main Content Area */}
         <main className="flex-grow-1 p-3">
           <Routes>
-            {/* Home/Landing Page Route */}
-            <Route path="/" element={<LandingPage handleNewItem={handleNewItem} />} />
-            {/* New Item Page Route */}
+            <Route path="/" element={
+              <LandingPage 
+                handleNewItem={handleNewItemClick} 
+                setCurrentItemId={setCurrentItemId} 
+                setMostRecentItemId={setMostRecentItemId} 
+              />
+            } />
+            <Route 
+              path="/new-item" 
+              element={
+                <NewItemPage 
+                  setMostRecentItemId={setMostRecentItemId} 
+                  currentItemId={currentItemId} 
+                />
+              } 
+            />
             <Route 
               path="/new-item/:itemId" 
               element={
                 <NewItemPage 
-                  setMostRecentItemId={setMostRecentItemId}
-                  currentItemId={currentItemId}
+                  setMostRecentItemId={setMostRecentItemId} 
+                  currentItemId={currentItemId} 
                 />
               } 
             />
-            {/* View Items Page Route */}
             <Route path="/view-items" element={<ViewItemsPage />} />
-            {/* Fallback Route - Redirects to LandingPage */}
-            <Route path="*" element={<LandingPage handleNewItem={handleNewItem} />} />
           </Routes>
         </main>
-      </div>
+      </PageContainer>
     </ErrorBoundary>
   );
 }

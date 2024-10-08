@@ -1,9 +1,45 @@
 // frontend\src\components\compSave.js
 
 import axios from 'axios';
+import { generateItemId } from '../App.js';
+
+// Function to create a default item
+export const createDefaultItem = (itemId) => {
+  return {
+    itemId: itemId,
+    name: '',
+    brand: '',
+    condition: '',
+    description: '',
+    uniqueFeatures: '',
+    accessories: '',
+    purchasePrice: '',
+    salesTax: '',
+    cleaningNeeded: false,
+    cleaningTime: '',
+    cleaningMaterialsCost: '',
+    estimatedValue: '',
+    shippingCost: '',
+    platformFees: '',
+    images: [],
+  };
+};
+
+// Function to handle new item creation
+export const handleNewItem = (setCurrentItemId, setMostRecentItemId, navigate) => {
+  const newItemId = generateItemId();
+  console.log('handleNewItem: New item created with ID:', newItemId);
+  
+  const newItem = createDefaultItem(newItemId);
+  handleLocalSave(newItem, {}, []); // Save to local storage
+  
+  navigate(`/new-item/${newItemId}`);
+  return newItemId;
+};
 
 // Function to handle draft save
 export const handleDraftSave = async (item, messages, currentItemId, backendPort) => {
+  console.log('handleDraftSave: Saving draft for item with ID:', item.itemId);
   if (!currentItemId) {
     console.error("Cannot save draft without a valid item ID");
     return;
@@ -65,15 +101,19 @@ export const handleAutoSave = async (item, messages, currentItemId, backendPort)
 
 // Function to handle local save
 export const handleLocalSave = (item, contextData, messages) => {
-  try {
-    localStorage.setItem(`item_${item.itemId}`, JSON.stringify(item));
-    localStorage.setItem(`contextData_${item.itemId}`, JSON.stringify(contextData));
-    localStorage.setItem(`messages_${item.itemId}`, JSON.stringify(messages));
-    console.log('Local save successful');
-  } catch (error) {
-    console.error('Error saving locally:', error);
-    throw error;
+  console.log('handleLocalSave: Received item:', JSON.stringify(item));
+  if (!item || !item.itemId) {
+    console.error('handleLocalSave: Item or itemId is undefined', item);
+    return; // Exit the function if item or itemId is undefined
   }
+  console.log('handleLocalSave: Saving locally for item with ID:', item.itemId);
+  
+  // Save the item to local storage
+  localStorage.setItem(`item_${item.itemId}`, JSON.stringify(item));
+  localStorage.setItem(`contextData_${item.itemId}`, JSON.stringify(contextData));
+  localStorage.setItem(`messages_${item.itemId}`, JSON.stringify(messages));
+  
+  console.log('Local save successful');
 };
 
 // Function to load local data
@@ -91,12 +131,65 @@ export const loadLocalData = (itemId) => {
 
 // Function to clear local data
 export const clearLocalData = (itemId) => {
-  try {
-    localStorage.removeItem(`item_${itemId}`);
-    localStorage.removeItem(`contextData_${itemId}`);
-    localStorage.removeItem(`messages_${itemId}`);
-    console.log('Local data cleared successfully');
-  } catch (error) {
-    console.error('Error clearing local data:', error);
+  if (!itemId) {
+    console.error('clearLocalData: No itemId provided');
+    return;
   }
+  localStorage.removeItem(`item_${itemId}`);
+  localStorage.removeItem(`contextData_${itemId}`);
+  localStorage.removeItem(`messages_${itemId}`);
+  console.log(`Local data cleared for item ${itemId}`);
+};
+
+// Function to update context data
+export const updateContextData = (itemId, newData) => {
+  try {
+    const prevData = JSON.parse(localStorage.getItem(`contextData_${itemId}`)) || {};
+    const updatedData = {
+      ...prevData,
+      ...newData,
+      itemId: itemId
+    };
+    localStorage.setItem(`contextData_${itemId}`, JSON.stringify(updatedData));
+    return updatedData;
+  } catch (error) {
+    console.error('Error updating context data:', error);
+    throw error;
+  }
+};
+
+// Function to save a draft (for ViewItemsPage)
+export const saveDraft = async (item) => {
+  const response = await fetch('/api/save-draft', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(item),
+  });
+  if (!response.ok) throw new Error('Failed to save draft.');
+  return await response.json();
+};
+
+// Function to delete a draft
+export const deleteDraft = async (id) => {
+  const response = await fetch(`/api/drafts/${id}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.message || 'Failed to delete draft.');
+  }
+};
+
+// Function to fetch drafts
+export const fetchDrafts = async () => {
+  const response = await fetch('/api/drafts');
+  if (!response.ok) throw new Error('Failed to fetch drafts.');
+  return await response.json();
+};
+
+// Function to fetch items
+export const fetchItems = async () => {
+  const response = await fetch('/api/items');
+  if (!response.ok) throw new Error('Failed to fetch items.');
+  return await response.json();
 };

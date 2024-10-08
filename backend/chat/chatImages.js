@@ -93,6 +93,7 @@ const deleteFile = (filePath) => {
  * @returns {Promise<string>} - The final response from the Moola-Matic assistant.
  */
 async function analyzeImage(imageBase64, message, contextData = {}, session, isInitialAnalysis, itemId) {
+  console.log('analyzeImage: Analyzing image for item with ID:', itemId);
   try {
     // Step 1: Analyze the image using OpenAI's GPT-4-Turbo model
     const openAIResponse = await openai.chat.completions.create({
@@ -159,6 +160,7 @@ async function analyzeImage(imageBase64, message, contextData = {}, session, isI
  * Expects multipart/form-data with 'image' and 'messages' fields
  */
 router.post('/analyze-image', upload.single('image'), async (req, res) => {
+  console.log('analyze-image route: Received request for item with ID:', req.body.itemId);
   const { message, isInitialAnalysis, itemId } = req.body;
   let contextData = req.body.contextData ? JSON.parse(req.body.contextData) : {};
 

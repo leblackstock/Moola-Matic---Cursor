@@ -2,267 +2,28 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { handleChatWithAssistant, analyzeImageWithGPT4Turbo, handleImageChat } from '../api/chat.js';
-import styled from 'styled-components';
-import '../App.css'; // Make sure to import the App.css file
+import '../App.css';
 
-const AIChatBox = styled.div`
-  margin-bottom: 2rem;
-  padding: 20px;
-  background: rgba(13, 0, 26, 0.8);
-  border: 2px solid #4A0E4E;
-  border-radius: 15px;
-  box-shadow: 0 0 30px rgba(138, 43, 226, 0.4); // BlueViolet glow
-  transition: box-shadow 0.3s ease, transform 0.3s ease; // Added transform to transition
-
-  &:hover {
-    box-shadow: 0 0 40px rgba(138, 43, 226, 0.6); // Stronger BlueViolet glow on hover
-    transform: translateY(-2px); // Move up by 2 pixels on hover
-  }
-
-  h3 {
-    color: #F5DEB3;
-    text-align: center;
-    margin-bottom: 1rem;
-  }
-`;
-
-const ChatHistory = styled.div`
-  max-height: 600px;
-  min-height: 400px;
-  overflow-y: auto;
-  margin-bottom: 1rem;
-  padding: 10px;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 10px;
-
-  /* Webkit browsers (Chrome, Safari) */
-  &::-webkit-scrollbar {
-    width: 8px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: rgba(13, 0, 26, 0.4);
-    border-radius: 10px;
-    margin: 5px 0; /* Add some space at the top and bottom of the track */
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: rgba(138, 43, 226, 0.5);
-    border-radius: 30px; /* Even more rounded */
-    border: 3px solid rgba(13, 0, 26, 0.4); /* Thicker border for more padding */
-    transition: background 0.3s ease;
-  }
-
-  &::-webkit-scrollbar-thumb:hover {
-    background: rgba(138, 43, 226, 0.7);
-  }
-
-  /* Firefox */
-  scrollbar-width: thin;
-  scrollbar-color: rgba(138, 43, 226, 0.5) rgba(13, 0, 26, 0.4);
-`;
-
-const AITyping = styled.div`
-  color: #F5DEB3;
-  font-style: italic;
-  text-align: center;
-  margin: 15px 0; // Increased margin top and bottom
-  padding: 10px;  // Added padding
-  position: relative;
-  overflow: hidden;
-  background: rgba(13, 0, 26, 0.4); // Slight background for separation
-  border-radius: 10px; // Rounded corners
-  box-shadow: 0 0 10px rgba(138, 43, 226, 0.3); // Subtle glow
-
-  &:after {
-    content: '...';
-    position: absolute;
-    width: 0;
-    height: 100%;
-    left: 0;
-    animation: ellipsis 1.5s infinite;
-    overflow: hidden;
-  }
-
-  @keyframes ellipsis {
-    0% { width: 0; }
-    33% { width: 10px; }
-    66% { width: 20px; }
-    100% { width: 30px; }
-  }
-`;
-
-const MessagesContainer = styled.div`
-  max-height: 400px;
-  overflow-y: auto;
-`;
-
-const MessageContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: ${props => props.$isUser ? 'flex-end' : 'flex-start'};
-  margin-bottom: 10px;
-`;
-
-const MessageBubble = styled.div`
-  max-width: 80%;
-  padding: 10px 15px;
-  border-radius: 10px;
-  color: #F5DEB3;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  background: ${props => props.$isUser 
-    ? 'linear-gradient(45deg, #2D0037, #4A0E4E)'
-    : 'rgba(139, 0, 0, 0.8)'};
-  text-align: ${props => props.$isUser ? 'right' : 'left'};
-`;
-
-const InputContainer = styled.div`
-  display: flex;
-  align-items: center;
-  background: rgba(13, 0, 26, 0.6);
-  border: 1px solid #4A0E4E;
-  border-radius: 25px;
-  padding: 5px 10px;
-  margin-bottom: 10px;
-  height: 50px;
-  box-shadow: 0 0 20px rgba(65, 105, 225, 0.5); // RoyalBlue glow
-  transition: box-shadow 0.3s ease, transform 0.3s ease;
-
-  &:hover {
-    box-shadow: 0 0 25px rgba(65, 105, 225, 0.8); // Stronger RoyalBlue glow when hovered
-    transform: translateY(-2px); // Move up by 2 pixels on hover
-  }
-
-  &:focus-within {
-    box-shadow: 0 0 25px rgba(65, 105, 225, 0.8); // Stronger RoyalBlue glow when focused
-    transform: translateY(-2px); // Move up by 2 pixels when focused
-  }
-`;
-
-const ChatInput = styled.textarea`
-  flex: 1;
-  border: none;
-  background: transparent;
-  color: #F5DEB3;
-  font-size: 1em;
-  resize: none;
-  outline: none;
-`;
-
-const SendButton = styled.button`
-  background: none;
-  border: none;
-  color: #F5DEB3;
-  cursor: pointer;
-  font-size: 1.2em;
-  transition: color 0.3s ease;
-
-  &:hover {
-    color: #00FFFF; /* Cyan color on hover */
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-`;
-
-const ImageInputContainer = styled(InputContainer)`
-  margin-bottom: 10px;
-`;
-
-const StyledTextarea = styled.textarea`
-  flex: 1;
-  border: none;
-  background: transparent;
-  color: #F5DEB3;
-  font-size: 1em;
-  resize: none;
-  outline: none;
-`;
-
-const IconButton = styled.button`
-  background: none;
-  border: none;
-  color: #F5DEB3;
-  cursor: pointer;
-  font-size: 1.2em;
-  transition: color 0.3s ease;
-
-  &:hover {
-    color: #00FFFF;
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-`;
-
-const TextIcon = styled.i`
-  color: #F5DEB3;
-  margin-right: 10px;
-  font-size: 1.2em;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-`;
-
-// Add this new styled component for the image preview
-const ImagePreviewContainer = styled.div`
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  overflow: hidden;
-  margin-right: 10px;
-  flex-shrink: 0;
-`;
-
-const ImagePreview = styled.img`
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-`;
-
-// Add this new styled component for the loading indicator
-const LoadingIndicator = styled.div`
-  color: #F5DEB3;
-  font-style: italic;
-  text-align: center;
-  margin: 15px 0;
-  padding: 10px;
-  background: rgba(13, 0, 26, 0.4);
-  border-radius: 10px;
-  box-shadow: 0 0 10px rgba(138, 43, 226, 0.3);
-  animation: pulse 1.5s infinite;
-  z-index: 1000; // Ensure it's on top
-  position: relative; // Ensure z-index works
-
-  @keyframes pulse {
-    0% { opacity: 0.6; }
-    50% { opacity: 1; }
-    100% { opacity: 0.6; }
-  }
-`;
-
-const StyledButton = styled.button`
-  background: none;
-  border: none;
-  color: #F5DEB3;
-  cursor: pointer;
-  font-size: 1.2em;
-  transition: color 0.3s ease;
-
-  &:hover {
-    color: #00FFFF;
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-`;
+// Import all styled components
+import {
+  AIChatBox,
+  ChatHistory,
+  AITyping,
+  MessagesContainer,
+  MessageContainer,
+  MessageBubble,
+  InputContainer,
+  ChatInput,
+  SendButton,
+  ImageInputContainer,
+  StyledTextarea,
+  IconButton,
+  TextIcon,
+  ImagePreviewContainer,
+  ImagePreview,
+  LoadingIndicator,
+  StyledButton
+} from './compStyles.js';
 
 function ChatComp({ item, updateItem, messages, setMessages, currentItemId, isLoading, onStartLoading, onEndLoading, imageUploaded, setImageUploaded, imagePreview: propImagePreview, selectedImage, setSelectedImage }) {
   const [message, setMessage] = useState('');

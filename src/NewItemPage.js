@@ -2,125 +2,46 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import styled from 'styled-components';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 import treasureSpecs from './Images/Treasure_Specs01.jpeg';
 import { handleChatWithAssistant, analyzeImageWithGPT4Turbo, createUserMessage, createAssistantMessage } from './api/chat.js';
 import axios from 'axios';
-import UploadedImagesGallery from './components/UploadedImagesGallery.js';
+import UploadedImagesGallery from './components/compGallery.js';
 import PropTypes from 'prop-types';
 import ChatComp from './components/compChat.js';
+import { 
+  handleDraftSave, 
+  handleAutoSave, 
+  handleLocalSave, 
+  loadLocalData, 
+  clearLocalData, 
+  updateContextData,
+  createDefaultItem
+} from './components/compSave.js';
 
-// Styled components
-const StyledContainer = styled.div`
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 20px;
-`;
+// AI NOTE: Do not create new items in this file. New item creation should only be handled in App.js.
 
-const StyledHeader = styled.div`
-  text-align: center;
-  margin-bottom: 2rem;
-`;
-
-const StyledLogo = styled.img`
-  max-width: 200px;
-  margin-bottom: 1rem;
-`;
-
-const StyledTitle = styled.h2`
-  color: #F5DEB3;
-  margin-bottom: 0.5rem;
-`;
-
-const StyledSubtitle = styled.p`
-  color: #D3D3D3;
-`;
-
-const StyledButton = styled.button`
-  background: linear-gradient(45deg, #2D0037, #4A0E4E);
-  color: #F5DEB3;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-
-  &:hover {
-    background: linear-gradient(45deg, #4A0E4E, #2D0037);
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-`;
-
-const StyledForm = styled.form`
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-`;
-
-const StyledFormGroup = styled.div`
-  display: flex;
-  flex-direction: column;
-`;
-
-const StyledLabel = styled.label`
-  color: #F5DEB3;
-  margin-bottom: 0.5rem;
-  display: block;
-`;
-
-const StyledInput = styled.input`
-  width: 100%;
-  padding: 10px;
-  border-radius: 5px;
-  border: 1px solid #4A0E4E;
-  background: rgba(13, 0, 26, 0.6);
-  color: #F5DEB3;
-`;
-
-const StyledSelect = styled.select`
-  width: 100%;
-  padding: 10px;
-  border-radius: 5px;
-  border: 1px solid #4A0E4E;
-  background: rgba(13, 0, 26, 0.6);
-  color: #F5DEB3;
-`;
-
-const StyledTextarea = styled.textarea`
-  width: 100%;
-  padding: 10px;
-  border-radius: 5px;
-  border: 1px solid #4A0E4E;
-  background: rgba(13, 0, 26, 0.6);
-  color: #F5DEB3;
-  resize: vertical;
-`;
-
-const StyledNotification = styled.div`
-  position: fixed;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: rgba(0, 128, 0, 0.8);
-  color: white;
-  padding: 10px 20px;
-  border-radius: 5px;
-  z-index: 1000;
-  animation: fadeInOut 3s ease-in-out;
-
-  @keyframes fadeInOut {
-    0% { opacity: 0; }
-    10% { opacity: 1; }
-    90% { opacity: 1; }
-    100% { opacity: 0; }
-  }
-`;
+// Import all styled components
+import {
+  PageContainer,
+  StyledHeader,
+  StyledLogo,
+  StyledTitle,
+  StyledSubtitle,
+  StyledForm,
+  StyledFormGroup,
+  StyledLabel,
+  StyledInput,
+  StyledSelect,
+  StyledTextarea,
+  StyledButton,
+  StyledNotification,
+  GlowingButton,
+  ModalOverlay,
+  ModalContent,
+  ModalButton
+} from './components/compStyles.js';
 
 // Add this function near the top of your file, outside of the NewItemPage component
 const getBase64 = (file) => {
@@ -132,46 +53,16 @@ const getBase64 = (file) => {
   });
 };
 
-// Add these new styled components
-const GlowingButton = styled(StyledButton)`
-  transition: box-shadow 0.3s ease, transform 0.3s ease;
-  margin-bottom: 20px; // Add this line
-
-  &:hover {
-    box-shadow: 0 0 15px rgba(138, 43, 226, 0.7); // BlueViolet glow
-    transform: translateY(-2px);
-  }
-`;
-
-const ModalOverlay = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-`;
-
-const ModalContent = styled.div`
-  background: rgba(13, 0, 26, 0.9);
-  padding: 20px;
-  border-radius: 10px;
-  box-shadow: 0 0 20px rgba(138, 43, 226, 0.5);
-`;
-
-const ModalButton = styled(GlowingButton)`
-  margin: 10px;
-  width: 120px;
-`;
+// Add this function at the top of your file
+const loadItemData = (itemId) => {
+  return loadLocalData(itemId);
+};
 
 function NewItemPage({ setMostRecentItemId, currentItemId }) {
-  const { itemId } = useParams();
+  const { itemId: paramItemId } = useParams();
+  const [item, setItem] = useState(null);
   const navigate = useNavigate();
-  const [item, setItem] = useState(() => createDefaultItem(currentItemId));
+  const [contextData, setContextData] = useState(null);
   const [messages, setMessages] = useState([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [lastAutoSave, setLastAutoSave] = useState(null);
@@ -182,59 +73,53 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
   const [uploadedImages, setUploadedImages] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
 
-  useEffect(() => {
-    if (itemId !== currentItemId) {
-      navigate(`/new-item/${currentItemId}`, { replace: true });
-    } else {
-      loadItem();
-    }
-  }, [itemId, currentItemId, navigate]);
+  console.log('NewItemPage: Rendered with itemId from params:', paramItemId, 'and currentItemId prop:', currentItemId);
 
-  const loadItem = async () => {
-    if (currentItemId) {
-      setMostRecentItemId(currentItemId);
-      try {
-        const response = await fetch(`http://localhost:${backendPort}/api/drafts/${currentItemId}`);
-        if (response.ok) {
-          const draftData = await response.json();
-          setItem(draftData);
-          setMessages(draftData.messages || []);
-        } else if (response.status === 404) {
-          const newItem = createDefaultItem(currentItemId);
-          setItem(newItem);
-        } else {
-          throw new Error('Failed to fetch draft');
-        }
-      } catch (error) {
-        console.error('Error loading draft:', error);
-        const newItem = createDefaultItem(currentItemId);
+  useEffect(() => {
+    const idToUse = paramItemId || currentItemId;
+    console.log('NewItemPage: Using itemId:', idToUse);
+
+    if (idToUse) {
+      const loadedItem = loadItemData(idToUse);
+      if (loadedItem) {
+        console.log('NewItemPage: Loaded existing item:', loadedItem);
+        setItem(loadedItem);
+      } else {
+        console.log('NewItemPage: Creating new item with ID:', idToUse);
+        const newItem = createDefaultItem(idToUse);
         setItem(newItem);
+        handleLocalSave(newItem, {}, []); // Save the new item immediately
       }
+      setMostRecentItemId(idToUse);
+    } else {
+      console.error('NewItemPage: No valid itemId available');
     }
+
+    // Cleanup function
+    return () => {
+      console.log('NewItemPage: Cleanup - Not clearing local data');
+      // We're not clearing local data here anymore
+    };
+  }, [paramItemId, currentItemId, setMostRecentItemId]);
+
+  // Prevent rendering until we have an item
+  if (!item) {
+    return <div>Loading...</div>;
+  }
+
+  const updateItem = (field, value) => {
+    setItem(prevItem => {
+      const updatedItem = { ...prevItem, [field]: value };
+      console.log('updateItem: Updating item:', updatedItem);
+      handleLocalSave(updatedItem, {}, []); // Save after each update
+      return updatedItem;
+    });
   };
 
   // Rename this function to avoid naming conflict
   const handleManualSave = async () => {
-    if (!currentItemId) {
-      console.error("Cannot save draft without a valid item ID");
-      return;
-    }
-
     try {
-      const response = await fetch(`http://localhost:${backendPort}/api/save-draft`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ ...item, messages, itemId: currentItemId }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to save draft');
-      }
-
-      const savedDraft = await response.json();
-      console.log('Draft saved successfully:', savedDraft);
+      const savedDraft = await handleDraftSave(item, messages, item.itemId, backendPort);
       setHasUnsavedChanges(false);
       setLastAutoSave(new Date());
       setShowNotification(true);
@@ -248,67 +133,35 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
   useEffect(() => {
     const timer = setTimeout(() => {
       if (item && item.itemId && hasUnsavedChanges) {
-        saveDraft();
+        handleAutoSave(item, messages, item.itemId, backendPort)
+          .then(() => {
+            setHasUnsavedChanges(false);
+            setLastAutoSave(new Date());
+          })
+          .catch(error => console.error('Error auto-saving:', error));
       }
     }, 30000); // Auto-save every 30 seconds if there are unsaved changes
 
     return () => clearTimeout(timer);
-  }, [item, hasUnsavedChanges]);
+  }, [item, hasUnsavedChanges, messages, backendPort]);
 
-  // Function to create a default item
-  function createDefaultItem(itemId) {
-    return {
-      itemId: itemId,
-      name: '',
-      brand: '',
-      condition: '',
-      description: '',
-      uniqueFeatures: '',
-      accessories: '',
-      purchasePrice: '',
-      salesTax: '',
-      cleaningNeeded: false,
-      cleaningTime: '',
-      cleaningMaterialsCost: '',
-      estimatedValue: '',
-      shippingCost: '',
-      platformFees: '',
-      images: [],
+  // Save to localStorage
+  useEffect(() => {
+    if (item) {
+      handleLocalSave(item, contextData, messages);
+    }
+  }, [item, contextData, messages]);
+
+  // Clear localStorage on unmount
+  useEffect(() => {
+    return () => {
+      if (item) {
+        clearLocalData(item.itemId);
+      }
     };
-  }
-
-  // Modified updateItem function
-  const updateItem = (field, value) => {
-    setItem(prevItem => ({
-      ...prevItem,
-      [field]: value
-    }));
-  };
+  }, [item]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const [contextData, setContextData] = useState(() => {
-    const savedContextData = localStorage.getItem(`contextData_${itemId}`);
-    return savedContextData ? JSON.parse(savedContextData) : {
-      itemId: itemId,
-      lastImageAnalysis: null,
-      lastAssistantResponse: null,
-      lastUserMessage: null,
-    };
-  });
-
-  // Update the updateContextData function
-  const updateContextData = (newData) => {
-    setContextData(prevData => {
-      const updatedData = {
-        ...prevData,
-        ...newData,
-        itemId: itemId
-      };
-      localStorage.setItem(`contextData_${itemId}`, JSON.stringify(updatedData));
-      return updatedData;
-    });
-  };
 
   // Handle form submission
   const handleSubmit = async (e) => {
@@ -354,7 +207,7 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
   const setMessagesAndSave = (newMessages) => {
     setMessages(newMessages);
     // If you want to save messages to localStorage or backend, do it here
-    localStorage.setItem(`messages_${currentItemId}`, JSON.stringify(newMessages));
+    localStorage.setItem(`messages_${item.itemId}`, JSON.stringify(newMessages));
   };
 
   // Add this function to render message content
@@ -404,11 +257,12 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
       });
 
       // Update contextData
-      updateContextData({
+      const updatedContextData = updateContextData(item.itemId, {
         lastAssistantResponse: response.content,
         lastUserMessage: imageFile ? imageSpecificInput : generalInput,
         // ... any other context updates
       });
+      setContextData(updatedContextData);
     } catch (error) {
       console.error('Error interacting with Moola-Matic assistant:', error);
       setMessagesAndSave(prevMessages => [
@@ -543,7 +397,7 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
     formData.append('base64Image', base64Image);  // Add base64 image
     formData.append('message', isInitialAnalysis ? imageAnalysisPrompt : message);
     formData.append('isInitialAnalysis', isInitialAnalysis);
-    formData.append('itemId', itemId);
+    formData.append('itemId', item.itemId);
     formData.append('contextData', JSON.stringify(contextData));
 
     try {
@@ -611,61 +465,6 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
   // Add this new state variable for the notification
   const [showNotification, setShowNotification] = useState(false);
 
-  // Update the saveAsDraft function
-  const saveAsDraft = async () => {
-    try {
-      const formData = new FormData();
-      const itemCopy = { ...item };
-      delete itemCopy.images; // Remove images from the JSON data
-      formData.append('draftData', JSON.stringify(itemCopy));
-
-      console.log('Item before saving:', item);
-      console.log('Images before saving:', item.images);
-
-      if (item.images && item.images.length > 0) {
-        item.images.forEach((image, index) => {
-          console.log(`Appending image ${index}:`, image);
-          formData.append('images', image);
-        });
-      } else {
-        console.log('No images to append');
-      }
-
-      const response = await axios.post('/api/save-draft', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
-      if (response.status !== 200) {
-        throw new Error('Failed to save draft');
-      }
-
-      const savedDraft = response.data.item;
-      console.log('Draft saved successfully:', savedDraft);
-      setShowNotification(true);
-      setTimeout(() => setShowNotification(false), 3000);
-
-      if (response.status === 200) {
-        // Clear localStorage after successful save
-        localStorage.removeItem(`item_${item.itemId}`);
-        localStorage.removeItem(`contextData_${item.itemId}`);
-        localStorage.removeItem(`messages_${item.itemId}`);
-      }
-    } catch (error) {
-      console.error('Error saving draft:', error);
-      // Optionally, you can show an error message to the user here
-    }
-  };
-
-  useEffect(() => {
-    if (item) {
-      localStorage.setItem(`item_${item.itemId}`, JSON.stringify(item));
-      localStorage.setItem(`contextData_${item.itemId}`, JSON.stringify(contextData));
-      localStorage.setItem(`messages_${item.itemId}`, JSON.stringify(messages));
-    }
-  }, [item, contextData, messages]);
-
   useEffect(() => {
     if (item) {
       return () => {
@@ -675,56 +474,6 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
       };
     }
   }, [item]);
-
-  const saveDraft = () => {
-    if (!item || !item.itemId) {
-      console.error("Cannot save draft without an item ID");
-      // Maybe show an error message to the user
-      return;
-    }
-    
-    // Proceed with saving
-    localStorage.setItem(`item_${item.itemId}`, JSON.stringify(item));
-    // If you're also saving to a backend, make the API call here
-  };
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (item && item.itemId && hasUnsavedChanges) {
-        saveDraft();
-      }
-    }, 30000); // Auto-save every 30 seconds if there are unsaved changes
-
-    return () => clearTimeout(timer);
-  }, [item, hasUnsavedChanges]);
-
-  // Add this useEffect for debugging
-  useEffect(() => {
-    console.log("Current item state:", item);
-  }, [item]);
-
-  const chatContainerRef = useRef(null);
-
-  useEffect(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-    }
-  }, [messages]);
-
-  // Function to handle image selection from the gallery
-  const handleImageSelect = (image) => {
-    setSelectedImage(image);
-  };
-
-  useEffect(() => {
-    // Load draft if itemID exists
-    if (itemId) {
-      const savedItem = localStorage.getItem(`item_${itemId}`);
-      if (savedItem) {
-        setItem(JSON.parse(savedItem));
-      }
-    }
-  }, [itemId]);
 
   const handleStartLoading = () => {
     setIsLoading(true);
@@ -740,8 +489,16 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
     }
   }, [uploadedImages, selectedImage]);
 
+  const handleImageSelect = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      setImageFile(file);
+      // You might want to add more logic here, like updating the item state
+    }
+  };
+
   return (
-    <StyledContainer>
+    <PageContainer>
       {showNotification && (
         <StyledNotification>
           Item successfully saved as draft
@@ -881,7 +638,7 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
       )}
 
       {hasUnsavedChanges && <span>Unsaved changes</span>}
-    </StyledContainer>
+    </PageContainer>
   );
 }
 
