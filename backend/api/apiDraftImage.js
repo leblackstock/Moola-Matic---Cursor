@@ -30,34 +30,39 @@ router.post('/upload', upload.single('image'), async (req, res) => {
       return res.status(400).json({ error: 'itemId is required' });
     }
 
-    // Generate filename after receiving itemId
     const itemId = req.body.itemId;
-    const imageIndex = req.body.imageIndex || '0';
-    const last6 = itemId.slice(-6);
-    const paddedIndex = String(parseInt(imageIndex) + 1).padStart(2, '0');
-    const fileExtension = path.extname(req.file.originalname);
-    const newFilename = `Draft-${last6}-${paddedIndex}${fileExtension}`;
+    const providedFilename = req.body.filename;
+
+    if (!providedFilename) {
+      console.log('No filename provided');
+      return res.status(400).json({ error: 'filename is required' });
+    }
 
     // Create the drafts directory if it doesn't exist
     const draftsDir = path.join(__dirname, '..', '..', 'uploads', 'drafts');
     await fs.mkdir(draftsDir, { recursive: true });
 
-    // Write the file to disk with the new filename
-    const filePath = path.join(draftsDir, newFilename);
+    // Write the file to disk with the provided filename
+    const filePath = path.join(draftsDir, providedFilename);
     await fs.writeFile(filePath, req.file.buffer);
 
-    const urlPath = `/uploads/drafts/${newFilename}`;
+    const urlPath = `/uploads/drafts/${providedFilename}`;
 
-    console.log('File saved:', newFilename);
+    console.log('File saved:', providedFilename);
     console.log('URL path:', urlPath);
 
-    res.json({ 
+    res.json({
       imageUrl: urlPath,
-      filename: newFilename
+      filename: providedFilename,
     });
   } catch (error) {
     console.error('Error processing upload:', error);
-    res.status(500).json({ error: 'An error occurred while processing the upload', details: error.message });
+    res
+      .status(500)
+      .json({
+        error: 'An error occurred while processing the upload',
+        details: error.message,
+      });
   }
 });
 

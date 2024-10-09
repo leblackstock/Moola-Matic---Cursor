@@ -1,9 +1,10 @@
 // frontend/src/api/chat.js
 
 // Determine the API URL based on the environment
-const API_URL = process.env.NODE_ENV === 'production'
-  ? '/api'
-  : `http://localhost:${process.env.REACT_APP_BACKEND_PORT || 3001}/api`;
+const API_URL =
+  process.env.NODE_ENV === 'production'
+    ? '/api'
+    : `http://localhost:${process.env.REACT_APP_BACKEND_PORT || 3001}/api`;
 
 // Add this at the top of the file
 let contextData = null;
@@ -44,7 +45,9 @@ export const handleChatWithAssistant = async (messageInput) => {
       messageArray = messageInput;
     } else {
       // If it's neither a string nor an array, throw an error
-      throw new Error('Invalid message format. Expected a string or an array of message objects.');
+      throw new Error(
+        'Invalid message format. Expected a string or an array of message objects.'
+      );
     }
 
     console.log('Sending messages to Moola-Matic:', messageArray);
@@ -60,7 +63,9 @@ export const handleChatWithAssistant = async (messageInput) => {
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      throw new Error(
+        errorData.error || `HTTP error! status: ${response.status}`
+      );
     }
 
     const data = await response.json();
@@ -102,7 +107,9 @@ export const analyzeImageWithGPT4Turbo = async (imageFile, message, itemId) => {
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      throw new Error(
+        errorData.error || `HTTP error! status: ${response.status}`
+      );
     }
 
     const data = await response.json();
@@ -114,7 +121,7 @@ export const analyzeImageWithGPT4Turbo = async (imageFile, message, itemId) => {
     return {
       assistantResponse: data.advice,
       status: data.status,
-      contextData: data.contextData
+      contextData: data.contextData,
     };
   } catch (error) {
     console.error('Error in analyzeImageWithGPT4Turbo:', error);
@@ -142,7 +149,9 @@ export const askQuestionAboutImage = async (question) => {
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      throw new Error(
+        errorData.error || `HTTP error! status: ${response.status}`
+      );
     }
 
     const data = await response.json();
@@ -154,6 +163,11 @@ export const askQuestionAboutImage = async (question) => {
   }
 };
 
-export const handleImageChat = async (message, base64Image, itemId, isInitialAnalysis) => {
+export const handleImageChat = async (
+  message,
+  base64Image,
+  itemId,
+  isInitialAnalysis
+) => {
   // ... implementation of handleImageChat (formerly chatImages)
 };

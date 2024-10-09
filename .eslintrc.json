@@ -1,16 +1,16 @@
 // frontend/.eslintrc.json
 
 {
-    "extends": [
-      // ... other extends ...
-      "plugin:prettier/recommended"
-    ],
-    "plugins": [
-      // ... other plugins ...
-      "prettier"
-    ],
-    "rules": {
-      // ... other rules ...
-      "prettier/prettier": "error"
-    }
+  "extends": [
+    // ... other extends ...
+    "plugin:prettier/recommended"
+  ],
+  "plugins": [
+    // ... other plugins ...
+    "prettier"
+  ],
+  "rules": {
+    // ... other rules ...
+    "prettier/prettier": "error"
   }
+}

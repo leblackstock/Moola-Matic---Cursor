@@ -35,7 +35,10 @@ export const handleUserMessage = async (userMessage, session) => {
     const managedMessages = await processTextChat(session.messages);
 
     // Get assistant response
-    const assistantResponseContent = await interactWithMoolaMaticAssistant(managedMessages, session);
+    const assistantResponseContent = await interactWithMoolaMaticAssistant(
+      managedMessages,
+      session
+    );
 
     // Create assistant message using helper
     const assistantMsg = createAssistantMessage(assistantResponseContent);
@@ -79,11 +82,16 @@ export const handleImageQuestion = async (question, imageReference) => {
     console.log('Handling image-related question:', question);
 
     // Process image question by sending it to chatImages.js
-    const assistantResponse = await processImageQuestion(question, imageReference);
+    const assistantResponse = await processImageQuestion(
+      question,
+      imageReference
+    );
 
     return assistantResponse;
   } catch (error) {
     console.error('Error in handleImageQuestion:', error);
-    throw new Error('Failed to process image question. Please try again later.');
+    throw new Error(
+      'Failed to process image question. Please try again later.'
+    );
   }
 };

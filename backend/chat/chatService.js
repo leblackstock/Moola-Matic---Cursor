@@ -45,7 +45,10 @@ export const manageContext = async (messages) => {
 export const handleMoolaMaticChat = async (messages, session) => {
   try {
     // Interact with the assistant, passing the session
-    const assistantResponse = await interactWithMoolaMaticAssistant(messages, session);
+    const assistantResponse = await interactWithMoolaMaticAssistant(
+      messages,
+      session
+    );
     return assistantResponse;
   } catch (error) {
     console.error('Error in handleMoolaMaticChat:', error);

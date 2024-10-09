@@ -21,7 +21,9 @@ if (!OPENAI_API_KEY) {
 }
 
 if (!MOOLA_MATIC_ASSISTANT_ID) {
-  console.error('Error: MOOLA_MATIC_ASSISTANT_ID is not defined in the .env file.');
+  console.error(
+    'Error: MOOLA_MATIC_ASSISTANT_ID is not defined in the .env file.'
+  );
   process.exit(1);
 }
 
@@ -58,7 +60,9 @@ const createAssistantMessage = (content) => ({
 const validateMessages = (messages) => {
   messages.forEach((msg, index) => {
     if (!msg.role || !msg.content) {
-      throw new Error(`Message at index ${index} is missing 'role' or 'content'.`);
+      throw new Error(
+        `Message at index ${index} is missing 'role' or 'content'.`
+      );
     }
   });
 };
@@ -70,12 +74,14 @@ const validateMessages = (messages) => {
  */
 const createThread = async (messages) => {
   try {
-    const formattedMessages = messages.map(msg => ({
+    const formattedMessages = messages.map((msg) => ({
       role: msg.role,
-      content: msg.content
+      content: msg.content,
     }));
 
-    const thread = await client.beta.threads.create({ messages: formattedMessages });
+    const thread = await client.beta.threads.create({
+      messages: formattedMessages,
+    });
     console.log('Thread created:', thread);
     return thread.id;
   } catch (error) {
@@ -94,9 +100,11 @@ const addMessageToThread = async (threadId, role, content) => {
   try {
     await client.beta.threads.messages.create(threadId, {
       role: role,
-      content: content
+      content: content,
     });
-    console.log(`Message added to thread ${threadId}: { role: '${role}', content: '${content.substring(0, 50)}...' }`);
+    console.log(
+      `Message added to thread ${threadId}: { role: '${role}', content: '${content.substring(0, 50)}...' }`
+    );
   } catch (error) {
     console.error('Error adding message to thread:', error);
     throw error;
@@ -112,7 +120,7 @@ const addMessageToThread = async (threadId, role, content) => {
 const createRun = async (threadId, assistantId) => {
   try {
     const run = await client.beta.threads.runs.create(threadId, {
-      assistant_id: assistantId
+      assistant_id: assistantId,
     });
     console.log('Run created:', run);
     return run.id;
@@ -128,7 +136,8 @@ const createRun = async (threadId, assistantId) => {
  * @param {String} runId - ID of the run
  * @returns {Promise<Object>} - Run object
  */
-const waitForRunCompletion = async (threadId, runId, timeout = 60000) => { // 60 seconds timeout
+const waitForRunCompletion = async (threadId, runId, timeout = 60000) => {
+  // 60 seconds timeout
   try {
     const interval = 1000; // 1 second
     let elapsed = 0;
@@ -163,10 +172,14 @@ const waitForRunCompletion = async (threadId, runId, timeout = 60000) => { // 60
  */
 const getAssistantResponse = async (threadId, runId) => {
   try {
-    console.log(`Retrieving assistant response for thread ${threadId} and run ${runId}`);
+    console.log(
+      `Retrieving assistant response for thread ${threadId} and run ${runId}`
+    );
     const messages = await client.beta.threads.messages.list(threadId);
     const lastMessage = messages.data
-      .filter(message => message.run_id === runId && message.role === 'assistant')
+      .filter(
+        (message) => message.run_id === runId && message.role === 'assistant'
+      )
       .pop();
 
     if (!lastMessage) {
@@ -174,7 +187,10 @@ const getAssistantResponse = async (threadId, runId) => {
       return null;
     }
 
-    console.log('Assistant response retrieved:', lastMessage.content[0].text.value);
+    console.log(
+      'Assistant response retrieved:',
+      lastMessage.content[0].text.value
+    );
     return lastMessage.content[0].text.value;
   } catch (error) {
     console.error('Error in getAssistantResponse:', error);
@@ -188,7 +204,9 @@ const getAssistantResponse = async (threadId, runId) => {
  */
 const retrieveMoolaMaticAssistant = async () => {
   try {
-    const assistant = await client.beta.assistants.retrieve(MOOLA_MATIC_ASSISTANT_ID);
+    const assistant = await client.beta.assistants.retrieve(
+      MOOLA_MATIC_ASSISTANT_ID
+    );
     console.log('Retrieved Moola-Matic assistant:', assistant);
     return assistant;
   } catch (error) {
@@ -221,7 +239,7 @@ const formatContextData = (contextData) => {
   if (Object.keys(filteredData).length > 0) {
     return {
       role: 'assistant', // Changed from 'system' to 'assistant'
-      content: JSON.stringify(filteredData)
+      content: JSON.stringify(filteredData),
     };
   }
 
@@ -240,8 +258,10 @@ const interactWithMoolaMaticAssistant = async (messages, contextData) => {
     const assistant = await retrieveMoolaMaticAssistant();
 
     // Ensure messages is an array and only contains user messages
-    const userMessages = Array.isArray(messages) 
-      ? messages.filter(msg => msg.role === 'user').map(({ content }) => ({ role: 'user', content }))
+    const userMessages = Array.isArray(messages)
+      ? messages
+          .filter((msg) => msg.role === 'user')
+          .map(({ content }) => ({ role: 'user', content }))
       : [{ role: 'user', content: messages }];
 
     const threadId = await createThread(userMessages);
@@ -249,7 +269,11 @@ const interactWithMoolaMaticAssistant = async (messages, contextData) => {
     // Add context data as a system message
     const formattedContextData = formatContextData(contextData);
     if (formattedContextData) {
-      await addMessageToThread(threadId, formattedContextData.role, formattedContextData.content);
+      await addMessageToThread(
+        threadId,
+        formattedContextData.role,
+        formattedContextData.content
+      );
     }
 
     // Create a run using the retrieved assistant
@@ -273,11 +297,11 @@ const interactWithMoolaMaticAssistant = async (messages, contextData) => {
 };
 
 // Consolidated export at the bottom
-export { 
-  interactWithMoolaMaticAssistant, 
-  createUserMessage, 
-  createAssistantMessage, 
-  waitForRunCompletion, 
+export {
+  interactWithMoolaMaticAssistant,
+  createUserMessage,
+  createAssistantMessage,
+  waitForRunCompletion,
   getAssistantResponse,
-  formatContextData  // Add this line
+  formatContextData, // Add this line
 };

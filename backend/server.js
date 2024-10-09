@@ -12,7 +12,7 @@ import session from 'express-session';
 import { fileURLToPath } from 'url';
 import chatImagesRouter from './chat/chatImages.js';
 import itemsRouter from './routes/items.js';
-import connectDB from './config/database.js';  // Import the database connection function
+import connectDB from './config/database.js'; // Import the database connection function
 
 // Import the assistant module functions
 import { handleMoolaMaticChat, manageContext } from './chat/chatService.js';
@@ -53,55 +53,59 @@ app.use(express.json()); // Parse JSON bodies
 
 // Enable CORS for all routes
 const frontendUrl = `http://localhost:${process.env.FRONTEND_PORT}`;
-app.use(cors({
-  origin: frontendUrl,
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: frontendUrl,
+    credentials: true,
+  })
+);
 
 // Serve static files from the uploads directory
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 // Replace the existing Helmet middleware with this more comprehensive configuration
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", "data:", "https:"],
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'https:'],
+      },
     },
-  },
-  referrerPolicy: {
-    policy: 'strict-origin-when-cross-origin',
-  },
-  hsts: {
-    maxAge: 31536000,
-    includeSubDomains: true,
-    preload: true
-  },
-  xssFilter: true,
-  noSniff: true,
-  frameguard: {
-    action: 'deny'
-  }
-}));
+    referrerPolicy: {
+      policy: 'strict-origin-when-cross-origin',
+    },
+    hsts: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true,
+    },
+    xssFilter: true,
+    noSniff: true,
+    frameguard: {
+      action: 'deny',
+    },
+  })
+);
 
 // Session setup to manage conversation history and image references
 import MongoStore from 'connect-mongo';
 app.use(
   session({
     secret: process.env.SESSION_SECRET || 'default_secret', // Use the SESSION_SECRET from .env
-    resave: false,                      // Don't save session if unmodified
-    saveUninitialized: false,            // Save uninitialized sessions
+    resave: false, // Don't save session if unmodified
+    saveUninitialized: false, // Save uninitialized sessions
     store: MongoStore.create({
       mongoUrl: process.env.MONGODB_URI,
-      ttl: 14 * 24 * 60 * 60 // = 14 days. Default
+      ttl: 14 * 24 * 60 * 60, // = 14 days. Default
     }),
-    cookie: { 
+    cookie: {
       secure: process.env.NODE_ENV === 'production', // Set to true in production with HTTPS
       httpOnly: true, // Prevents client-side JavaScript from accessing the cookie
       maxAge: 14 * 24 * 60 * 60 * 1000, // 14 days
-      sameSite: 'strict' // Helps protect against CSRF attacks
+      sameSite: 'strict', // Helps protect against CSRF attacks
     },
   })
 );
@@ -123,7 +127,11 @@ const upload = multer({
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Unsupported file type. Only JPEG, PNG, WEBP, and GIF are allowed.'));
+      cb(
+        new Error(
+          'Unsupported file type. Only JPEG, PNG, WEBP, and GIF are allowed.'
+        )
+      );
     }
   },
 });
@@ -156,7 +164,10 @@ app.post('/api/chat', async (req, res) => {
     const managedMessages = await manageContext(messages);
 
     // Interact with the assistant, passing the managed messages and context data
-    const assistantResponse = await handleMoolaMaticChat(managedMessages, contextData);
+    const assistantResponse = await handleMoolaMaticChat(
+      managedMessages,
+      contextData
+    );
 
     // Just send the response content
     return res.json({ content: assistantResponse });
@@ -195,7 +206,9 @@ app.post('/api/logout', (req, res) => {
   req.session.destroy((err) => {
     if (err) {
       console.error('Error destroying session during logout:', err);
-      return res.status(500).json({ error: 'An error occurred during logout.' });
+      return res
+        .status(500)
+        .json({ error: 'An error occurred during logout.' });
     }
     res.clearCookie('connect.sid'); // Clear the session cookie
     res.json({ message: 'Logged out successfully.' });
@@ -214,5 +227,7 @@ app.use((err, req, res, next) => {
 // Start the server
 app.listen(BACKEND_PORT, () => {
   console.log(`Backend server is running on http://localhost:${BACKEND_PORT}`);
-  console.log(`Frontend is expected to run on http://localhost:${FRONTEND_PORT}`);
+  console.log(
+    `Frontend is expected to run on http://localhost:${FRONTEND_PORT}`
+  );
 });

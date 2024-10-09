@@ -1,6 +1,5 @@
 // frontend/src/helpers/logger.js
 
-
 import winston from 'winston';
 
 // Define custom log levels
@@ -21,7 +20,7 @@ const colors = {
   debug: 'white',
 };
 
-// Tell winston that you want to link the colors 
+// Tell winston that you want to link the colors
 winston.addColors(colors);
 
 // Create the logger instance
@@ -32,8 +31,8 @@ const logger = winston.createLogger({
     winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss:ms' }),
     winston.format.colorize({ all: true }),
     winston.format.printf(
-      (info) => `${info.timestamp} ${info.level}: ${info.message}`,
-    ),
+      (info) => `${info.timestamp} ${info.level}: ${info.message}`
+    )
   ),
   transports: [
     new winston.transports.Console(),

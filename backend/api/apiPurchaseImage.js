@@ -1,6 +1,5 @@
 // backend/api/apiPurchaseImage.js
 
-
 import express from 'express';
 import path from 'path';
 import { promises as fs } from 'fs';
@@ -19,7 +18,14 @@ router.post('/save', async (req, res) => {
       return res.status(400).json({ error: 'Missing required information' });
     }
 
-    const purchasedDir = path.join(__dirname, '..', '..', 'uploads', 'purchased', itemId);
+    const purchasedDir = path.join(
+      __dirname,
+      '..',
+      '..',
+      'uploads',
+      'purchased',
+      itemId
+    );
     await fs.mkdir(purchasedDir, { recursive: true });
 
     const newFilename = `purchased-${Date.now()}${path.extname(originalFilename)}`;
@@ -32,9 +38,9 @@ router.post('/save', async (req, res) => {
       await fs.rmdir(draftDir, { recursive: true });
     }
 
-    res.json({ 
+    res.json({
       purchasedPath: newPath,
-      filename: newFilename
+      filename: newFilename,
     });
   } catch (error) {
     console.error('Error saving purchased image:', error);
@@ -43,4 +49,3 @@ router.post('/save', async (req, res) => {
 });
 
 export default router;
-

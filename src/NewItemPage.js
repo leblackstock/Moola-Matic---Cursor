@@ -5,22 +5,22 @@ import { useParams, useNavigate } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 import treasureSpecs from './Images/Treasure_Specs01.jpeg';
-import { 
-  handleChatWithAssistant, 
-  analyzeImageWithGPT4Turbo, 
-  createUserMessage, 
-  createAssistantMessage 
+import {
+  handleChatWithAssistant,
+  analyzeImageWithGPT4Turbo,
+  createUserMessage,
+  createAssistantMessage,
 } from './api/chat.js';
 import axios from 'axios';
-import UploadedImagesGallery from './components/compGallery.js';
+import { UploadedImagesGallery } from './components/compGallery.js';
 import PropTypes from 'prop-types';
 import ChatComp from './components/compChat.js';
-import { 
-  handleDraftSave, 
-  handleAutoSave, 
-  handleLocalSave, 
-  loadLocalData, 
-  clearLocalData, 
+import {
+  handleDraftSave,
+  handleAutoSave,
+  handleLocalSave,
+  loadLocalData,
+  clearLocalData,
   updateContextData,
   createDefaultItem,
   handleDraftSaveWithImages,
@@ -32,14 +32,15 @@ import {
   deleteDraft,
   fetchDrafts,
   fetchItems,
-  saveToLocalStorage
+  saveToLocalStorage,
 } from './components/compSave.js';
 
 // Import all styled components
 import {
   PageContainer,
   StyledHeader,
-  StyledLogo,
+  LogoContainer,
+  StaticLogo, // Add this import
   StyledTitle,
   StyledSubtitle,
   StyledForm,
@@ -54,7 +55,8 @@ import {
   ModalOverlay,
   ModalContent,
   ModalButton,
-  MainContentArea
+  MainContentArea,
+  ButtonContainer, // Add this import
 } from './components/compStyles.js';
 
 // Helper functions
@@ -78,8 +80,12 @@ function generateDraftImageName(itemId, index) {
 }
 
 function NewItemPage({ setMostRecentItemId, currentItemId }) {
+  console.log('NewItemPage: Component rendered');
   const { itemId } = useParams();
   const navigate = useNavigate();
+
+  console.log('NewItemPage: itemId from params:', itemId);
+  console.log('NewItemPage: currentItemId prop:', currentItemId);
 
   // ----------------------------
   // Unconditionally declare Hooks
@@ -111,84 +117,118 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
   const cameraInputRef = useRef(null);
   const messagesContainerRef = useRef(null);
 
-  console.log('NewItemPage: Rendered with itemId from params:', itemId, 'and currentItemId prop:', currentItemId);
+  console.log(
+    'NewItemPage: Rendered with itemId from params:',
+    itemId,
+    'and currentItemId prop:',
+    currentItemId
+  );
 
   // ---------------------------------
   // useEffect Hook: Load or Create Item
   // ---------------------------------
   useEffect(() => {
-    const loadDraft = async () => {
-      console.log('Loading draft for itemId:', itemId);
-      if (!itemId) {
-        console.error('No itemId provided');
-        return;
-      }
+    console.log('NewItemPage: useEffect triggered');
+    console.log('NewItemPage: Current itemId:', itemId);
+    
+    const loadedData = loadItemData(itemId);
+    console.log('NewItemPage: Loaded data:', loadedData);
+    
+    if (loadedData && loadedData.item) {
+      console.log('NewItemPage: Loading existing draft');
+      setItem(loadedData.item);
+      setContextData(loadedData.contextData || {});
+      setMessages(loadedData.messages || []);
+    } else {
+      console.log('NewItemPage: Creating new item');
+      const newItem = createDefaultItem(itemId);
+      console.log('NewItemPage: New item created:', newItem);
+      setItem(newItem);
+    }
 
-      const localData = loadLocalData(itemId);
-      if (localData.item) {
-        console.log('Found local data for item:', localData.item);
-        setItem(localData.item);
-        if (localData.item.images) {
-          console.log('Loading images from local storage:', localData.item.images);
-          setUploadedImages(localData.item.images.map(img => ({
-            url: typeof img === 'string' ? img : img.url,
-            file: null // Existing images have no file
-          })));
-        }
-        setMessages(localData.messages || []);
-        setContextData(localData.contextData || {});
-      } else {
-        try {
-          const response = await fetch(`http://localhost:${backendPort}/api/drafts/${itemId}`);
-          if (response.ok) {
-            const draftData = await response.json();
-            console.log('Fetched draft data:', draftData);
-            setItem(draftData);
-            if (draftData.images) {
-              console.log('Loading images from server:', draftData.images);
-              setUploadedImages(draftData.images.map(img => ({
-                url: typeof img === 'string' ? img : img.url,
-                file: null // Existing images have no file
-              })));
-            }
-            setMessages(draftData.messages || []);
-            setContextData(draftData.contextData || {});
-          } else if (response.status === 404) {
-            console.log('No existing draft found, creating new item');
-            const newItem = createDefaultItem(itemId);
-            setItem(newItem);
-            setUploadedImages([]);
-            setMessages([]);
-          } else {
-            console.error('Failed to fetch draft data');
-          }
-        } catch (error) {
-          console.error('Error fetching draft data:', error);
-        }
+    // Fetch the image analysis prompt
+    const fetchImageAnalysisPrompt = async () => {
+      try {
+        const response = await axios.get(`http://localhost:${backendPort}/api/image-analysis-prompt`);
+        setImageAnalysisPrompt(response.data.IMAGE_ANALYSIS_PROMPT);
+      } catch (error) {
+        console.error('Error fetching image analysis prompt:', error);
       }
     };
 
-    loadDraft();
+    fetchImageAnalysisPrompt();
   }, [itemId, backendPort]);
+
+  // Add this new function to handle loading drafts with deduplication
+  const loadDraft = (draftData) => {
+    if (draftData) {
+      console.log('Loading draft:', draftData);
+      // Use a Set to keep track of unique filenames
+      const uniqueFilenames = new Set();
+      const uniqueImages = [];
+
+      // Add images to the uniqueImages array only if their filename is not already in the Set
+      draftData.images.forEach(img => {
+        if (!uniqueFilenames.has(img.filename)) {
+          uniqueFilenames.add(img.filename);
+          uniqueImages.push(img);
+        }
+      });
+
+      // Update the draft data with unique images
+      const updatedDraftData = {
+        ...draftData,
+        images: uniqueImages
+      };
+
+      console.log('Setting item state with:', updatedDraftData);
+      setItem(updatedDraftData);
+      setUploadedImages(uniqueImages);
+    } else {
+      console.log('No draft data to load');
+    }
+  };
 
   // ----------------------------
   // useEffect Hook: Auto-Save
   // ----------------------------
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (item && item.itemId && hasUnsavedChanges) {
-        handleAutoSave(item, messages, item.itemId, backendPort)
-          .then(() => {
-            setHasUnsavedChanges(false);
-            setLastAutoSave(new Date());
-            console.log('Auto-save successful for itemId:', item.itemId);
-          })
-          .catch(error => console.error('Error auto-saving:', error));
-      }
-    }, 30000); // Auto-save every 30 seconds if there are unsaved changes
+    const autoSave = () => {
+      console.log('Auto-save triggered');
+      console.log('Current item state:', item);
+      console.log('Current uploadedImages:', uploadedImages);
 
-    return () => clearTimeout(timer);
-  }, [item, hasUnsavedChanges, messages, backendPort]);
+      if (item) {
+        const dataToSave = {
+          ...item,
+          images: uploadedImages
+        };
+
+        console.log('Data to be auto-saved:', dataToSave);
+
+        handleAutoSave(
+          dataToSave,
+          uploadedImages,
+          backendPort,
+          setItem,
+          setUploadedImages,
+          setHasUnsavedChanges,
+          setLastAutoSave,
+          (savedData) => {
+            console.log('Auto-save successful', savedData);
+          },
+          (error) => {
+            console.error('Error auto-saving:', error);
+          }
+        );
+      }
+    };
+
+    // Set up auto-save interval
+    const autoSaveInterval = setInterval(autoSave, 60000); // Auto-save every minute
+
+    return () => clearInterval(autoSaveInterval);
+  }, [item, uploadedImages, backendPort]);
 
   // ----------------------------
   // useEffect Hook: Save to localStorage
@@ -205,7 +245,10 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
   useEffect(() => {
     return () => {
       if (item && item.itemId) {
-        console.log('NewItemPage: Cleanup - Clearing local data for itemId:', item.itemId);
+        console.log(
+          'NewItemPage: Cleanup - Clearing local data for itemId:',
+          item.itemId
+        );
         clearLocalData(item.itemId);
       }
     };
@@ -224,7 +267,10 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
         const data = await response.json();
         setImageAnalysisPrompt(data.IMAGE_ANALYSIS_PROMPT);
         setIsPromptLoaded(true);
-        console.log('Fetched IMAGE_ANALYSIS_PROMPT:', data.IMAGE_ANALYSIS_PROMPT);
+        console.log(
+          'Fetched IMAGE_ANALYSIS_PROMPT:',
+          data.IMAGE_ANALYSIS_PROMPT
+        );
       } catch (error) {
         console.error('Error fetching IMAGE_ANALYSIS_PROMPT:', error);
       }
@@ -242,6 +288,20 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
     }
   }, [uploadedImages, selectedImage]);
 
+  // ----------------------------
+  // useEffect Hook: item state changed
+  // ----------------------------
+  useEffect(() => {
+    console.log('NewItemPage: item state changed:', item);
+  }, [item]);
+
+  // ----------------------------
+  // useEffect Hook: itemId changed
+  // ----------------------------
+  useEffect(() => {
+    console.log('NewItemPage: itemId changed:', itemId);
+  }, [itemId]);
+
   // Event handlers
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -253,7 +313,7 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
   const sendMessage = async () => {
     const generalInput = message.trim();
     const imageSpecificInput = imageInput.trim();
-    
+
     if (!generalInput && !imageSpecificInput && !imageFile) return;
 
     setMessage('');
@@ -265,26 +325,47 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
 
       if (imageFile) {
         // Handle image-based messages
-        const messageToSend = imageAnalyzed ? imageSpecificInput : imageAnalysisPrompt;
-        const result = await analyzeImageWithGPT4Turbo(imageFile, messageToSend, item.itemId);
-        response = { content: result.assistantResponse, status: 'completed', contextData: result.contextData };
-        
+        const messageToSend = imageAnalyzed
+          ? imageSpecificInput
+          : imageAnalysisPrompt;
+        const result = await analyzeImageWithGPT4Turbo(
+          imageFile,
+          messageToSend,
+          item.itemId
+        );
+        response = {
+          content: result.assistantResponse,
+          status: 'completed',
+          contextData: result.contextData,
+        };
+
         if (!imageAnalyzed) {
           setImageAnalyzed(true);
         }
       } else {
         // Handle text-only messages
-        response = await handleChatWithAssistant([...messages, { role: 'user', content: generalInput }], item.itemId);
+        response = await handleChatWithAssistant(
+          [...messages, { role: 'user', content: generalInput }],
+          item.itemId
+        );
       }
 
       console.log('Assistant response:', response);
 
       // Update the UI with the new message and response
-      setMessages(prevMessages => {
+      setMessages((prevMessages) => {
         const newMessages = [
           ...prevMessages,
-          { role: 'user', content: imageFile ? imageSpecificInput : generalInput },
-          { role: 'assistant', content: response.content, source: 'moola-matic', status: response.status }
+          {
+            role: 'user',
+            content: imageFile ? imageSpecificInput : generalInput,
+          },
+          {
+            role: 'assistant',
+            content: response.content,
+            source: 'moola-matic',
+            status: response.status,
+          },
         ];
         return newMessages;
       });
@@ -298,9 +379,13 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
       setContextData(updatedContextData);
     } catch (error) {
       console.error('Error interacting with Moola-Matic assistant:', error);
-      setMessages(prevMessages => [
+      setMessages((prevMessages) => [
         ...prevMessages,
-        { role: 'assistant', content: 'I apologize, but I encountered an error while processing your request. Please try again or contact support if the issue persists.' }
+        {
+          role: 'assistant',
+          content:
+            'I apologize, but I encountered an error while processing your request. Please try again or contact support if the issue persists.',
+        },
       ]);
     } finally {
       setIsLoading(false);
@@ -308,28 +393,38 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
   };
 
   // Rename this function to avoid conflict with the imported function
-  const analyzeImageLocally = async (file, message, isInitialAnalysis = true) => {
+  const analyzeImageLocally = async (
+    file,
+    message,
+    isInitialAnalysis = true
+  ) => {
     // Convert the file to base64
     const base64Image = await fileToBase64(file);
 
     const formData = new FormData();
     formData.append('image', file);
-    formData.append('base64Image', base64Image);  // Add base64 image
-    formData.append('message', isInitialAnalysis ? imageAnalysisPrompt : message);
+    formData.append('base64Image', base64Image); // Add base64 image
+    formData.append(
+      'message',
+      isInitialAnalysis ? imageAnalysisPrompt : message
+    );
     formData.append('isInitialAnalysis', isInitialAnalysis);
     formData.append('itemId', item.itemId);
     formData.append('contextData', JSON.stringify(contextData));
 
     try {
-      const response = await fetch(`http://localhost:${backendPort}/api/analyze-image`, {
-        method: 'POST',
-        body: formData,
-      });
+      const response = await fetch(
+        `http://localhost:${backendPort}/api/analyze-image`,
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
       const data = await response.json();
       // Update your local contextData with the response
-      setContextData(prevContextData => ({
+      setContextData((prevContextData) => ({
         ...prevContextData,
-        ...data.contextData
+        ...data.contextData,
       }));
       return data.advice;
     } catch (error) {
@@ -344,57 +439,69 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = () => resolve(reader.result.split(',')[1]);
-      reader.onerror = error => reject(error);
+      reader.onerror = (error) => reject(error);
     });
   };
 
   // Update the handleFileChange function to use the renamed function
   const handleFileChange = async (event) => {
-    console.log("handleFileChange called in NewItemPage");
+    console.log('handleFileChange called');
     const files = event.target.files;
     if (files && files.length > 0) {
       const image = files[0];
-      console.log("Image file selected:", image.name);
-      console.log("Current itemId:", item.itemId);
+      console.log('Image file selected:', image.name);
+      console.log('Current itemId:', item.itemId);
 
       if (!item.itemId) {
-        console.error("Error: itemId is undefined");
+        console.error('Error: itemId is undefined');
         return;
       }
 
       try {
-        const { newImage, response } = await handleFileUpload(image, backendPort, item);
+        const { newImage, response } = await handleFileUpload(
+          image,
+          backendPort,
+          item
+        );
 
-        console.log("New image object:", newImage);
+        console.log('New image object:', newImage);
 
-        setItem(prevItem => ({
-          ...prevItem,
-          images: [...(prevItem.images || []), newImage]
-        }));
-
-        setUploadedImages(prevImages => [...prevImages, newImage]);
+        // Update uploaded images and set the new image as selected
+        setUploadedImages((prevImages) => {
+          const updatedImages = [...prevImages, newImage];
+          setSelectedImage(newImage); // Set the newly uploaded image as selected
+          return updatedImages;
+        });
 
         setHasUnsavedChanges(true);
 
         // Image analysis code
         setIsLoading(true);
         try {
-          console.log("Starting image analysis");
-          const assistantResponse = await analyzeImageLocally(image, imageAnalysisPrompt, true);
-          console.log("Received response from analyzeImageLocally");
+          console.log('Starting image analysis');
+          const assistantResponse = await analyzeImageLocally(
+            image,
+            imageAnalysisPrompt,
+            true
+          );
+          console.log('Received response from analyzeImageLocally');
 
-          setMessages(prevMessages => [
+          setMessages((prevMessages) => [
             ...prevMessages,
             { role: 'user', content: 'Image uploaded', image: imageURL },
-            { role: 'assistant', content: assistantResponse }
+            { role: 'assistant', content: assistantResponse },
           ]);
           setImageAnalyzed(true);
         } catch (error) {
           console.error('Error analyzing image:', error);
-          setMessages(prevMessages => [
+          setMessages((prevMessages) => [
             ...prevMessages,
             { role: 'user', content: 'Image upload failed', image: imageURL },
-            { role: 'assistant', content: 'Sorry, an error occurred while analyzing the image. Please try again.' }
+            {
+              role: 'assistant',
+              content:
+                'Sorry, an error occurred while analyzing the image. Please try again.',
+            },
           ]);
         } finally {
           setIsLoading(false);
@@ -418,22 +525,29 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
       image: imagePreview,
     };
 
-    setMessages(prevMessages => [...prevMessages, newMessage]);
+    setMessages((prevMessages) => [...prevMessages, newMessage]);
     setIsLoading(true);
 
     try {
-      const assistantResponse = await analyzeImageWithGPT4Turbo(imageFile, imageInput.trim(), false);
-      
-      setMessages(prevMessages => [
+      const assistantResponse = await analyzeImageWithGPT4Turbo(
+        imageFile,
+        imageInput.trim(),
+        false
+      );
+
+      setMessages((prevMessages) => [
         ...prevMessages,
         { role: 'user', content: imageInput.trim(), image: imagePreview },
         { role: 'assistant', content: assistantResponse },
       ]);
     } catch (error) {
       console.error('Error in sendImageMessage:', error);
-      setMessages(prevMessages => [
+      setMessages((prevMessages) => [
         ...prevMessages,
-        { role: 'assistant', content: 'Sorry, an error occurred. Please try again.' },
+        {
+          role: 'assistant',
+          content: 'Sorry, an error occurred. Please try again.',
+        },
       ]);
     } finally {
       setIsLoading(false);
@@ -476,13 +590,36 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
   };
 
   const handleDeleteImage = (imageToDelete) => {
-    setUploadedImages(prevImages => prevImages.filter(img => img.id !== imageToDelete.id));
+    setUploadedImages((prevImages) =>
+      prevImages.filter((img) => img.id !== imageToDelete.id)
+    );
   };
 
-  // Render loading state if item is null
+  const updateItem = (field, value) => {
+    console.log('updateItem called with:', { field, value });
+    console.log('Current item state before update:', item);
+    setItem(prevItem => {
+      const updatedItem = {
+        ...prevItem,
+        [field]: value
+      };
+      console.log('Updated item:', updatedItem);
+      handleLocalSave(updatedItem, contextData, messages);
+      return updatedItem;
+    });
+    setHasUnsavedChanges(true);
+  };
+
+  console.log('NewItemPage: Current item state:', item);
+
+  console.log('NewItemPage: Rendering. Current item state:', item);
+
   if (!item) {
+    console.log('NewItemPage: Item is null, rendering loading state');
     return <div>Loading...</div>;
   }
+
+  console.log('NewItemPage: Item is not null, rendering full component');
 
   return (
     <PageContainer>
@@ -493,40 +630,46 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
       )}
 
       <StyledHeader>
-        <StyledLogo src={treasureSpecs} alt="Treasure Specs" />
+        <LogoContainer>
+          <StaticLogo src={treasureSpecs} alt="Treasure Specs" />
+        </LogoContainer>
         <StyledTitle>Add Your Thrifty Find</StyledTitle>
-        <StyledSubtitle>Ready to turn that rusty gold into shiny cash? Let's get started!</StyledSubtitle>
+        <StyledSubtitle>
+          Ready to turn that rusty gold into shiny cash? Let's get started!
+        </StyledSubtitle>
       </StyledHeader>
-      
+
       <MainContentArea>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <ChatComp 
+          <ChatComp
             item={item}
             updateItem={updateItem}
             messages={messages}
             setMessages={setMessages}
             currentItemId={item?.itemId} // Use optional chaining
-            onFileChange={handleFileChange}  // Add this prop
+            onFileChange={handleFileChange} // Add this prop
             isLoading={isLoading}
             onStartLoading={handleStartLoading}
             onEndLoading={handleEndLoading}
             imageUploaded={imageUploaded}
             setImageUploaded={setImageUploaded}
-            imagePreview={imagePreview}  // Pass the imagePreview to ChatComp
+            imagePreview={imagePreview} // Pass the imagePreview to ChatComp
             selectedImage={selectedImage}
             setSelectedImage={setSelectedImage}
           />
 
-          <GlowingButton 
-            onClick={handleImageButtonClick}
-            disabled={!isPromptLoaded || isLoading}
-          >
-            <i className="fas fa-image"></i> Add Images
-          </GlowingButton>
+          <ButtonContainer>
+            <GlowingButton
+              onClick={handleImageButtonClick}
+              disabled={!isPromptLoaded || isLoading}
+            >
+              <i className="fas fa-image"></i> Add Images
+            </GlowingButton>
+          </ButtonContainer>
 
           <UploadedImagesGallery
             images={uploadedImages}
-            onSelect={handleImageSelect}
+            onSelect={setSelectedImage}
             selectedImage={selectedImage}
             onDelete={handleDeleteImage}
           />
@@ -568,32 +711,32 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
           <StyledForm onSubmit={handleSubmit}>
             <StyledFormGroup>
               <StyledLabel htmlFor="itemName">Item Name</StyledLabel>
-              <StyledInput 
-                type="text" 
-                id="itemName" 
-                value={item?.name || ''} 
-                onChange={(e) => updateItem('name', e.target.value)} 
-                required 
+              <StyledInput
+                type="text"
+                id="itemName"
+                value={item?.name || ''}
+                onChange={(e) => updateItem('name', e.target.value)}
+                required
               />
             </StyledFormGroup>
 
             <StyledFormGroup>
               <StyledLabel htmlFor="brand">Brand</StyledLabel>
-              <StyledInput 
-                type="text" 
-                id="brand" 
-                value={item?.brand || ''} 
-                onChange={(e) => updateItem('brand', e.target.value)} 
+              <StyledInput
+                type="text"
+                id="brand"
+                value={item?.brand || ''}
+                onChange={(e) => updateItem('brand', e.target.value)}
               />
             </StyledFormGroup>
 
             <StyledFormGroup>
               <StyledLabel htmlFor="condition">Condition</StyledLabel>
-              <StyledSelect 
-                id="condition" 
-                value={item?.condition || ''} 
-                onChange={(e) => updateItem('condition', e.target.value)} 
-                required 
+              <StyledSelect
+                id="condition"
+                value={item?.condition || ''}
+                onChange={(e) => updateItem('condition', e.target.value)}
+                required
               >
                 <option value="">Select condition</option>
                 <option value="new">New</option>
@@ -606,11 +749,11 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
 
             <StyledFormGroup>
               <StyledLabel htmlFor="description">Description</StyledLabel>
-              <StyledTextarea 
-                id="description" 
-                rows="3" 
-                value={item?.description || ''} 
-                onChange={(e) => updateItem('description', e.target.value)} 
+              <StyledTextarea
+                id="description"
+                rows="3"
+                value={item?.description || ''}
+                onChange={(e) => updateItem('description', e.target.value)}
               ></StyledTextarea>
             </StyledFormGroup>
 
@@ -619,7 +762,28 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
             <StyledButton type="submit">Evaluate Item</StyledButton>
           </StyledForm>
 
-          <StyledButton onClick={() => handleManualSave(item, uploadedImages, backendPort, setItem, setUploadedImages, setHasUnsavedChanges, setLastAutoSave)}>
+          <StyledButton
+            onClick={() => {
+              console.log('Save Draft button clicked');
+              console.log('Current item state:', item);
+              console.log('Current uploadedImages:', uploadedImages);
+              handleManualSave(
+                item,
+                uploadedImages,
+                backendPort,
+                setItem,
+                setUploadedImages,
+                setHasUnsavedChanges,
+                setLastAutoSave
+              ).then(() => {
+                console.log('Manual save completed');
+                console.log('Updated item state:', item);
+                console.log('Updated uploadedImages:', uploadedImages);
+              }).catch(error => {
+                console.error('Error in manual save:', error);
+              });
+            }}
+          >
             Save Draft
           </StyledButton>
 
@@ -636,7 +800,7 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
 
 NewItemPage.propTypes = {
   setMostRecentItemId: PropTypes.func.isRequired,
-  currentItemId: PropTypes.string
+  currentItemId: PropTypes.string,
 };
 
 export default NewItemPage;

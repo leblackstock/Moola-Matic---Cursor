@@ -8,12 +8,12 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid'; // For generating unique identifiers
 import multer from 'multer';
-import { 
-  interactWithMoolaMaticAssistant, 
-  waitForRunCompletion, 
-  getAssistantResponse, 
-  createUserMessage, 
-  createAssistantMessage 
+import {
+  interactWithMoolaMaticAssistant,
+  waitForRunCompletion,
+  getAssistantResponse,
+  createUserMessage,
+  createAssistantMessage,
 } from './chatAssistant.js';
 import { IMAGE_ANALYSIS_PROMPT } from '../routes/constants.js';
 
@@ -92,7 +92,14 @@ const deleteFile = (filePath) => {
  * @param {Object} session - The Express session object.
  * @returns {Promise<string>} - The final response from the Moola-Matic assistant.
  */
-async function analyzeImage(imageBase64, message, contextData = {}, session, isInitialAnalysis, itemId) {
+async function analyzeImage(
+  imageBase64,
+  message,
+  contextData = {},
+  session,
+  isInitialAnalysis,
+  itemId
+) {
   console.log('analyzeImage: Analyzing image for item with ID:', itemId);
   try {
     // Ensure contextData is an object
@@ -100,19 +107,19 @@ async function analyzeImage(imageBase64, message, contextData = {}, session, isI
 
     // Step 1: Analyze the image using OpenAI's GPT-4-Turbo model
     const openAIResponse = await openai.chat.completions.create({
-      model: "gpt-4-turbo",
+      model: 'gpt-4-turbo',
       messages: [
         {
-          role: "user",
+          role: 'user',
           content: [
             {
-              type: "image_url",
+              type: 'image_url',
               image_url: {
                 url: `data:image/jpeg;base64,${imageBase64}`,
               },
             },
             {
-              type: "text",
+              type: 'text',
               text: isInitialAnalysis ? IMAGE_ANALYSIS_PROMPT : message,
             },
           ],
@@ -124,13 +131,13 @@ async function analyzeImage(imageBase64, message, contextData = {}, session, isI
       frequency_penalty: 0,
       presence_penalty: 0,
       response_format: {
-        type: "text",
+        type: 'text',
       },
     });
 
     // Extract the image analysis result
     const imageAnalysis = openAIResponse.choices[0].message.content.trim();
-    
+
     console.log('Image analysis result:', imageAnalysis);
 
     // Step 2: Interact with Moola-Matic Assistant
@@ -141,7 +148,8 @@ async function analyzeImage(imageBase64, message, contextData = {}, session, isI
       assistantPrompt = `User Question: ${message}\nPlease provide a relevant response.`;
     }
 
-    const assistantResponse = await interactWithMoolaMaticAssistant(assistantPrompt);
+    const assistantResponse =
+      await interactWithMoolaMaticAssistant(assistantPrompt);
 
     // Update contextData with the latest image analysis and assistant response
     if (isInitialAnalysis) {
@@ -152,7 +160,7 @@ async function analyzeImage(imageBase64, message, contextData = {}, session, isI
 
     return { assistantResponse, contextData };
   } catch (error) {
-    console.error("Error during image analysis integration:", error);
+    console.error('Error during image analysis integration:', error);
     throw error;
   }
 }
@@ -163,10 +171,13 @@ async function analyzeImage(imageBase64, message, contextData = {}, session, isI
  * Expects multipart/form-data with 'image' and 'messages' fields
  */
 router.post('/analyze-image', upload.single('image'), async (req, res) => {
-  console.log('analyze-image route: Received request for item with ID:', req.body.itemId);
+  console.log(
+    'analyze-image route: Received request for item with ID:',
+    req.body.itemId
+  );
   const { message, isInitialAnalysis, itemId } = req.body;
   let contextData;
-  
+
   try {
     contextData = req.body.contextData ? JSON.parse(req.body.contextData) : {};
   } catch (error) {
@@ -194,14 +205,15 @@ router.post('/analyze-image', upload.single('image'), async (req, res) => {
 
   // Call the analyzeImage function to process the image and get financial advice
   try {
-    const { assistantResponse, contextData: updatedContextData } = await analyzeImage(
-      base64Image, 
-      message, 
-      contextData, 
-      req.session, 
-      isInitialAnalysis === 'true',
-      itemId
-    );
+    const { assistantResponse, contextData: updatedContextData } =
+      await analyzeImage(
+        base64Image,
+        message,
+        contextData,
+        req.session,
+        isInitialAnalysis === 'true',
+        itemId
+      );
 
     // Send the assistant's response and updated contextData to the frontend
     res.json({
@@ -211,7 +223,11 @@ router.post('/analyze-image', upload.single('image'), async (req, res) => {
     });
   } catch (error) {
     console.error('Error processing image upload:', error);
-    res.status(500).json({ error: 'Internal Server Error: Failed to process image upload.' });
+    res
+      .status(500)
+      .json({
+        error: 'Internal Server Error: Failed to process image upload.',
+      });
   }
 });
 

@@ -1,7 +1,11 @@
 // frontend/src/components/compChat.js
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { handleChatWithAssistant, analyzeImageWithGPT4Turbo, handleImageChat } from '../api/chat.js';
+import {
+  handleChatWithAssistant,
+  analyzeImageWithGPT4Turbo,
+  handleImageChat,
+} from '../api/chat.js';
 import '../App.css';
 
 // Import all styled components
@@ -24,13 +28,29 @@ import {
   LoadingIndicator,
   StyledButton,
   LoadingOverlay,
-  LoadingSpinner
+  LoadingSpinner,
 } from './compStyles.js';
 
-function ChatComp({ item, updateItem, messages, setMessages, currentItemId, isLoading, onStartLoading, onEndLoading, imageUploaded, setImageUploaded, imagePreview: propImagePreview, selectedImage, setSelectedImage }) {
+function ChatComp({
+  item,
+  updateItem,
+  messages,
+  setMessages,
+  currentItemId,
+  isLoading,
+  onStartLoading,
+  onEndLoading,
+  imageUploaded,
+  setImageUploaded,
+  imagePreview: propImagePreview,
+  selectedImage,
+  setSelectedImage,
+}) {
   const [message, setMessage] = useState('');
   const [imageFile, setImageFile] = useState(null);
-  const [localImagePreview, setLocalImagePreview] = useState(propImagePreview || '');
+  const [localImagePreview, setLocalImagePreview] = useState(
+    propImagePreview || ''
+  );
   const [imageInput, setImageInput] = useState('');
   const [imageAnalyzed, setImageAnalyzed] = useState(false);
   const [imageAnalysisPrompt, setImageAnalysisPrompt] = useState('');
@@ -47,13 +67,14 @@ function ChatComp({ item, updateItem, messages, setMessages, currentItemId, isLo
   }, [propImagePreview]);
 
   useEffect(() => {
-    console.log("Component mounted or updated");
-    return () => console.log("Component will unmount");
+    console.log('Component mounted or updated');
+    return () => console.log('Component will unmount');
   });
 
   useEffect(() => {
     if (messagesContainerRef.current) {
-      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+      messagesContainerRef.current.scrollTop =
+        messagesContainerRef.current.scrollHeight;
     }
   }, [messages]);
 
@@ -81,7 +102,7 @@ function ChatComp({ item, updateItem, messages, setMessages, currentItemId, isLo
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = () => resolve(reader.result.split(',')[1]);
-      reader.onerror = error => reject(error);
+      reader.onerror = (error) => reject(error);
     });
   };
 
@@ -92,12 +113,20 @@ function ChatComp({ item, updateItem, messages, setMessages, currentItemId, isLo
     onStartLoading();
 
     try {
-      const response = await handleChatWithAssistant([...messages, { role: 'user', content: message }], currentItemId);
-      
-      setMessages(prevMessages => [
+      const response = await handleChatWithAssistant(
+        [...messages, { role: 'user', content: message }],
+        currentItemId
+      );
+
+      setMessages((prevMessages) => [
         ...prevMessages,
         { role: 'user', content: message },
-        { role: 'assistant', content: response.content, source: 'moola-matic', status: response.status }
+        {
+          role: 'assistant',
+          content: response.content,
+          source: 'moola-matic',
+          status: response.status,
+        },
       ]);
 
       if (response.itemUpdates) {
@@ -105,9 +134,13 @@ function ChatComp({ item, updateItem, messages, setMessages, currentItemId, isLo
       }
     } catch (error) {
       console.error('Error interacting with Moola-Matic assistant:', error);
-      setMessages(prevMessages => [
+      setMessages((prevMessages) => [
         ...prevMessages,
-        { role: 'assistant', content: 'I apologize, but I encountered an error while processing your request. Please try again or contact support if the issue persists.' }
+        {
+          role: 'assistant',
+          content:
+            'I apologize, but I encountered an error while processing your request. Please try again or contact support if the issue persists.',
+        },
       ]);
     } finally {
       onEndLoading();
@@ -115,11 +148,11 @@ function ChatComp({ item, updateItem, messages, setMessages, currentItemId, isLo
   };
 
   const handleFileChange = async (event) => {
-    console.log("handleFileChange called");
+    console.log('handleFileChange called');
     const files = event.target.files;
     if (files && files.length > 0) {
       const image = files[0];
-      console.log("Image file selected:", image.name);
+      console.log('Image file selected:', image.name);
       setImageFile(image);
       setImageAnalyzed(false);
 
@@ -129,32 +162,44 @@ function ChatComp({ item, updateItem, messages, setMessages, currentItemId, isLo
       onStartLoading(); // Call this instead of setIsLoading(true)
 
       try {
-        console.log("Starting image analysis");
+        console.log('Starting image analysis');
         // Simulate a delay to ensure we can see the loading state
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        console.log("Calling analyzeImageWithGPT4Turbo");
-        const assistantResponse = await analyzeImageWithGPT4Turbo(image, imageAnalysisPrompt, currentItemId);
-        console.log("Received response from analyzeImageWithGPT4Turbo");
+        await new Promise((resolve) => setTimeout(resolve, 2000));
 
-        setMessages(prevMessages => [
+        console.log('Calling analyzeImageWithGPT4Turbo');
+        const assistantResponse = await analyzeImageWithGPT4Turbo(
+          image,
+          imageAnalysisPrompt,
+          currentItemId
+        );
+        console.log('Received response from analyzeImageWithGPT4Turbo');
+
+        setMessages((prevMessages) => [
           ...prevMessages,
           { role: 'user', content: 'Image uploaded', image: imagePreviewUrl },
-          { role: 'assistant', content: assistantResponse }
+          { role: 'assistant', content: assistantResponse },
         ]);
         setImageAnalyzed(true);
       } catch (error) {
         console.error('Error analyzing image:', error);
-        setMessages(prevMessages => [
+        setMessages((prevMessages) => [
           ...prevMessages,
-          { role: 'user', content: 'Image upload failed', image: imagePreviewUrl },
-          { role: 'assistant', content: 'Sorry, an error occurred while analyzing the image. Please try again.' }
+          {
+            role: 'user',
+            content: 'Image upload failed',
+            image: imagePreviewUrl,
+          },
+          {
+            role: 'assistant',
+            content:
+              'Sorry, an error occurred while analyzing the image. Please try again.',
+          },
         ]);
       } finally {
         onEndLoading(); // Call this instead of setIsLoading(false)
       }
     } else {
-      console.log("No file selected");
+      console.log('No file selected');
     }
   };
 
@@ -174,19 +219,29 @@ function ChatComp({ item, updateItem, messages, setMessages, currentItemId, isLo
     }
 
     if (typeof parsedContent === 'string') {
-      const lines = parsedContent.split('\n').filter(line => line.trim() !== '');
+      const lines = parsedContent
+        .split('\n')
+        .filter((line) => line.trim() !== '');
       return lines.map((line, i) => (
         <React.Fragment key={i}>
           {line.startsWith('###') ? (
-            <h3 style={{marginBottom: '0.5em', marginTop: '0.5em'}}>{line.replace('###', '').trim()}</h3>
+            <h3 style={{ marginBottom: '0.5em', marginTop: '0.5em' }}>
+              {line.replace('###', '').trim()}
+            </h3>
           ) : line.startsWith('##') ? (
-            <h4 style={{marginBottom: '0.3em', marginTop: '0.3em'}}>{line.replace('##', '').trim()}</h4>
+            <h4 style={{ marginBottom: '0.3em', marginTop: '0.3em' }}>
+              {line.replace('##', '').trim()}
+            </h4>
           ) : line.startsWith('#') ? (
-            <h5 style={{marginBottom: '0.2em', marginTop: '0.2em'}}>{line.replace('#', '').trim()}</h5>
+            <h5 style={{ marginBottom: '0.2em', marginTop: '0.2em' }}>
+              {line.replace('#', '').trim()}
+            </h5>
           ) : line.startsWith('-') ? (
-            <li style={{marginBottom: '0.1em'}}>{line.replace('-', '').trim()}</li>
+            <li style={{ marginBottom: '0.1em' }}>
+              {line.replace('-', '').trim()}
+            </li>
           ) : (
-            <p style={{marginBottom: '0.1em', marginTop: '0.1em'}}>{line}</p>
+            <p style={{ marginBottom: '0.1em', marginTop: '0.1em' }}>{line}</p>
           )}
         </React.Fragment>
       ));
@@ -202,12 +257,17 @@ function ChatComp({ item, updateItem, messages, setMessages, currentItemId, isLo
 
     try {
       const base64Image = await getBase64(selectedImage.file);
-      const response = await handleImageChat(imageInput.trim(), base64Image, currentItemId, false);
-      
-      setMessages(prevMessages => [
+      const response = await handleImageChat(
+        imageInput.trim(),
+        base64Image,
+        currentItemId,
+        false
+      );
+
+      setMessages((prevMessages) => [
         ...prevMessages,
         { role: 'user', content: imageInput.trim(), image: selectedImage.url },
-        { role: 'assistant', content: response.advice }
+        { role: 'assistant', content: response.advice },
       ]);
 
       if (response.contextData) {
@@ -215,9 +275,13 @@ function ChatComp({ item, updateItem, messages, setMessages, currentItemId, isLo
       }
     } catch (error) {
       console.error('Error processing image message:', error);
-      setMessages(prevMessages => [
+      setMessages((prevMessages) => [
         ...prevMessages,
-        { role: 'assistant', content: 'Sorry, an error occurred while processing your image message. Please try again.' }
+        {
+          role: 'assistant',
+          content:
+            'Sorry, an error occurred while processing your image message. Please try again.',
+        },
       ]);
     } finally {
       onEndLoading();
@@ -238,7 +302,9 @@ function ChatComp({ item, updateItem, messages, setMessages, currentItemId, isLo
           messages.map((message, index) => (
             <MessageContainer key={index} $isUser={message.role === 'user'}>
               <MessageBubble $isUser={message.role === 'user'}>
-                {message.role === 'assistant' ? renderContent(message.content) : message.content}
+                {message.role === 'assistant'
+                  ? renderContent(message.content)
+                  : message.content}
               </MessageBubble>
             </MessageContainer>
           ))
@@ -246,7 +312,9 @@ function ChatComp({ item, updateItem, messages, setMessages, currentItemId, isLo
           <p>No chat history available.</p>
         )}
       </ChatHistory>
-      {isLoading && <LoadingIndicator>Processing your request...</LoadingIndicator>}
+      {isLoading && (
+        <LoadingIndicator>Processing your request...</LoadingIndicator>
+      )}
       {selectedImage && (
         <ImageInputContainer>
           <ImagePreviewContainer>

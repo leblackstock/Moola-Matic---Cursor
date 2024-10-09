@@ -10,11 +10,11 @@ import NewItemPage from './NewItemPage.js';
 import ViewItemsPage from './ViewItemsPage.js';
 import { v4 as uuidv4 } from 'uuid';
 import { handleNewItem, handleLocalSave } from './components/compSave.js';
-import { 
-  PageContainer, 
-  StyledButton, 
-  StyledLogo, 
-  StyledTitle, 
+import {
+  PageContainer,
+  StyledButton,
+  StyledLogo,
+  StyledTitle,
   StyledSubtitle,
   GlowingButton,
   StyledContainer,
@@ -26,9 +26,11 @@ import {
   WarningBoxOverlay,
   WarningBox,
   WarningBoxButtons,
+  WarningButton, // Add this line
   LogoContainer,
   Logo,
-  MainContent
+  MainContent,
+  ButtonContainer,
 } from './components/compStyles.js';
 
 // Export the UUID generation function
@@ -70,7 +72,7 @@ Sidebar.propTypes = {
 /**
  * WarningBoxModal Component
  * Displays a modal overlay with a warning message before proceeding.
- * 
+ *
  * @param {Function} onProceed - Callback when user chooses to proceed.
  * @param {Function} onGoBack - Callback when user chooses to go back.
  */
@@ -79,10 +81,16 @@ function WarningBoxModal({ onProceed, onGoBack }) {
     <WarningBoxOverlay>
       <WarningBox>
         <StyledTitle>Whoa there, bargain hunter!</StyledTitle>
-        <StyledSubtitle>Are you sure you want to embark on a new treasure hunt? Any unsaved progress on your current item will vanish faster than a yard sale deal!</StyledSubtitle>
+        <StyledSubtitle>
+          Are you sure you want to embark on a new treasure hunt? Any unsaved
+          progress on your current item will vanish faster than a yard sale
+          deal!
+        </StyledSubtitle>
         <WarningBoxButtons>
-          <ModalButton onClick={onProceed}>Let's do this!</ModalButton>
-          <ModalButton onClick={onGoBack}>Oops, nevermind!</ModalButton>
+          <WarningButton className="proceed" onClick={onProceed}>
+            Let's do this!
+          </WarningButton>
+          <WarningButton onClick={onGoBack}>Oops, nevermind!</WarningButton>
         </WarningBoxButtons>
       </WarningBox>
     </WarningBoxOverlay>
@@ -108,15 +116,23 @@ function LandingPage({ handleNewItem, setCurrentItemId, setMostRecentItemId }) {
   };
 
   const handleProceed = () => {
+    console.log('handleProceed: User confirmed, creating new item');
     setShowWarning(false);
+    
     // Clear all unsaved variables
     setCurrentItemId(null);
     setMostRecentItemId(null);
     localStorage.clear();
     sessionStorage.clear();
-    
-    // Create a new itemId and navigate to NewItemPage
-    const newItemId = handleNewItem();
+
+    // Create a new itemId
+    const newItemId = generateItemId();
+    console.log('handleProceed: Generated new itemId:', newItemId);
+    setCurrentItemId(newItemId);
+    setMostRecentItemId(newItemId);
+
+    // Navigate to the new item page
+    console.log('handleProceed: Navigating to:', `/new-item/${newItemId}`);
     navigate(`/new-item/${newItemId}`);
   };
 
@@ -128,25 +144,27 @@ function LandingPage({ handleNewItem, setCurrentItemId, setMostRecentItemId }) {
     <StyledContainer>
       <div>
         <LogoContainer>
-          <Logo 
-            src={moolaMaticLogo} 
-            alt="Moola-Matic Logo"
-          />
+          <Logo src={moolaMaticLogo} alt="Moola-Matic Logo" />
         </LogoContainer>
         <StyledTitle>Moola-Matic</StyledTitle>
-        <StyledSubtitle>Turn your thrifty finds into a treasure trove of cold, hard cash!</StyledSubtitle>
-        <div>
+        <StyledSubtitle>
+          Turn your thrifty finds into a treasure trove of cold, hard cash!
+        </StyledSubtitle>
+        <ButtonContainer>
           <GlowingButton onClick={handleNewItemClick}>New Item</GlowingButton>
-          <GlowingButton as={Link} to="/view-items">View Items</GlowingButton>
-        </div>
+          <GlowingButton as={Link} to="/view-items">
+            View Items
+          </GlowingButton>
+        </ButtonContainer>
         {showWarning && (
-          <WarningBoxModal
-            onProceed={handleProceed}
-            onGoBack={handleGoBack}
-          />
+          <WarningBoxModal onProceed={handleProceed} onGoBack={handleGoBack} />
         )}
         <div>
-          <p>Are you sitting on a goldmine of garage sale goodies? Let Moola-Matic help you squeeze every last penny out of your dusty discoveries!</p>
+          <p>
+            Are you sitting on a goldmine of garage sale goodies? Let
+            Moola-Matic help you squeeze every last penny out of your dusty
+            discoveries!
+          </p>
           <p>We're like a money-making time machine for your junk drawer!</p>
         </div>
       </div>
@@ -201,7 +219,7 @@ class ErrorBoundary extends React.Component {
       );
     }
 
-    return this.props.children; 
+    return this.props.children;
   }
 }
 
@@ -218,9 +236,13 @@ function NotFound() {
   return (
     <StyledContainer>
       <StyledTitle>404 - Page Not Found</StyledTitle>
-      <StyledSubtitle>Oops! It looks like this page has vanished like a yard sale bargain.</StyledSubtitle>
+      <StyledSubtitle>
+        Oops! It looks like this page has vanished like a yard sale bargain.
+      </StyledSubtitle>
       <p>Don't worry, there are still plenty of treasures to be found!</p>
-      <GlowingButton as={Link} to="/">Return to Home</GlowingButton>
+      <GlowingButton as={Link} to="/">
+        Return to Home
+      </GlowingButton>
     </StyledContainer>
   );
 }
@@ -264,17 +286,17 @@ function AppContent() {
     setMostRecentItemId(null);
     localStorage.clear(); // This clears all localStorage items
     sessionStorage.clear(); // Clear any session storage as well
-    
+
     // Create a new itemId
     const newItemId = generateItemId();
     setCurrentItemId(newItemId);
     setMostRecentItemId(newItemId);
-    
+
     // Navigate to the new item page
     navigate(`/new-item/${newItemId}`);
-    
+
     console.log('handleNewItemClick: New item created with ID:', newItemId);
-    
+
     return newItemId;
   };
 
@@ -294,33 +316,39 @@ function AppContent() {
   return (
     <ErrorBoundary>
       <PageContainer>
-        <Sidebar handleLogout={handleLogout} handleChangeItem={handleChangeItem} />
+        <Sidebar
+          handleLogout={handleLogout}
+          handleChangeItem={handleChangeItem}
+        />
         <MainContent>
           <Routes>
-            <Route path="/" element={
-              <LandingPage 
-                handleNewItem={handleNewItemClick} 
-                setCurrentItemId={setCurrentItemId} 
-                setMostRecentItemId={setMostRecentItemId} 
-              />
-            } />
-            <Route 
-              path="/new-item" 
+            <Route
+              path="/"
               element={
-                <NewItemPage 
-                  setMostRecentItemId={setMostRecentItemId} 
-                  currentItemId={currentItemId} 
+                <LandingPage
+                  handleNewItem={handleNewItemClick}
+                  setCurrentItemId={setCurrentItemId}
+                  setMostRecentItemId={setMostRecentItemId}
                 />
-              } 
+              }
             />
-            <Route 
-              path="/new-item/:itemId" 
+            <Route
+              path="/new-item"
               element={
-                <NewItemPage 
-                  setMostRecentItemId={setMostRecentItemId} 
-                  currentItemId={currentItemId} 
+                <NewItemPage
+                  setMostRecentItemId={setMostRecentItemId}
+                  currentItemId={currentItemId}
                 />
-              } 
+              }
+            />
+            <Route
+              path="/new-item/:itemId"
+              element={
+                <NewItemPage
+                  setMostRecentItemId={setMostRecentItemId}
+                  currentItemId={currentItemId}
+                />
+              }
             />
             <Route path="/view-items" element={<ViewItemsPage />} />
             <Route path="*" element={<NotFound />} />

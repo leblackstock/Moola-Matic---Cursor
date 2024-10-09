@@ -14,158 +14,179 @@ const router = express.Router();
 
 // Configure multer for file upload
 const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, path.join(__dirname, '..', '..', 'uploads', 'drafts'))
-    },
-    filename: function (req, file, cb) {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
-        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname))
-    }
+  destination: function (req, file, cb) {
+    cb(null, path.join(__dirname, '..', '..', 'uploads', 'drafts'));
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(
+      null,
+      file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname)
+    );
+  },
 });
 
 const upload = multer({ storage: storage });
 
-router.post('/save-draft', upload.array('newImages'), async (req, res) => {
-    try {
-        console.log('Received save-draft request');
-        console.log('Received files:', JSON.stringify(req.files, null, 2));
-        console.log('Received body keys:', Object.keys(req.body));
-        console.log('Received body:', JSON.stringify(req.body, null, 2));
+router.post('/save-draft', upload.array('images'), async (req, res) => {
+  console.log('Received request body:', req.body);
+  console.log('Received files:', req.files);
 
-        let draftData = req.body;
-        if (typeof req.body.draftData === 'string') {
-            console.log('draftData is a string, parsing...');
-            draftData = JSON.parse(req.body.draftData);
-        }
-        console.log('Parsed draftData:', JSON.stringify(draftData, null, 2));
-
-        const itemId = draftData.itemId || `draft-${uuidv4()}`;
-        console.log('Using itemId:', itemId);
-        draftData.itemId = itemId;
-
-        // Handle existing images
-        let existingImages = draftData.images || [];
-        console.log('Initial existingImages:', JSON.stringify(existingImages, null, 2));
-        if (typeof existingImages === 'string') {
-            console.log('existingImages is a string, parsing...');
-            existingImages = JSON.parse(existingImages);
-        }
-        console.log('Parsed existing images:', JSON.stringify(existingImages, null, 2));
-
-        // Handle new images
-        const newImages = [];
-        if (req.files && req.files.length > 0) {
-            console.log('Processing new files...');
-            for (const file of req.files) {
-                console.log('Processing file:', file.filename);
-                const imageUrl = `/uploads/drafts/${file.filename}`;
-                newImages.push({
-                    url: imageUrl,
-                    filename: file.filename,
-                    isNew: true
-                });
-            }
-        }
-        console.log('New images:', JSON.stringify(newImages, null, 2));
-
-        // Combine existing and new image data
-        draftData.images = [...existingImages, ...newImages];
-        console.log('Final draftData images to be saved:', JSON.stringify(draftData.images, null, 2));
-
-        // Remove _id from draftData if it exists
-        if (draftData._id) {
-            console.log('Removing _id from draftData');
-            delete draftData._id;
-        }
-
-        console.log('Final draftData to be saved:', JSON.stringify(draftData, null, 2));
-        console.log('Attempting to save draft to database...');
-        // Save or update the draft in the database
-        const savedDraft = await DraftItem.findOneAndUpdate(
-            { itemId: itemId },
-            { $set: draftData },
-            { upsert: true, new: true, setDefaultsOnInsert: true }
-        );
-
-        console.log('Saved draft:', JSON.stringify(savedDraft, null, 2));
-
-        if (!savedDraft) {
-            throw new Error('Failed to save draft to database');
-        }
-
-        res.status(200).json({ message: 'Draft saved successfully', item: savedDraft });
-    } catch (error) {
-        console.error('Error saving draft:', error);
-        console.error('Error stack:', error.stack);
-        res.status(500).json({ error: 'Failed to save draft', details: error.message, stack: error.stack });
+  try {
+    let draftData = req.body;
+    if (typeof draftData === 'string') {
+      try {
+        draftData = JSON.parse(draftData);
+      } catch (error) {
+        console.error('Error parsing draftData:', error);
+        return res.status(400).json({ error: 'Invalid draftData format' });
+      }
     }
+    console.log('Parsed draftData:', draftData);
+
+    // Handle image uploads
+    const newImages = req.files ? req.files.map(file => ({
+      id: uuidv4(),
+      url: `/uploads/drafts/${file.filename}`,
+      filename: file.filename,
+      isNew: true
+    })) : [];
+
+    // Merge existing images with new images
+    let updatedImages = draftData.images || [];
+    if (newImages.length > 0) {
+      updatedImages = [...updatedImages, ...newImages];
+    }
+
+    // Merge existing draft data with new data
+    const updatedDraft = {
+      ...draftData,
+      images: updatedImages,
+      lastUpdated: new Date()
+    };
+
+    console.log('Updated draft to be saved:', updatedDraft);
+
+    // Save the updated draft
+    let savedDraft;
+    if (updatedDraft._id) {
+      savedDraft = await DraftItem.findByIdAndUpdate(updatedDraft._id, updatedDraft, { new: true });
+    } else {
+      savedDraft = new DraftItem(updatedDraft);
+      await savedDraft.save();
+    }
+
+    console.log('Saved draft:', savedDraft);
+
+    res.json({ message: 'Draft saved successfully', item: savedDraft });
+  } catch (error) {
+    console.error('Error saving draft:', error);
+    res.status(500).json({ error: 'An error occurred while saving the draft' });
+  }
 });
 
 router.get('/drafts', async (req, res) => {
-    try {
-        const drafts = await DraftItem.find({ isDraft: true });
-        console.log('Fetched drafts:', drafts);
-        res.json(drafts);
-    } catch (error) {
-        console.error('Error fetching drafts:', error);
-        res.status(500).json({ message: error.message });
-    }
+  try {
+    const drafts = await DraftItem.find({ isDraft: true });
+    console.log('Fetched drafts:', drafts);
+    res.json(drafts);
+  } catch (error) {
+    console.error('Error fetching drafts:', error);
+    res.status(500).json({ message: error.message });
+  }
 });
 
 router.get('/drafts/:itemId', async (req, res) => {
-    try {
-        const { itemId } = req.params;
-        const draft = await DraftItem.findOne({ itemId: itemId });
-        
-        if (!draft) {
-            return res.status(404).json({ message: 'Draft not found' });
-        }
-        
-        console.log('Fetched draft:', draft);
-        res.json(draft);
-    } catch (error) {
-        console.error('Error fetching draft:', error);
-        res.status(500).json({ message: error.message });
+  try {
+    const { itemId } = req.params;
+    const draft = await DraftItem.findOne({ itemId: itemId });
+
+    if (!draft) {
+      return res.status(404).json({ message: 'Draft not found' });
     }
+
+    console.log('Fetched draft:', draft);
+    res.json(draft);
+  } catch (error) {
+    console.error('Error fetching draft:', error);
+    res.status(500).json({ message: error.message });
+  }
 });
 
 router.get('/image-analysis-prompt', (req, res) => {
-    res.json({ IMAGE_ANALYSIS_PROMPT });
+  res.json({ IMAGE_ANALYSIS_PROMPT });
 });
 
 router.get('/items', async (req, res) => {
-    try {
-        const items = await DraftItem.find({ isDraft: false });
-        res.json(items);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
+  try {
+    const items = await DraftItem.find({ isDraft: false });
+    res.json(items);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 });
 
 router.delete('/drafts/:id', async (req, res) => {
-    try {
-        let result = await DraftItem.findOneAndDelete({ itemId: req.params.id });
-        if (!result) {
-            result = await DraftItem.findByIdAndDelete(req.params.id);
-        }
-        if (!result) {
-            return res.status(404).json({ message: 'Draft not found' });
-        }
-        
-        if (result.images && result.images.length > 0) {
-            result.images.forEach(imagePath => {
-                const fullPath = path.join(__dirname, '..', '..', imagePath);
-                fs.unlink(fullPath, (err) => {
-                    if (err) console.error('Error deleting image:', err);
-                });
-            });
-        }
-        
-        res.json({ message: 'Draft deleted successfully' });
-    } catch (error) {
-        console.error('Error deleting draft:', error);
-        res.status(500).json({ message: error.message });
+  try {
+    const { id } = req.params;
+    console.log('Attempting to delete draft with id:', id);
+
+    let result = await DraftItem.findOneAndDelete({ itemId: id });
+    if (!result) {
+      result = await DraftItem.findByIdAndDelete(id);
     }
+    
+    if (!result) {
+      console.log('Draft not found for deletion');
+      return res.status(404).json({ message: 'Draft not found' });
+    }
+
+    console.log('Draft deleted:', result);
+
+    // Image deletion logic
+    if (result.images && result.images.length > 0) {
+      result.images.forEach((image) => {
+        if (image.url) {
+          const imagePath = image.url.replace('/uploads/', '');
+          const fullPath = path.join(__dirname, '..', '..', 'uploads', 'drafts', imagePath);
+          fs.unlink(fullPath, (err) => {
+            if (err) console.error('Error deleting image:', err);
+            else console.log('Deleted image:', fullPath);
+          });
+        }
+      });
+    }
+
+    res.json({ message: 'Draft deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting draft:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.delete('/drafts', async (req, res) => {
+  try {
+    const result = await DraftItem.deleteMany({ isDraft: true });
+    console.log('Deleted drafts:', result);
+
+    // Delete all images in the drafts folder
+    const draftsFolder = path.join(__dirname, '..', '..', 'uploads', 'drafts');
+    fs.readdir(draftsFolder, (err, files) => {
+      if (err) throw err;
+
+      for (const file of files) {
+        fs.unlink(path.join(draftsFolder, file), (err) => {
+          if (err) console.error('Error deleting file:', file, err);
+          else console.log('Deleted file:', file);
+        });
+      }
+    });
+
+    res.json({ message: 'All drafts deleted successfully', deletedCount: result.deletedCount });
+  } catch (error) {
+    console.error('Error deleting all drafts:', error);
+    res.status(500).json({ message: error.message });
+  }
 });
 
 export default router;
