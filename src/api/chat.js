@@ -171,3 +171,26 @@ export const handleImageChat = async (
 ) => {
   // ... implementation of handleImageChat (formerly chatImages)
 };
+
+export const analyzeImagesWithAssistant = async (formData) => {
+  try {
+    const response = await fetch(`${API_URL}/analyze-images`, {
+      method: 'POST',
+      body: formData,
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(
+        errorData.error || `HTTP error! status: ${response.status}`
+      );
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error in analyzeImagesWithAssistant:', error);
+    throw error;
+  }
+};

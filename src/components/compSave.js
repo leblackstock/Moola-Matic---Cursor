@@ -1,6 +1,8 @@
 // frontend\src\components\compSave.js
 
 import axios from 'axios';
+import { useEffect, useCallback } from 'react';
+import debounce from 'lodash/debounce';
 
 // Define API_URL
 const BACKEND_PORT = process.env.REACT_APP_BACKEND_PORT || 3001;
@@ -8,23 +10,44 @@ const API_URL = `http://localhost:${BACKEND_PORT}/api`;
 
 // Function to create a default item
 export const createDefaultItem = (itemId) => {
+  if (!itemId) {
+    throw new Error('ItemId is required when creating a new item');
+  }
   return {
     itemId: itemId,
     name: '',
-    brand: '',
-    condition: '',
     description: '',
-    uniqueFeatures: '',
-    accessories: '',
-    purchasePrice: '',
-    salesTax: '',
-    cleaningNeeded: false,
-    cleaningTime: '',
-    cleaningMaterialsCost: '',
-    estimatedValue: '',
-    shippingCost: '',
-    platformFees: '',
+    category: '',
+    itemDetails: {
+      type: '',
+      brand: '',
+      condition: '',
+      rarity: '',
+      authenticityConfirmed: false,
+      packagingAccessories: '',
+    },
     images: [],
+    purchaseDate: null,
+    listingDate: null,
+    financials: {
+      purchasePrice: '',
+      cleaningRepairCosts: '',
+      estimatedShippingCosts: '',
+      platformFees: '',
+      expectedProfit: '',
+      estimatedValue: '',
+    },
+    marketAnalysis: {
+      marketDemand: '',
+      historicalPriceTrends: '',
+      marketSaturation: '',
+      salesVelocity: '',
+    },
+    finalRecommendation: {
+      purchaseRecommendation: false,
+      detailedBreakdown: '',
+    },
+    sellerNotes: '',
   };
 };
 
@@ -64,11 +87,11 @@ export const handleDraftSave = async (
   console.log('handleDraftSave: Saving draft for item with ID:', currentItemId);
   if (!currentItemId) {
     console.error('Cannot save draft without a valid item ID');
-    return;
+    throw new Error('Invalid item ID');
   }
 
   try {
-    const itemCopy = { ...item };
+    const itemCopy = { ...item, itemId: currentItemId };
 
     console.log('Images to be saved:', itemCopy.images);
 
@@ -134,34 +157,23 @@ export const handleAutoSave = async (
 ) => {
   console.log('Starting auto-save process');
   try {
-    // Prepare the data to be sent
-    const formData = new FormData();
+    if (!item.itemId) {
+      throw new Error('Item ID is missing');
+    }
+
     const draftData = {
       ...item,
-      images: uploadedImages.map(img => ({
-        id: img.id,
-        url: img.url,
-        filename: img.filename,
-        isNew: img.isNew
-      }))
+      images: uploadedImages,
     };
-    formData.append('draftData', JSON.stringify(draftData));
-
-    // Append new images if they exist
-    uploadedImages.forEach((img) => {
-      if (img.file && img.isNew) {
-        formData.append('images', img.file, img.filename);
-      }
-    });
 
     console.log('Data being sent for auto-save:', draftData);
 
     const response = await axios.post(
-      `http://localhost:${backendPort}/api/save-draft`,
-      formData,
+      `http://localhost:${backendPort}/api/autosave-draft`,
+      { draftData },
       {
         headers: {
-          'Content-Type': 'multipart/form-data',
+          'Content-Type': 'application/json',
         },
       }
     );
@@ -169,17 +181,8 @@ export const handleAutoSave = async (
     console.log('Auto-save response:', response.data);
 
     if (response.data && response.data.item) {
-      // Merge the saved images with the existing uploaded images
-      const mergedImages = response.data.item.images.map(savedImg => {
-        const existingImg = uploadedImages.find(img => img.id === savedImg.id);
-        return existingImg || savedImg;
-      });
-
-      setItem({
-        ...response.data.item,
-        images: mergedImages
-      });
-      setUploadedImages(mergedImages);
+      setItem(response.data.item);
+      setUploadedImages(response.data.item.images || []);
       setHasUnsavedChanges(false);
       setLastAutoSave(new Date());
       onSuccess(response.data);
@@ -188,78 +191,60 @@ export const handleAutoSave = async (
     }
   } catch (error) {
     console.error('Error during auto-save:', error);
-    if (error.response) {
-      console.error('Server responded with:', error.response.data);
-      console.error('Status code:', error.response.status);
-      console.error('Headers:', error.response.headers);
-    } else if (error.request) {
-      console.error('No response received:', error.request);
-    } else {
-      console.error('Error setting up request:', error.message);
-    }
     onError(error);
   }
 };
 
 // Function to handle local save
 export const handleLocalSave = (item, contextData, messages) => {
-  console.log('handleLocalSave called with:', { item, contextData, messages });
-  if (!item) {
-    console.error('handleLocalSave: Item is undefined');
+  if (!item || !item.itemId) {
+    console.error('Cannot save item without a valid itemId');
     return;
   }
 
-  const itemId = item.itemId || item._id;
-  if (!itemId) {
-    console.error('handleLocalSave: ItemId is undefined');
-    return;
-  }
+  const itemToSave = {
+    ...item,
+    images: item.images.map((img) => ({
+      id: img.id,
+      url: img.url,
+      filename: img.filename,
+      isNew: img.isNew,
+    })),
+  };
 
-  console.log('handleLocalSave: Saving locally for item with ID:', itemId);
+  localStorage.setItem(`item_${item.itemId}`, JSON.stringify(itemToSave));
+  localStorage.setItem(
+    `contextData_${item.itemId}`,
+    JSON.stringify(contextData)
+  );
+  localStorage.setItem(`messages_${item.itemId}`, JSON.stringify(messages));
 
-  try {
-    // Use a Set to keep track of unique filenames
-    const uniqueFilenames = new Set();
-    const uniqueImages = [];
-
-    // Add images to the uniqueImages array only if their filename is not already in the Set
-    item.images.forEach(img => {
-      if (!uniqueFilenames.has(img.filename)) {
-        uniqueFilenames.add(img.filename);
-        uniqueImages.push(img);
-      }
-    });
-
-    // Create the item to be saved with unique images
-    const itemToSave = {
-      ...item,
-      images: uniqueImages
-    };
-
-    console.log('Item to be saved:', itemToSave);
-
-    // Save the item to local storage
-    localStorage.setItem(`item_${itemId}`, JSON.stringify(itemToSave));
-    localStorage.setItem(`contextData_${itemId}`, JSON.stringify(contextData || {}));
-    localStorage.setItem(`messages_${itemId}`, JSON.stringify(messages || []));
-
-    console.log('Local save successful');
-  } catch (error) {
-    console.error('Error during local save:', error);
-  }
+  console.log('Item saved locally:', itemToSave);
 };
 
 // Function to load local data based on itemId
 export const loadLocalData = (itemId) => {
+  if (!itemId) {
+    console.error('Cannot load data without a valid itemId');
+    return null;
+  }
+
   const itemString = localStorage.getItem(`item_${itemId}`);
   const contextDataString = localStorage.getItem(`contextData_${itemId}`);
   const messagesString = localStorage.getItem(`messages_${itemId}`);
 
-  return {
-    item: itemString ? JSON.parse(itemString) : null,
-    contextData: contextDataString ? JSON.parse(contextDataString) : {},
-    messages: messagesString ? JSON.parse(messagesString) : [],
-  };
+  if (!itemString) {
+    console.log('No local data found for itemId:', itemId);
+    return null;
+  }
+
+  const item = JSON.parse(itemString);
+  const contextData = contextDataString ? JSON.parse(contextDataString) : {};
+  const messages = messagesString ? JSON.parse(messagesString) : [];
+
+  console.log('Loaded local data for itemId:', itemId, 'Item:', item);
+
+  return { item, contextData, messages };
 };
 
 // Function to clear local data
@@ -439,7 +424,9 @@ export const handleManualSave = async (
   // Combine existing images from item and new uploaded images
   const combinedImages = [
     ...(item.images || []),
-    ...uploadedImages.filter(img => !item.images.some(existingImg => existingImg.id === img.id))
+    ...uploadedImages.filter(
+      (img) => !item.images.some((existingImg) => existingImg.id === img.id)
+    ),
   ];
 
   const updatedItem = {
@@ -488,12 +475,33 @@ export const handleManualSave = async (
   }
 };
 
-export const updateItem = (prevItem, field, value, contextData, messages, handleLocalSave, setHasUnsavedChanges) => {
+export const updateItem = (
+  prevItem,
+  field,
+  value,
+  contextData,
+  messages,
+  handleLocalSave,
+  setHasUnsavedChanges
+) => {
   if (!prevItem) {
     console.error('updateItem: prevItem is null');
     return null;
   }
-  const updatedItem = { ...prevItem, [field]: value };
+
+  let updatedItem = { ...prevItem };
+
+  // Handle nested fields
+  if (field.includes('.')) {
+    const [parentField, childField] = field.split('.');
+    updatedItem[parentField] = {
+      ...updatedItem[parentField],
+      [childField]: value,
+    };
+  } else {
+    updatedItem[field] = value;
+  }
+
   console.log('updateItem: Updating item:', updatedItem);
   handleLocalSave(updatedItem, contextData, messages); // Save after each update
   setHasUnsavedChanges(true);
@@ -501,18 +509,17 @@ export const updateItem = (prevItem, field, value, contextData, messages, handle
 };
 
 // Function to handle file upload
-export const handleFileUpload = async (file, backendPort, item) => {
+export const handleFileUpload = async (
+  file,
+  backendPort,
+  item,
+  setUploadedImages,
+  imageName
+) => {
   const formData = new FormData();
   formData.append('image', file);
   formData.append('itemId', item.itemId);
-
-  // Get the current image count
-  const currentImageCount = item.images ? item.images.length : 0;
-
-  // Generate a unique filename
-  const fileExtension = file.name.split('.').pop();
-  const uniqueFilename = `${item.itemId}_image_${currentImageCount + 1}.${fileExtension}`;
-  formData.append('filename', uniqueFilename);
+  formData.append('filename', imageName);
 
   try {
     const response = await axios.post(
@@ -530,9 +537,11 @@ export const handleFileUpload = async (file, backendPort, item) => {
     const newImage = {
       id: Date.now().toString(),
       url: currentImageURL,
-      filename: response.data.filename,
+      filename: imageName,
       isNew: true,
     };
+
+    setUploadedImages((prevImages) => [...prevImages, newImage]);
 
     return { newImage, response };
   } catch (error) {
@@ -551,4 +560,58 @@ export const deleteAllDrafts = async () => {
     console.error('Error deleting all drafts:', error);
     throw error;
   }
+};
+
+// New autosave hook
+export const useAutosave = (
+  item,
+  uploadedImages,
+  backendPort,
+  setItem,
+  setUploadedImages,
+  setHasUnsavedChanges,
+  setLastAutoSave
+) => {
+  const debouncedAutoSave = useCallback(
+    debounce((currentItem, currentUploadedImages) => {
+      if (currentItem && currentItem.itemId) {
+        console.log('Debounced auto-save triggered');
+        const dataToSave = {
+          ...currentItem,
+          images: currentUploadedImages,
+        };
+
+        handleAutoSave(
+          dataToSave,
+          currentUploadedImages,
+          backendPort,
+          setItem,
+          setUploadedImages,
+          setHasUnsavedChanges,
+          setLastAutoSave,
+          (savedData) => {
+            console.log('Auto-save successful', savedData);
+          },
+          (error) => {
+            console.error('Error auto-saving:', error);
+          }
+        );
+      }
+    }, 5000), // Debounce for 5 seconds
+    [
+      backendPort,
+      setItem,
+      setUploadedImages,
+      setHasUnsavedChanges,
+      setLastAutoSave,
+    ]
+  );
+
+  useEffect(() => {
+    if (item && item.itemId) {
+      debouncedAutoSave(item, uploadedImages);
+    }
+  }, [item, uploadedImages, debouncedAutoSave]);
+
+  return debouncedAutoSave;
 };

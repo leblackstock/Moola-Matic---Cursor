@@ -34,7 +34,7 @@ import {
 } from './components/compStyles.js';
 
 // Export the UUID generation function
-export const generateItemId = () => `draft-${uuidv4()}`;
+export const generateItemId = () => uuidv4();
 
 /**
  * Sidebar Component
@@ -118,7 +118,7 @@ function LandingPage({ handleNewItem, setCurrentItemId, setMostRecentItemId }) {
   const handleProceed = () => {
     console.log('handleProceed: User confirmed, creating new item');
     setShowWarning(false);
-    
+
     // Clear all unsaved variables
     setCurrentItemId(null);
     setMostRecentItemId(null);

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import debounce from 'lodash/debounce'; // Add this line
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 import treasureSpecs from './Images/Treasure_Specs01.jpeg';
@@ -10,6 +11,7 @@ import {
   analyzeImageWithGPT4Turbo,
   createUserMessage,
   createAssistantMessage,
+  analyzeImagesWithAssistant,
 } from './api/chat.js';
 import axios from 'axios';
 import { UploadedImagesGallery } from './components/compGallery.js';
@@ -24,7 +26,7 @@ import {
   updateContextData,
   createDefaultItem,
   handleDraftSaveWithImages,
-  updateItem,
+  updateItem as updateItemFunc,
   handleFileUpload,
   handleManualSave,
   handleNewItem,
@@ -33,6 +35,7 @@ import {
   fetchDrafts,
   fetchItems,
   saveToLocalStorage,
+  useAutosave,
 } from './components/compSave.js';
 
 // Import all styled components
@@ -40,7 +43,7 @@ import {
   PageContainer,
   StyledHeader,
   LogoContainer,
-  StaticLogo, // Add this import
+  StaticLogo,
   StyledTitle,
   StyledSubtitle,
   StyledForm,
@@ -56,7 +59,7 @@ import {
   ModalContent,
   ModalButton,
   MainContentArea,
-  ButtonContainer, // Add this import
+  ButtonContainer,
 } from './components/compStyles.js';
 
 // Helper functions
@@ -124,32 +127,47 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
     currentItemId
   );
 
+  // Use the autosave hook
+  const debouncedAutoSave = useAutosave(
+    item,
+    uploadedImages,
+    backendPort,
+    setItem,
+    setUploadedImages,
+    setHasUnsavedChanges,
+    setLastAutoSave
+  );
+
   // ---------------------------------
   // useEffect Hook: Load or Create Item
   // ---------------------------------
   useEffect(() => {
     console.log('NewItemPage: useEffect triggered');
     console.log('NewItemPage: Current itemId:', itemId);
-    
+
     const loadedData = loadItemData(itemId);
     console.log('NewItemPage: Loaded data:', loadedData);
-    
+
     if (loadedData && loadedData.item) {
       console.log('NewItemPage: Loading existing draft');
       setItem(loadedData.item);
       setContextData(loadedData.contextData || {});
       setMessages(loadedData.messages || []);
+      setUploadedImages(loadedData.item.images || []);
     } else {
       console.log('NewItemPage: Creating new item');
       const newItem = createDefaultItem(itemId);
       console.log('NewItemPage: New item created:', newItem);
       setItem(newItem);
+      setUploadedImages([]);
     }
 
     // Fetch the image analysis prompt
     const fetchImageAnalysisPrompt = async () => {
       try {
-        const response = await axios.get(`http://localhost:${backendPort}/api/image-analysis-prompt`);
+        const response = await axios.get(
+          `http://localhost:${backendPort}/api/image-analysis-prompt`
+        );
         setImageAnalysisPrompt(response.data.IMAGE_ANALYSIS_PROMPT);
       } catch (error) {
         console.error('Error fetching image analysis prompt:', error);
@@ -168,7 +186,7 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
       const uniqueImages = [];
 
       // Add images to the uniqueImages array only if their filename is not already in the Set
-      draftData.images.forEach(img => {
+      draftData.images.forEach((img) => {
         if (!uniqueFilenames.has(img.filename)) {
           uniqueFilenames.add(img.filename);
           uniqueImages.push(img);
@@ -178,7 +196,7 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
       // Update the draft data with unique images
       const updatedDraftData = {
         ...draftData,
-        images: uniqueImages
+        images: uniqueImages,
       };
 
       console.log('Setting item state with:', updatedDraftData);
@@ -193,42 +211,34 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
   // useEffect Hook: Auto-Save
   // ----------------------------
   useEffect(() => {
-    const autoSave = () => {
-      console.log('Auto-save triggered');
-      console.log('Current item state:', item);
-      console.log('Current uploadedImages:', uploadedImages);
+    const debouncedSave = debounce(async () => {
+      console.log('Autosave triggered. Current item state:', item);
+      console.log(
+        'Number of images before autosave:',
+        item.images ? item.images.length : 0
+      );
 
-      if (item) {
-        const dataToSave = {
-          ...item,
-          images: uploadedImages
-        };
-
-        console.log('Data to be auto-saved:', dataToSave);
-
-        handleAutoSave(
-          dataToSave,
-          uploadedImages,
-          backendPort,
-          setItem,
-          setUploadedImages,
-          setHasUnsavedChanges,
-          setLastAutoSave,
-          (savedData) => {
-            console.log('Auto-save successful', savedData);
-          },
-          (error) => {
-            console.error('Error auto-saving:', error);
-          }
+      try {
+        const savedItem = await autosaveDraft(item);
+        console.log('Autosave successful. Saved item:', savedItem);
+        console.log(
+          'Number of images after autosave:',
+          savedItem.images ? savedItem.images.length : 0
         );
+
+        // Update the local state with the saved item
+        setItem(savedItem);
+      } catch (error) {
+        console.error('Autosave failed:', error);
       }
-    };
+    }, 3000);
 
-    // Set up auto-save interval
-    const autoSaveInterval = setInterval(autoSave, 60000); // Auto-save every minute
+    if (item && hasUnsavedChanges) {
+      debouncedSave();
+    }
 
-    return () => clearInterval(autoSaveInterval);
-  }, [item, uploadedImages, backendPort]);
+    return () => debouncedSave.cancel();
+  }, [item, hasUnsavedChanges]);
 
   // ----------------------------
   // useEffect Hook: Save to localStorage
@@ -245,14 +255,13 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
   useEffect(() => {
     return () => {
       if (item && item.itemId) {
-        console.log(
-          'NewItemPage: Cleanup - Clearing local data for itemId:',
-          item.itemId
-        );
-        clearLocalData(item.itemId);
+        console.log('NewItemPage: Component unmounting');
+        // Instead of clearing, let's save the current state
+        handleLocalSave(item, contextData, messages);
+        console.log('NewItemPage: Saved local data for itemId:', item.itemId);
       }
     };
-  }, [item]);
+  }, [item, contextData, messages]);
 
   // ----------------------------
   // useEffect Hook: Fetch Image Analysis Prompt
@@ -443,13 +452,12 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
     });
   };
 
-  // Update the handleFileChange function to use the renamed function
+  // Update the handleFileChange function to remove automatic analysis
   const handleFileChange = async (event) => {
     console.log('handleFileChange called');
     const files = event.target.files;
     if (files && files.length > 0) {
-      const image = files[0];
-      console.log('Image file selected:', image.name);
+      console.log(`${files.length} image(s) selected`);
       console.log('Current itemId:', item.itemId);
 
       if (!item.itemId) {
@@ -458,59 +466,40 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
       }
 
       try {
-        const { newImage, response } = await handleFileUpload(
-          image,
-          backendPort,
-          item
-        );
+        const newImages = [];
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          let imageName;
+          let sequentialNumber = (item.images?.length || 0) + i;
+          let isUnique = false;
 
-        console.log('New image object:', newImage);
+          while (!isUnique) {
+            sequentialNumber++;
+            imageName = `Draft-${item.itemId.slice(-6)}-${String(sequentialNumber).padStart(2, '0')}`;
+            isUnique = !item.images?.some((img) => img.filename === imageName);
+          }
 
-        // Update uploaded images and set the new image as selected
-        setUploadedImages((prevImages) => {
-          const updatedImages = [...prevImages, newImage];
-          setSelectedImage(newImage); // Set the newly uploaded image as selected
-          return updatedImages;
-        });
+          const { newImage } = await handleFileUpload(
+            file,
+            backendPort,
+            item,
+            setUploadedImages,
+            imageName
+          );
+          newImages.push(newImage);
+        }
+
+        console.log('New images to be added:', newImages);
+
+        setItem((prevItem) => ({
+          ...prevItem,
+          images: [...(prevItem.images || []), ...newImages],
+        }));
 
         setHasUnsavedChanges(true);
-
-        // Image analysis code
-        setIsLoading(true);
-        try {
-          console.log('Starting image analysis');
-          const assistantResponse = await analyzeImageLocally(
-            image,
-            imageAnalysisPrompt,
-            true
-          );
-          console.log('Received response from analyzeImageLocally');
-
-          setMessages((prevMessages) => [
-            ...prevMessages,
-            { role: 'user', content: 'Image uploaded', image: imageURL },
-            { role: 'assistant', content: assistantResponse },
-          ]);
-          setImageAnalyzed(true);
-        } catch (error) {
-          console.error('Error analyzing image:', error);
-          setMessages((prevMessages) => [
-            ...prevMessages,
-            { role: 'user', content: 'Image upload failed', image: imageURL },
-            {
-              role: 'assistant',
-              content:
-                'Sorry, an error occurred while analyzing the image. Please try again.',
-            },
-          ]);
-        } finally {
-          setIsLoading(false);
-        }
+        setImageUploaded(true);
       } catch (error) {
-        console.error('Error uploading image:', error);
-        if (error.response) {
-          console.error('Server responded with:', error.response.data);
-        }
+        console.error('Error processing images:', error);
       }
     }
   };
@@ -568,16 +557,21 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
 
   // Additional Handlers
   const handleImageButtonClick = () => {
-    setShowImageModal(true);
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
   };
 
-  const handleCameraClick = () => {
-    cameraInputRef.current.click();
-    setShowImageModal(false);
+  const handleCameraButtonClick = () => {
+    if (cameraInputRef.current) {
+      cameraInputRef.current.click();
+    }
   };
 
   const handleMediaClick = () => {
-    fileInputRef.current.click();
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
     setShowImageModal(false);
   };
 
@@ -596,23 +590,86 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
   };
 
   const updateItem = (field, value) => {
-    console.log('updateItem called with:', { field, value });
-    console.log('Current item state before update:', item);
-    setItem(prevItem => {
-      const updatedItem = {
-        ...prevItem,
-        [field]: value
-      };
-      console.log('Updated item:', updatedItem);
+    setItem((prevItem) => {
+      const updatedItem = { ...prevItem, [field]: value };
       handleLocalSave(updatedItem, contextData, messages);
+      setHasUnsavedChanges(true);
+      debouncedAutoSave(updatedItem, uploadedImages);
       return updatedItem;
     });
-    setHasUnsavedChanges(true);
   };
 
   console.log('NewItemPage: Current item state:', item);
 
   console.log('NewItemPage: Rendering. Current item state:', item);
+
+  // Add this new function to handle image analysis
+  const handleAnalyzeImages = async () => {
+    if (!imageFiles.length) {
+      alert('Please upload at least one image before analyzing.');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const formData = new FormData();
+      imageFiles.forEach((file, index) => {
+        formData.append('images', file);
+      });
+      formData.append('description', item.description || '');
+      formData.append('itemId', item.itemId);
+
+      // Update the function call here
+      const result = await analyzeImagesWithAssistant(formData);
+
+      // Update item fields with the analysis results
+      updateItem({
+        ...result.item,
+        itemId: item.itemId,
+      });
+
+      // Add the summary to the chat
+      setMessages((prevMessages) => [
+        ...prevMessages,
+        {
+          role: 'assistant',
+          content: result.advice,
+          source: 'moola-matic',
+          status: 'completed',
+        },
+      ]);
+    } catch (error) {
+      console.error('Error analyzing images:', error);
+      alert('An error occurred while analyzing the images. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleImageUpload = async (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      try {
+        const { newImage } = await handleFileUpload(
+          file,
+          backendPort,
+          item,
+          setUploadedImages
+        );
+
+        setItem((prevItem) => ({
+          ...prevItem,
+          images: [...prevItem.images, newImage],
+        }));
+
+        setImageUploaded(true);
+        setHasUnsavedChanges(true);
+      } catch (error) {
+        console.error('Error uploading image:', error);
+      }
+    }
+  };
 
   if (!item) {
     console.log('NewItemPage: Item is null, rendering loading state');
@@ -661,9 +718,15 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
           <ButtonContainer>
             <GlowingButton
               onClick={handleImageButtonClick}
-              disabled={!isPromptLoaded || isLoading}
+              disabled={isLoading}
             >
               <i className="fas fa-image"></i> Add Images
+            </GlowingButton>
+            <GlowingButton
+              onClick={handleAnalyzeImages}
+              disabled={isLoading || uploadedImages.length === 0}
+            >
+              <i className="fas fa-search"></i> Analyze Images
             </GlowingButton>
           </ButtonContainer>
 
@@ -698,6 +761,7 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
             accept="image/*"
             capture="environment"
             onChange={handleFileChange}
+            multiple // Add this attribute
           />
 
           <input
@@ -706,16 +770,50 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
             style={{ display: 'none' }}
             accept="image/*"
             onChange={handleFileChange}
+            multiple // Add this attribute
           />
 
           <StyledForm onSubmit={handleSubmit}>
+            {/* Basic item information */}
             <StyledFormGroup>
-              <StyledLabel htmlFor="itemName">Item Name</StyledLabel>
+              <StyledLabel htmlFor="name">Item Name</StyledLabel>
               <StyledInput
                 type="text"
-                id="itemName"
-                value={item?.name || ''}
+                id="name"
+                value={item.name || ''}
                 onChange={(e) => updateItem('name', e.target.value)}
+                required
+              />
+            </StyledFormGroup>
+
+            <StyledFormGroup>
+              <StyledLabel htmlFor="description">Description</StyledLabel>
+              <StyledTextarea
+                id="description"
+                value={item.description || ''}
+                onChange={(e) => updateItem('description', e.target.value)}
+                rows="3"
+              />
+            </StyledFormGroup>
+
+            <StyledFormGroup>
+              <StyledLabel htmlFor="category">Category</StyledLabel>
+              <StyledInput
+                type="text"
+                id="category"
+                value={item.category || ''}
+                onChange={(e) => updateItem('category', e.target.value)}
+              />
+            </StyledFormGroup>
+
+            {/* Item details */}
+            <StyledFormGroup>
+              <StyledLabel htmlFor="itemType">Item Type</StyledLabel>
+              <StyledInput
+                type="text"
+                id="itemType"
+                value={item.itemDetails?.type || ''}
+                onChange={(e) => updateItem('itemDetails.type', e.target.value)}
                 required
               />
             </StyledFormGroup>
@@ -725,8 +823,10 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
               <StyledInput
                 type="text"
                 id="brand"
-                value={item?.brand || ''}
-                onChange={(e) => updateItem('brand', e.target.value)}
+                value={item.itemDetails?.brand || ''}
+                onChange={(e) =>
+                  updateItem('itemDetails.brand', e.target.value)
+                }
               />
             </StyledFormGroup>
 
@@ -734,9 +834,10 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
               <StyledLabel htmlFor="condition">Condition</StyledLabel>
               <StyledSelect
                 id="condition"
-                value={item?.condition || ''}
-                onChange={(e) => updateItem('condition', e.target.value)}
-                required
+                value={item.itemDetails?.condition || ''}
+                onChange={(e) =>
+                  updateItem('itemDetails.condition', e.target.value)
+                }
               >
                 <option value="">Select condition</option>
                 <option value="new">New</option>
@@ -748,18 +849,180 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
             </StyledFormGroup>
 
             <StyledFormGroup>
-              <StyledLabel htmlFor="description">Description</StyledLabel>
-              <StyledTextarea
-                id="description"
-                rows="3"
-                value={item?.description || ''}
-                onChange={(e) => updateItem('description', e.target.value)}
-              ></StyledTextarea>
+              <StyledLabel htmlFor="rarity">Rarity</StyledLabel>
+              <StyledInput
+                type="text"
+                id="rarity"
+                value={item.itemDetails?.rarity || ''}
+                onChange={(e) =>
+                  updateItem('itemDetails.rarity', e.target.value)
+                }
+              />
             </StyledFormGroup>
 
-            {/* Continue with the rest of your form fields using the styled components... */}
+            <StyledFormGroup>
+              <StyledLabel htmlFor="authenticityConfirmed">
+                Authenticity Confirmed
+              </StyledLabel>
+              <StyledInput
+                type="checkbox"
+                id="authenticityConfirmed"
+                checked={item.itemDetails?.authenticityConfirmed || false}
+                onChange={(e) =>
+                  updateItem(
+                    'itemDetails.authenticityConfirmed',
+                    e.target.checked
+                  )
+                }
+              />
+            </StyledFormGroup>
 
-            <StyledButton type="submit">Evaluate Item</StyledButton>
+            <StyledFormGroup>
+              <StyledLabel htmlFor="packagingAccessories">
+                Packaging/Accessories
+              </StyledLabel>
+              <StyledInput
+                type="text"
+                id="packagingAccessories"
+                value={item.itemDetails?.packagingAccessories || ''}
+                onChange={(e) =>
+                  updateItem('itemDetails.packagingAccessories', e.target.value)
+                }
+              />
+            </StyledFormGroup>
+
+            {/* Dates */}
+            <StyledFormGroup>
+              <StyledLabel htmlFor="purchaseDate">Purchase Date</StyledLabel>
+              <StyledInput
+                type="date"
+                id="purchaseDate"
+                value={item.purchaseDate ? item.purchaseDate.split('T')[0] : ''}
+                onChange={(e) => updateItem('purchaseDate', e.target.value)}
+              />
+            </StyledFormGroup>
+
+            <StyledFormGroup>
+              <StyledLabel htmlFor="listingDate">Listing Date</StyledLabel>
+              <StyledInput
+                type="date"
+                id="listingDate"
+                value={item.listingDate ? item.listingDate.split('T')[0] : ''}
+                onChange={(e) => updateItem('listingDate', e.target.value)}
+              />
+            </StyledFormGroup>
+
+            {/* Financial information */}
+            <StyledFormGroup>
+              <StyledLabel htmlFor="purchasePrice">Purchase Price</StyledLabel>
+              <StyledInput
+                type="number"
+                id="purchasePrice"
+                value={item.financials?.purchasePrice || ''}
+                onChange={(e) =>
+                  updateItem(
+                    'financials.purchasePrice',
+                    parseFloat(e.target.value)
+                  )
+                }
+              />
+            </StyledFormGroup>
+
+            <StyledFormGroup>
+              <StyledLabel htmlFor="cleaningRepairCosts">
+                Cleaning/Repair Costs
+              </StyledLabel>
+              <StyledInput
+                type="number"
+                id="cleaningRepairCosts"
+                value={item.financials?.cleaningRepairCosts || ''}
+                onChange={(e) =>
+                  updateItem(
+                    'financials.cleaningRepairCosts',
+                    parseFloat(e.target.value)
+                  )
+                }
+              />
+            </StyledFormGroup>
+
+            <StyledFormGroup>
+              <StyledLabel htmlFor="estimatedShippingCosts">
+                Estimated Shipping Costs
+              </StyledLabel>
+              <StyledInput
+                type="number"
+                id="estimatedShippingCosts"
+                value={item.financials?.estimatedShippingCosts || ''}
+                onChange={(e) =>
+                  updateItem(
+                    'financials.estimatedShippingCosts',
+                    parseFloat(e.target.value)
+                  )
+                }
+              />
+            </StyledFormGroup>
+
+            <StyledFormGroup>
+              <StyledLabel htmlFor="platformFees">Platform Fees</StyledLabel>
+              <StyledInput
+                type="number"
+                id="platformFees"
+                value={item.financials?.platformFees || ''}
+                onChange={(e) =>
+                  updateItem(
+                    'financials.platformFees',
+                    parseFloat(e.target.value)
+                  )
+                }
+              />
+            </StyledFormGroup>
+
+            <StyledFormGroup>
+              <StyledLabel htmlFor="expectedProfit">
+                Expected Profit
+              </StyledLabel>
+              <StyledInput
+                type="number"
+                id="expectedProfit"
+                value={item.financials?.expectedProfit || ''}
+                onChange={(e) =>
+                  updateItem(
+                    'financials.expectedProfit',
+                    parseFloat(e.target.value)
+                  )
+                }
+              />
+            </StyledFormGroup>
+
+            <StyledFormGroup>
+              <StyledLabel htmlFor="estimatedValue">
+                Estimated Value
+              </StyledLabel>
+              <StyledInput
+                type="number"
+                id="estimatedValue"
+                value={item.financials?.estimatedValue || ''}
+                onChange={(e) =>
+                  updateItem(
+                    'financials.estimatedValue',
+                    parseFloat(e.target.value)
+                  )
+                }
+              />
+            </StyledFormGroup>
+
+            {/* Additional information */}
+            <StyledFormGroup>
+              <StyledLabel htmlFor="sellerNotes">Seller Notes</StyledLabel>
+              <StyledTextarea
+                id="sellerNotes"
+                value={item.sellerNotes || ''}
+                onChange={(e) => updateItem('sellerNotes', e.target.value)}
+                rows="3"
+              />
+            </StyledFormGroup>
+
+            <StyledButton type="submit">Save Item</StyledButton>
           </StyledForm>
 
           <StyledButton
@@ -775,13 +1038,15 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
                 setUploadedImages,
                 setHasUnsavedChanges,
                 setLastAutoSave
-              ).then(() => {
-                console.log('Manual save completed');
-                console.log('Updated item state:', item);
-                console.log('Updated uploadedImages:', uploadedImages);
-              }).catch(error => {
-                console.error('Error in manual save:', error);
-              });
+              )
+                .then(() => {
+                  console.log('Manual save completed');
+                  console.log('Updated item state:', item);
+                  console.log('Updated uploadedImages:', uploadedImages);
+                })
+                .catch((error) => {
+                  console.error('Error in manual save:', error);
+                });
             }}
           >
             Save Draft

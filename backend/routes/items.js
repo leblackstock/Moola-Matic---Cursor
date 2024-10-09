@@ -44,13 +44,20 @@ router.post('/save-draft', upload.array('images'), async (req, res) => {
     }
     console.log('Parsed draftData:', draftData);
 
+    // Ensure itemId is present
+    if (!draftData.itemId) {
+      return res.status(400).json({ error: 'itemId is required' });
+    }
+
     // Handle image uploads
-    const newImages = req.files ? req.files.map(file => ({
-      id: uuidv4(),
-      url: `/uploads/drafts/${file.filename}`,
-      filename: file.filename,
-      isNew: true
-    })) : [];
+    const newImages = req.files
+      ? req.files.map((file) => ({
+          id: uuidv4(),
+          url: `/uploads/drafts/${file.filename}`,
+          filename: file.filename,
+          isNew: true,
+        }))
+      : [];
 
     // Merge existing images with new images
     let updatedImages = draftData.images || [];
@@ -58,11 +65,18 @@ router.post('/save-draft', upload.array('images'), async (req, res) => {
       updatedImages = [...updatedImages, ...newImages];
     }
 
+    // Ensure itemDetails.type is present
+    const itemDetails = {
+      ...draftData.itemDetails,
+      type: draftData.itemDetails?.type || 'Unknown',
+    };
+
     // Merge existing draft data with new data
     const updatedDraft = {
       ...draftData,
       images: updatedImages,
-      lastUpdated: new Date()
+      itemDetails,
+      lastUpdated: new Date(),
     };
 
     console.log('Updated draft to be saved:', updatedDraft);
@@ -70,7 +84,11 @@ router.post('/save-draft', upload.array('images'), async (req, res) => {
     // Save the updated draft
     let savedDraft;
     if (updatedDraft._id) {
-      savedDraft = await DraftItem.findByIdAndUpdate(updatedDraft._id, updatedDraft, { new: true });
+      savedDraft = await DraftItem.findByIdAndUpdate(
+        updatedDraft._id,
+        updatedDraft,
+        { new: true }
+      );
     } else {
       savedDraft = new DraftItem(updatedDraft);
       await savedDraft.save();
@@ -82,6 +100,68 @@ router.post('/save-draft', upload.array('images'), async (req, res) => {
   } catch (error) {
     console.error('Error saving draft:', error);
     res.status(500).json({ error: 'An error occurred while saving the draft' });
+  }
+});
+
+// Autosave route
+router.post('/autosave-draft', upload.array('images'), async (req, res) => {
+  console.log('Received autosave request body:', req.body);
+  console.log('Received autosave files:', req.files);
+
+  try {
+    let draftData = req.body;
+    if (typeof draftData === 'string') {
+      try {
+        draftData = JSON.parse(draftData);
+      } catch (error) {
+        console.error('Error parsing draftData:', error);
+        return res.status(400).json({ error: 'Invalid draftData format' });
+      }
+    }
+    console.log('Parsed draftData:', draftData);
+
+    if (!draftData.itemId) {
+      return res.status(400).json({ error: 'itemId is required' });
+    }
+
+    // Handle new image uploads
+    const newImages = req.files
+      ? req.files.map((file) => ({
+          id: uuidv4(),
+          url: `/uploads/drafts/${file.filename}`,
+          filename: file.filename,
+          isNew: true,
+        }))
+      : [];
+
+    // Merge existing images with new images
+    let updatedImages = draftData.images || [];
+    if (newImages.length > 0) {
+      updatedImages = [...updatedImages, ...newImages];
+    }
+
+    const updatedDraft = {
+      ...draftData,
+      images: updatedImages,
+      lastUpdated: new Date(),
+    };
+
+    console.log('Updated draft to be autosaved:', updatedDraft);
+
+    let savedDraft = await DraftItem.findOneAndUpdate(
+      { itemId: draftData.itemId },
+      updatedDraft,
+      { new: true, upsert: true }
+    );
+
+    console.log('Autosaved draft:', savedDraft);
+
+    res.json({ message: 'Draft autosaved successfully', item: savedDraft });
+  } catch (error) {
+    console.error('Error autosaving draft:', error);
+    res
+      .status(500)
+      .json({ error: 'An error occurred while autosaving the draft' });
   }
 });
 
@@ -135,7 +215,7 @@ router.delete('/drafts/:id', async (req, res) => {
     if (!result) {
       result = await DraftItem.findByIdAndDelete(id);
     }
-    
+
     if (!result) {
       console.log('Draft not found for deletion');
       return res.status(404).json({ message: 'Draft not found' });
@@ -148,7 +228,14 @@ router.delete('/drafts/:id', async (req, res) => {
       result.images.forEach((image) => {
         if (image.url) {
           const imagePath = image.url.replace('/uploads/', '');
-          const fullPath = path.join(__dirname, '..', '..', 'uploads', 'drafts', imagePath);
+          const fullPath = path.join(
+            __dirname,
+            '..',
+            '..',
+            'uploads',
+            'drafts',
+            imagePath
+          );
           fs.unlink(fullPath, (err) => {
             if (err) console.error('Error deleting image:', err);
             else console.log('Deleted image:', fullPath);
@@ -182,7 +269,10 @@ router.delete('/drafts', async (req, res) => {
       }
     });
 
-    res.json({ message: 'All drafts deleted successfully', deletedCount: result.deletedCount });
+    res.json({
+      message: 'All drafts deleted successfully',
+      deletedCount: result.deletedCount,
+    });
   } catch (error) {
     console.error('Error deleting all drafts:', error);
     res.status(500).json({ message: error.message });

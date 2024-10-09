@@ -80,10 +80,12 @@ function ViewItemsPage() {
     }
     try {
       await deleteDraft(id);
-      setDrafts(drafts.filter((d) => {
-        const dId = d.itemId || (d._id && d._id.toString());
-        return dId !== id;
-      }));
+      setDrafts(
+        drafts.filter((d) => {
+          const dId = d.itemId || (d._id && d._id.toString());
+          return dId !== id;
+        })
+      );
     } catch (error) {
       console.error('Error deleting draft:', error);
       alert(`Error deleting draft: ${error.message}`);

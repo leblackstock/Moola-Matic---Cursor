@@ -31,6 +31,8 @@ import {
   LoadingSpinner,
 } from './compStyles.js';
 
+import PropTypes from 'prop-types';
+
 function ChatComp({
   item,
   updateItem,
@@ -47,12 +49,9 @@ function ChatComp({
   setSelectedImage,
 }) {
   const [message, setMessage] = useState('');
-  const [imageFile, setImageFile] = useState(null);
   const [localImagePreview, setLocalImagePreview] = useState(
     propImagePreview || ''
   );
-  const [imageInput, setImageInput] = useState('');
-  const [imageAnalyzed, setImageAnalyzed] = useState(false);
   const [imageAnalysisPrompt, setImageAnalysisPrompt] = useState('');
   const [isPromptLoaded, setIsPromptLoaded] = useState(false);
   const messagesContainerRef = useRef(null);
@@ -147,62 +146,6 @@ function ChatComp({
     }
   };
 
-  const handleFileChange = async (event) => {
-    console.log('handleFileChange called');
-    const files = event.target.files;
-    if (files && files.length > 0) {
-      const image = files[0];
-      console.log('Image file selected:', image.name);
-      setImageFile(image);
-      setImageAnalyzed(false);
-
-      const imagePreviewUrl = URL.createObjectURL(image);
-      setLocalImagePreview(imagePreviewUrl);
-
-      onStartLoading(); // Call this instead of setIsLoading(true)
-
-      try {
-        console.log('Starting image analysis');
-        // Simulate a delay to ensure we can see the loading state
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-
-        console.log('Calling analyzeImageWithGPT4Turbo');
-        const assistantResponse = await analyzeImageWithGPT4Turbo(
-          image,
-          imageAnalysisPrompt,
-          currentItemId
-        );
-        console.log('Received response from analyzeImageWithGPT4Turbo');
-
-        setMessages((prevMessages) => [
-          ...prevMessages,
-          { role: 'user', content: 'Image uploaded', image: imagePreviewUrl },
-          { role: 'assistant', content: assistantResponse },
-        ]);
-        setImageAnalyzed(true);
-      } catch (error) {
-        console.error('Error analyzing image:', error);
-        setMessages((prevMessages) => [
-          ...prevMessages,
-          {
-            role: 'user',
-            content: 'Image upload failed',
-            image: imagePreviewUrl,
-          },
-          {
-            role: 'assistant',
-            content:
-              'Sorry, an error occurred while analyzing the image. Please try again.',
-          },
-        ]);
-      } finally {
-        onEndLoading(); // Call this instead of setIsLoading(false)
-      }
-    } else {
-      console.log('No file selected');
-    }
-  };
-
   const renderContent = (content) => {
     let parsedContent;
 
@@ -250,45 +193,6 @@ function ChatComp({
     }
   };
 
-  const sendImageMessage = async () => {
-    if (!imageInput.trim() || !selectedImage) return;
-
-    onStartLoading();
-
-    try {
-      const base64Image = await getBase64(selectedImage.file);
-      const response = await handleImageChat(
-        imageInput.trim(),
-        base64Image,
-        currentItemId,
-        false
-      );
-
-      setMessages((prevMessages) => [
-        ...prevMessages,
-        { role: 'user', content: imageInput.trim(), image: selectedImage.url },
-        { role: 'assistant', content: response.advice },
-      ]);
-
-      if (response.contextData) {
-        console.log('Updated context data:', response.contextData);
-      }
-    } catch (error) {
-      console.error('Error processing image message:', error);
-      setMessages((prevMessages) => [
-        ...prevMessages,
-        {
-          role: 'assistant',
-          content:
-            'Sorry, an error occurred while processing your image message. Please try again.',
-        },
-      ]);
-    } finally {
-      onEndLoading();
-      setImageInput('');
-    }
-  };
-
   return (
     <AIChatBox>
       {isLoading && (
@@ -315,28 +219,6 @@ function ChatComp({
       {isLoading && (
         <LoadingIndicator>Processing your request...</LoadingIndicator>
       )}
-      {selectedImage && (
-        <ImageInputContainer>
-          <ImagePreviewContainer>
-            <ImagePreview src={selectedImage.url} alt="Selected" />
-          </ImagePreviewContainer>
-          <StyledTextarea
-            value={imageInput}
-            onChange={(e) => setImageInput(e.target.value)}
-            onKeyPress={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendImageMessage();
-              }
-            }}
-            placeholder="Ask a question about the image..."
-            rows="1"
-          />
-          <IconButton onClick={sendImageMessage} disabled={isLoading}>
-            <i className="fas fa-paper-plane"></i>
-          </IconButton>
-        </ImageInputContainer>
-      )}
       <InputContainer>
         <TextIcon className="fas fa-comment"></TextIcon>
         <StyledTextarea
@@ -355,15 +237,24 @@ function ChatComp({
           <i className="fas fa-paper-plane"></i>
         </IconButton>
       </InputContainer>
-      <input
-        type="file"
-        ref={fileInputRef}
-        style={{ display: 'none' }}
-        accept="image/*"
-        onChange={handleFileChange}
-      />
     </AIChatBox>
   );
 }
+
+ChatComp.propTypes = {
+  item: PropTypes.object,
+  updateItem: PropTypes.func.isRequired,
+  messages: PropTypes.array.isRequired,
+  setMessages: PropTypes.func.isRequired,
+  currentItemId: PropTypes.string,
+  isLoading: PropTypes.bool.isRequired,
+  onStartLoading: PropTypes.func.isRequired,
+  onEndLoading: PropTypes.func.isRequired,
+  imageUploaded: PropTypes.bool.isRequired,
+  setImageUploaded: PropTypes.func.isRequired,
+  imagePreview: PropTypes.string,
+  selectedImage: PropTypes.object,
+  setSelectedImage: PropTypes.func.isRequired,
+};
 
 export default React.memo(ChatComp);

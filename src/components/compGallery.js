@@ -7,8 +7,10 @@ import {
   StyledImage,
   HoverDeleteButton,
   ErrorImagePlaceholder,
-  DraftItemOverlay, // This is likely the existing style you were referring to
+  DraftItemOverlay, // Make sure this line is present
 } from './compStyles.js';
+
+import PropTypes from 'prop-types';
 
 export const UploadedImagesGallery = ({
   images,
@@ -16,38 +18,56 @@ export const UploadedImagesGallery = ({
   selectedImage,
   onDelete,
 }) => {
+  console.log('UploadedImagesGallery: Received images:', images);
+
+  const validImages = images.filter(
+    (image) =>
+      image && typeof image === 'object' && (image.url || image.localUrl)
+  );
+
+  if (validImages.length === 0) {
+    return <div>No images available</div>;
+  }
+
   return (
     <GalleryContainer>
-      {images.map((image, index) => (
-        <ImageContainer
-          key={image.id || `image-${index}`}
-          onClick={() => onSelect(image)}
-          $isSelected={selectedImage === image}
-        >
-          {image.url ? (
-            <StyledImage 
-              src={image.url} 
-              alt={`Uploaded image ${index + 1}`} 
-              onError={(e) => {
-                console.error(`Error loading image: ${image.url}`);
-                e.target.style.display = 'none';
-                e.target.nextElementSibling.style.display = 'flex';
-              }}
-            />
-          ) : null}
-          <ErrorImagePlaceholder>
-            Error loading image
-          </ErrorImagePlaceholder>
-          <HoverDeleteButton
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(image);
-            }}
+      {validImages.map((image) => {
+        console.log(`Rendering image:`, image);
+        const imageUrl = image.url || image.localUrl;
+        return (
+          <ImageContainer
+            key={
+              image.id ||
+              image.filename ||
+              Math.random().toString(36).substr(2, 9)
+            }
+            onClick={() => onSelect(image)}
+            $isSelected={selectedImage === image}
           >
-            ×
-          </HoverDeleteButton>
-        </ImageContainer>
-      ))}
+            {imageUrl ? (
+              <StyledImage
+                src={imageUrl}
+                alt={`Uploaded image ${image.filename || 'unnamed'}`}
+                onError={(e) => {
+                  console.error(`Error loading image: ${imageUrl}`);
+                  e.target.style.display = 'none';
+                  e.target.nextElementSibling.style.display = 'flex';
+                }}
+              />
+            ) : (
+              <ErrorImagePlaceholder>No URL available</ErrorImagePlaceholder>
+            )}
+            <HoverDeleteButton
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(image);
+              }}
+            >
+              ×
+            </HoverDeleteButton>
+          </ImageContainer>
+        );
+      })}
     </GalleryContainer>
   );
 };
@@ -80,4 +100,17 @@ export const DraftItemGallery = ({ items, onSelect, onDelete }) => {
       })}
     </GalleryContainer>
   );
+};
+
+UploadedImagesGallery.propTypes = {
+  images: PropTypes.array.isRequired,
+  onSelect: PropTypes.func.isRequired,
+  selectedImage: PropTypes.object,
+  onDelete: PropTypes.func.isRequired,
+};
+
+DraftItemGallery.propTypes = {
+  items: PropTypes.array.isRequired,
+  onSelect: PropTypes.func.isRequired,
+  onDelete: PropTypes.func.isRequired,
 };

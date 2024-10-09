@@ -1,5 +1,3 @@
-// backend/server.js
-
 import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
@@ -10,9 +8,10 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import session from 'express-session';
 import { fileURLToPath } from 'url';
-import chatImagesRouter from './chat/chatImages.js';
+import chatHandler from './chat/chatHandler.js';
 import itemsRouter from './routes/items.js';
 import connectDB from './config/database.js'; // Import the database connection function
+import MongoStore from 'connect-mongo';
 
 // Import the assistant module functions
 import { handleMoolaMaticChat, manageContext } from './chat/chatService.js';
@@ -91,7 +90,7 @@ app.use(
 );
 
 // Session setup to manage conversation history and image references
-import MongoStore from 'connect-mongo';
+
 app.use(
   session({
     secret: process.env.SESSION_SECRET || 'default_secret', // Use the SESSION_SECRET from .env
@@ -144,6 +143,9 @@ app.use('/api/temp-image', tempImageRouter);
 app.use('/api/draft-image', draftImageRouter);
 app.use('/api/purchase-image', purchaseImageRouter);
 
+// Use the chatHandler router
+app.use('/api', chatHandler);
+
 // Test route to check server status
 app.get('/', (req, res) => {
   res.send('Backend server is running!');
@@ -180,7 +182,7 @@ app.post('/api/chat', async (req, res) => {
 });
 
 // Use the chatImages router
-app.use('/api', chatImagesRouter);
+app.use('/api', chatHandler);
 
 /**
  * Endpoint to handle user logout and clean up uploaded images
