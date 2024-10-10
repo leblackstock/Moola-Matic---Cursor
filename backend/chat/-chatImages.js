@@ -223,11 +223,9 @@ router.post('/analyze-image', upload.single('image'), async (req, res) => {
     });
   } catch (error) {
     console.error('Error processing image upload:', error);
-    res
-      .status(500)
-      .json({
-        error: 'Internal Server Error: Failed to process image upload.',
-      });
+    res.status(500).json({
+      error: 'Internal Server Error: Failed to process image upload.',
+    });
   }
 });
 

@@ -25,10 +25,10 @@ winston.addColors(colors);
 
 // Create the logger instance
 const logger = winston.createLogger({
-  level: process.env.NODE_ENV === 'development' ? 'debug' : 'warn',
+  level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
   levels,
   format: winston.format.combine(
-    winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss:ms' }),
+    winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
     winston.format.colorize({ all: true }),
     winston.format.printf(
       (info) => `${info.timestamp} ${info.level}: ${info.message}`
@@ -40,7 +40,6 @@ const logger = winston.createLogger({
       filename: 'logs/error.log',
       level: 'error',
     }),
-    new winston.transports.File({ filename: 'logs/all.log' }),
   ],
 });
 

@@ -14,7 +14,7 @@ const PageContainer = styled.div`
   margin: 0 auto;
   padding: 20px;
   background-color: #1a001a;
-  color: #F5DEB3;
+  color: #f5deb3;
   border-radius: 10px;
 `;
 
@@ -30,31 +30,31 @@ const Label = styled.label`
 
 const Input = styled.input`
   padding: 10px;
-  border: 1px solid #4A0E4E;
+  border: 1px solid #4a0e4e;
   border-radius: 5px;
   background-color: #330033;
-  color: #F5DEB3;
+  color: #f5deb3;
 `;
 
 const TextArea = styled.textarea`
   padding: 10px;
-  border: 1px solid #4A0E4E;
+  border: 1px solid #4a0e4e;
   border-radius: 5px;
   background-color: #330033;
-  color: #F5DEB3;
+  color: #f5deb3;
   resize: vertical;
 `;
 
 const SubmitButton = styled.button`
   margin-top: 20px;
   padding: 10px;
-  background: linear-gradient(45deg, #2D0037, #4A0E4E);
-  color: #F5DEB3;
+  background: linear-gradient(45deg, #2d0037, #4a0e4e);
+  color: #f5deb3;
   border: none;
   border-radius: 20px;
   cursor: pointer;
   font-size: 1em;
-  
+
   &:disabled {
     background: #333333;
     cursor: not-allowed;
@@ -94,7 +94,10 @@ function NewItemPage() {
     try {
       if (imageFile) {
         const messages = [
-          { role: 'user', content: 'Please analyze the following item for resale.' },
+          {
+            role: 'user',
+            content: 'Please analyze the following item for resale.',
+          },
           { role: 'user', content: itemDescription || itemName },
         ];
         const response = await analyzeImageWithGPT4Turbo(imageFile, messages);

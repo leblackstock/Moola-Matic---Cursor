@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import debounce from 'lodash/debounce'; // Add this line
+import { debounce } from 'lodash'; // Change this line
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 import treasureSpecs from './Images/Treasure_Specs01.jpeg';
@@ -17,6 +17,7 @@ import axios from 'axios';
 import { UploadedImagesGallery } from './components/compGallery.js';
 import PropTypes from 'prop-types';
 import ChatComp from './components/compChat.js';
+import { generateDraftFilename } from './components/compSave.js';
 import {
   handleDraftSave,
   handleAutoSave,
@@ -37,6 +38,10 @@ import {
   saveToLocalStorage,
   useAutosave,
 } from './components/compSave.js';
+import {
+  handleFileChange,
+  handleImageDeletion,
+} from './components/compUpload.js';
 
 // Import all styled components
 import {
@@ -76,19 +81,9 @@ const loadItemData = (itemId) => {
   return loadLocalData(itemId);
 };
 
-function generateDraftImageName(itemId, index) {
-  const last6 = itemId.slice(-6);
-  const paddedIndex = String(index + 1).padStart(2, '0');
-  return `Draft-${last6}-${paddedIndex}`;
-}
-
 function NewItemPage({ setMostRecentItemId, currentItemId }) {
-  console.log('NewItemPage: Component rendered');
   const { itemId } = useParams();
   const navigate = useNavigate();
-
-  console.log('NewItemPage: itemId from params:', itemId);
-  console.log('NewItemPage: currentItemId prop:', currentItemId);
 
   // ----------------------------
   // Unconditionally declare Hooks
@@ -120,13 +115,6 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
   const cameraInputRef = useRef(null);
   const messagesContainerRef = useRef(null);
 
-  console.log(
-    'NewItemPage: Rendered with itemId from params:',
-    itemId,
-    'and currentItemId prop:',
-    currentItemId
-  );
-
   // Use the autosave hook
   const debouncedAutoSave = useAutosave(
     item,
@@ -142,22 +130,20 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
   // useEffect Hook: Load or Create Item
   // ---------------------------------
   useEffect(() => {
-    console.log('NewItemPage: useEffect triggered');
-    console.log('NewItemPage: Current itemId:', itemId);
-
-    const loadedData = loadItemData(itemId);
-    console.log('NewItemPage: Loaded data:', loadedData);
-
+    console.log('NewItemPage useEffect triggered with itemId:', itemId);
+    const loadedData = loadLocalData(itemId);
+    console.log('Loaded data from local storage:', loadedData);
     if (loadedData && loadedData.item) {
-      console.log('NewItemPage: Loading existing draft');
+      console.log('Setting item state with loaded data:', loadedData.item);
       setItem(loadedData.item);
+      console.log('Setting uploaded images:', loadedData.item.images || []);
+      setUploadedImages(loadedData.item.images || []);
       setContextData(loadedData.contextData || {});
       setMessages(loadedData.messages || []);
-      setUploadedImages(loadedData.item.images || []);
     } else {
-      console.log('NewItemPage: Creating new item');
+      console.log('Creating new item with ID:', itemId);
       const newItem = createDefaultItem(itemId);
-      console.log('NewItemPage: New item created:', newItem);
+      console.log('New item created:', newItem);
       setItem(newItem);
       setUploadedImages([]);
     }
@@ -177,68 +163,20 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
     fetchImageAnalysisPrompt();
   }, [itemId, backendPort]);
 
-  // Add this new function to handle loading drafts with deduplication
+  // Optimize the loadDraft function
   const loadDraft = (draftData) => {
     if (draftData) {
-      console.log('Loading draft:', draftData);
-      // Use a Set to keep track of unique filenames
-      const uniqueFilenames = new Set();
-      const uniqueImages = [];
-
-      // Add images to the uniqueImages array only if their filename is not already in the Set
-      draftData.images.forEach((img) => {
-        if (!uniqueFilenames.has(img.filename)) {
-          uniqueFilenames.add(img.filename);
-          uniqueImages.push(img);
-        }
-      });
-
-      // Update the draft data with unique images
+      const uniqueImages = [
+        ...new Map(draftData.images.map((img) => [img.filename, img])).values(),
+      ];
       const updatedDraftData = {
         ...draftData,
         images: uniqueImages,
       };
-
-      console.log('Setting item state with:', updatedDraftData);
       setItem(updatedDraftData);
       setUploadedImages(uniqueImages);
-    } else {
-      console.log('No draft data to load');
     }
   };
-
-  // ----------------------------
-  // useEffect Hook: Auto-Save
-  // ----------------------------
-  useEffect(() => {
-    const debouncedSave = debounce(async () => {
-      console.log('Autosave triggered. Current item state:', item);
-      console.log(
-        'Number of images before autosave:',
-        item.images ? item.images.length : 0
-      );
-
-      try {
-        const savedItem = await autosaveDraft(item);
-        console.log('Autosave successful. Saved item:', savedItem);
-        console.log(
-          'Number of images after autosave:',
-          savedItem.images ? savedItem.images.length : 0
-        );
-
-        // Update the local state with the saved item
-        setItem(savedItem);
-      } catch (error) {
-        console.error('Autosave failed:', error);
-      }
-    }, 3000);
-
-    if (item && hasUnsavedChanges) {
-      debouncedSave();
-    }
-
-    return () => debouncedSave.cancel();
-  }, [item, hasUnsavedChanges]);
 
   // ----------------------------
   // useEffect Hook: Save to localStorage
@@ -255,10 +193,7 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
   useEffect(() => {
     return () => {
       if (item && item.itemId) {
-        console.log('NewItemPage: Component unmounting');
-        // Instead of clearing, let's save the current state
         handleLocalSave(item, contextData, messages);
-        console.log('NewItemPage: Saved local data for itemId:', item.itemId);
       }
     };
   }, [item, contextData, messages]);
@@ -276,10 +211,6 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
         const data = await response.json();
         setImageAnalysisPrompt(data.IMAGE_ANALYSIS_PROMPT);
         setIsPromptLoaded(true);
-        console.log(
-          'Fetched IMAGE_ANALYSIS_PROMPT:',
-          data.IMAGE_ANALYSIS_PROMPT
-        );
       } catch (error) {
         console.error('Error fetching IMAGE_ANALYSIS_PROMPT:', error);
       }
@@ -296,20 +227,6 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
       setSelectedImage(uploadedImages[uploadedImages.length - 1]);
     }
   }, [uploadedImages, selectedImage]);
-
-  // ----------------------------
-  // useEffect Hook: item state changed
-  // ----------------------------
-  useEffect(() => {
-    console.log('NewItemPage: item state changed:', item);
-  }, [item]);
-
-  // ----------------------------
-  // useEffect Hook: itemId changed
-  // ----------------------------
-  useEffect(() => {
-    console.log('NewItemPage: itemId changed:', itemId);
-  }, [itemId]);
 
   // Event handlers
   const handleSubmit = async (e) => {
@@ -452,52 +369,45 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
     });
   };
 
-  // Update the handleFileChange function to remove automatic analysis
+  // Optimize the handleFileChange function
   const handleFileChange = async (event) => {
     console.log('handleFileChange called');
     const files = event.target.files;
-    if (files && files.length > 0) {
-      console.log(`${files.length} image(s) selected`);
-      console.log('Current itemId:', item.itemId);
-
-      if (!item.itemId) {
-        console.error('Error: itemId is undefined');
-        return;
-      }
-
+    if (files && files.length > 0 && item.itemId) {
       try {
-        const newImages = [];
-        for (let i = 0; i < files.length; i++) {
-          const file = files[i];
-          let imageName;
-          let sequentialNumber = (item.images?.length || 0) + i;
-          let isUnique = false;
+        console.log('Processing files:', files.length);
+        const existingFilenames = new Set(
+          item.images?.map((img) => img.filename) || []
+        );
+        const newImages = await Promise.all(
+          Array.from(files).map(async (file) => {
+            try {
+              console.log('Uploading file:', file.name);
+              const uploadedImage = await handleFileUpload(file, item.itemId);
+              console.log('Upload result:', uploadedImage);
+              return uploadedImage &&
+                !existingFilenames.has(uploadedImage.filename)
+                ? uploadedImage
+                : null;
+            } catch (error) {
+              console.error(`Error uploading file ${file.name}:`, error);
+              return null;
+            }
+          })
+        );
 
-          while (!isUnique) {
-            sequentialNumber++;
-            imageName = `Draft-${item.itemId.slice(-6)}-${String(sequentialNumber).padStart(2, '0')}`;
-            isUnique = !item.images?.some((img) => img.filename === imageName);
-          }
+        const validNewImages = newImages.filter(Boolean);
+        console.log('Valid new images:', validNewImages);
 
-          const { newImage } = await handleFileUpload(
-            file,
-            backendPort,
-            item,
-            setUploadedImages,
-            imageName
-          );
-          newImages.push(newImage);
+        if (validNewImages.length > 0) {
+          setItem((prevItem) => ({
+            ...prevItem,
+            images: [...(prevItem.images || []), ...validNewImages],
+          }));
+          setUploadedImages((prevImages) => [...prevImages, ...validNewImages]);
+          setHasUnsavedChanges(true);
+          setImageUploaded(true);
         }
-
-        console.log('New images to be added:', newImages);
-
-        setItem((prevItem) => ({
-          ...prevItem,
-          images: [...(prevItem.images || []), ...newImages],
-        }));
-
-        setHasUnsavedChanges(true);
-        setImageUploaded(true);
       } catch (error) {
         console.error('Error processing images:', error);
       }
@@ -546,16 +456,35 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
     }
   };
 
-  // Handle Image Selection
-  const handleImageSelect = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      setImageFile(file);
-      // You might want to add more logic here, like updating the item state
+  // Remove or comment out the existing handleImageSelect function
+  /*
+  const handleImageSelect = async (event) => {
+    const files = Array.from(event.target.files);
+    setSelectedFiles(files);
+
+    for (const file of files) {
+      try {
+        const uploadedImage = await handleFileUpload(file, item.itemId);
+        setUploadedImages((prevImages) => [...prevImages, uploadedImage]);
+        setItem((prevItem) => ({
+          ...prevItem,
+          images: [...(prevItem.images || []), uploadedImage],
+        }));
+      } catch (error) {
+        console.error('Error uploading image:', error);
+        alert(`Error uploading image: ${error.message}`);
+      }
     }
   };
+  */
 
-  // Additional Handlers
+  // Replace it with this simplified version that uses the existing handleFileChange function
+  const handleImageSelect = (event) => {
+    console.log('Image select triggered');
+    console.log('Selected files:', event.target.files);
+    handleFileChange(event);
+  };
+
   const handleImageButtonClick = () => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
@@ -583,9 +512,14 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
     setIsLoading(false);
   };
 
-  const handleDeleteImage = (imageToDelete) => {
-    setUploadedImages((prevImages) =>
-      prevImages.filter((img) => img.id !== imageToDelete.id)
+  const handleDeleteImageWrapper = (imageToDelete) => {
+    handleImageDeletion(
+      imageToDelete,
+      setItem,
+      setUploadedImages,
+      setHasUnsavedChanges,
+      backendPort,
+      item // Pass the entire item object instead of draftData
     );
   };
 
@@ -599,13 +533,9 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
     });
   };
 
-  console.log('NewItemPage: Current item state:', item);
-
-  console.log('NewItemPage: Rendering. Current item state:', item);
-
   // Add this new function to handle image analysis
   const handleAnalyzeImages = async () => {
-    if (!imageFiles.length) {
+    if (!uploadedImages.length) {
       alert('Please upload at least one image before analyzing.');
       return;
     }
@@ -614,22 +544,19 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
 
     try {
       const formData = new FormData();
-      imageFiles.forEach((file, index) => {
-        formData.append('images', file);
+      uploadedImages.forEach((image, index) => {
+        formData.append('images', image.file || image.url);
       });
       formData.append('description', item.description || '');
       formData.append('itemId', item.itemId);
 
-      // Update the function call here
       const result = await analyzeImagesWithAssistant(formData);
 
-      // Update item fields with the analysis results
       updateItem({
         ...result.item,
         itemId: item.itemId,
       });
 
-      // Add the summary to the chat
       setMessages((prevMessages) => [
         ...prevMessages,
         {
@@ -672,11 +599,8 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
   };
 
   if (!item) {
-    console.log('NewItemPage: Item is null, rendering loading state');
     return <div>Loading...</div>;
   }
-
-  console.log('NewItemPage: Item is not null, rendering full component');
 
   return (
     <PageContainer>
@@ -732,9 +656,10 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
 
           <UploadedImagesGallery
             images={uploadedImages}
-            onSelect={setSelectedImage}
+            onSelect={handleImageSelect}
             selectedImage={selectedImage}
-            onDelete={handleDeleteImage}
+            onDelete={handleDeleteImageWrapper}
+            itemId={item.itemId}
           />
 
           {/* Image Selection Modal */}
@@ -767,10 +692,10 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
           <input
             type="file"
             ref={fileInputRef}
-            style={{ display: 'none' }}
             accept="image/*"
-            onChange={handleFileChange}
-            multiple // Add this attribute
+            multiple
+            onChange={handleImageSelect}
+            style={{ display: 'none' }}
           />
 
           <StyledForm onSubmit={handleSubmit}>
@@ -1027,26 +952,13 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
 
           <StyledButton
             onClick={() => {
-              console.log('Save Draft button clicked');
-              console.log('Current item state:', item);
-              console.log('Current uploadedImages:', uploadedImages);
-              handleManualSave(
-                item,
-                uploadedImages,
-                backendPort,
-                setItem,
-                setUploadedImages,
-                setHasUnsavedChanges,
-                setLastAutoSave
-              )
-                .then(() => {
-                  console.log('Manual save completed');
-                  console.log('Updated item state:', item);
-                  console.log('Updated uploadedImages:', uploadedImages);
-                })
-                .catch((error) => {
-                  console.error('Error in manual save:', error);
-                });
+              if (item && item.itemId) {
+                debouncedAutoSave(item, uploadedImages);
+                setShowNotification(true);
+                setTimeout(() => setShowNotification(false), 3000); // Hide notification after 3 seconds
+              } else {
+                console.error('Cannot save: item or itemId is missing');
+              }
             }}
           >
             Save Draft

@@ -829,13 +829,19 @@ export const WarningButton = styled(ModalButton)`
 
 // Gallery Components
 export const GalleryContainer = styled.div`
-  display: grid;
-  grid-template-columns: repeat(
-    auto-fill,
-    minmax(150px, 1fr)
-  ); // Increased from 100px to 150px
-  gap: 15px; // Increased from 10px to 15px
-  margin-bottom: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-start;
+
+  ${(props) =>
+    props.$isDraftGallery &&
+    `
+    flex-direction: row;
+    @media (max-width: 768px) {
+      flex-direction: column;
+    }
+  `}
 `;
 
 export const StyledImage = styled.img`

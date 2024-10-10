@@ -10,7 +10,7 @@ const draftItemSchema = new mongoose.Schema(
 
     // Item details
     itemDetails: {
-      type: { type: String, required: true },
+      type: { type: String, required: false }, // Change this line to make it optional
       brand: String,
       condition: String,
       rarity: String,

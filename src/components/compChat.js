@@ -66,11 +66,6 @@ function ChatComp({
   }, [propImagePreview]);
 
   useEffect(() => {
-    console.log('Component mounted or updated');
-    return () => console.log('Component will unmount');
-  });
-
-  useEffect(() => {
     if (messagesContainerRef.current) {
       messagesContainerRef.current.scrollTop =
         messagesContainerRef.current.scrollHeight;

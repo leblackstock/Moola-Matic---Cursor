@@ -2,7 +2,20 @@
 
 import axios from 'axios';
 import { useEffect, useCallback } from 'react';
-import debounce from 'lodash/debounce';
+import debounce from 'lodash.debounce';
+
+// Add this function near the top of the file, after the imports
+export const generateDraftFilename = (
+  itemId,
+  sequentialNumber = 1,
+  originalFilename = 'image'
+) => {
+  const fileExtension = originalFilename.includes('.')
+    ? originalFilename.split('.').pop().toLowerCase()
+    : 'jpg';
+  const paddedSequentialNumber = String(sequentialNumber).padStart(1, '0');
+  return `Draft-${itemId.slice(-6)}-${paddedSequentialNumber}.${fileExtension}`;
+};
 
 // Define API_URL
 const BACKEND_PORT = process.env.REACT_APP_BACKEND_PORT || 3001;
@@ -58,8 +71,6 @@ export const handleNewItem = (
   setMostRecentItemId,
   navigate
 ) => {
-  console.log('handleNewItem: New item created with ID:', itemId);
-
   const newItem = createDefaultItem(itemId);
 
   // Clear any existing local storage for this new item
@@ -84,7 +95,6 @@ export const handleDraftSave = async (
   currentItemId,
   backendPort
 ) => {
-  console.log('handleDraftSave: Saving draft for item with ID:', currentItemId);
   if (!currentItemId) {
     console.error('Cannot save draft without a valid item ID');
     throw new Error('Invalid item ID');
@@ -93,9 +103,6 @@ export const handleDraftSave = async (
   try {
     const itemCopy = { ...item, itemId: currentItemId };
 
-    console.log('Images to be saved:', itemCopy.images);
-
-    // Separate existing images (URLs) and new images (File objects)
     const existingImages = itemCopy.images
       .filter((image) => image.url && !image.file)
       .map((image) => ({ ...image, isNew: false }));
@@ -104,21 +111,14 @@ export const handleDraftSave = async (
       .filter((image) => image.file)
       .map((image) => ({ ...image, isNew: true }));
 
-    console.log('Existing Images:', existingImages);
-    console.log('New Images:', newImages);
-
-    // Combine existing and new images
     const allImages = [...existingImages, ...newImages];
 
-    // Prepare the data to send
     const dataToSend = {
       ...itemCopy,
       messages,
       itemId: currentItemId,
       images: allImages,
     };
-
-    console.log('Data prepared, sending to server:', dataToSend);
 
     const response = await axios.post(
       `http://localhost:${backendPort}/api/save-draft`,
@@ -134,9 +134,7 @@ export const handleDraftSave = async (
       throw new Error('Failed to save draft');
     }
 
-    const savedDraft = response.data.item;
-    console.log('Draft saved successfully. Server response:', savedDraft);
-    return savedDraft;
+    return response.data.item;
   } catch (error) {
     console.error('handleDraftSave: Error saving draft:', error);
     throw error;
@@ -155,18 +153,20 @@ export const handleAutoSave = async (
   onSuccess,
   onError
 ) => {
-  console.log('Starting auto-save process');
   try {
-    if (!item.itemId) {
-      throw new Error('Item ID is missing');
+    if (!item || !item.itemId) {
+      throw new Error('Item or itemId is missing');
     }
 
     const draftData = {
       ...item,
-      images: uploadedImages,
+      images: uploadedImages.map((image) => ({
+        id: image.id,
+        url: image.url,
+        filename: image.filename,
+        isNew: image.isNew,
+      })),
     };
-
-    console.log('Data being sent for auto-save:', draftData);
 
     const response = await axios.post(
       `http://localhost:${backendPort}/api/autosave-draft`,
@@ -178,8 +178,6 @@ export const handleAutoSave = async (
       }
     );
 
-    console.log('Auto-save response:', response.data);
-
     if (response.data && response.data.item) {
       setItem(response.data.item);
       setUploadedImages(response.data.item.images || []);
@@ -190,7 +188,7 @@ export const handleAutoSave = async (
       throw new Error('Invalid response format from server');
     }
   } catch (error) {
-    console.error('Error during auto-save:', error);
+    console.error('Error during autosave:', error);
     onError(error);
   }
 };
@@ -218,33 +216,30 @@ export const handleLocalSave = (item, contextData, messages) => {
     JSON.stringify(contextData)
   );
   localStorage.setItem(`messages_${item.itemId}`, JSON.stringify(messages));
-
-  console.log('Item saved locally:', itemToSave);
 };
 
 // Function to load local data based on itemId
 export const loadLocalData = (itemId) => {
+  console.log('Loading local data for itemId:', itemId);
   if (!itemId) {
-    console.error('Cannot load data without a valid itemId');
+    console.error('Invalid itemId:', itemId);
     return null;
   }
-
-  const itemString = localStorage.getItem(`item_${itemId}`);
-  const contextDataString = localStorage.getItem(`contextData_${itemId}`);
-  const messagesString = localStorage.getItem(`messages_${itemId}`);
-
-  if (!itemString) {
-    console.log('No local data found for itemId:', itemId);
-    return null;
+  const key = `item_${itemId}`;
+  const storedData = localStorage.getItem(key);
+  console.log('Retrieved data from local storage:', storedData);
+  if (storedData) {
+    try {
+      const parsedData = JSON.parse(storedData);
+      console.log('Parsed local data:', parsedData);
+      return parsedData;
+    } catch (error) {
+      console.error('Error parsing stored data:', error);
+      return null;
+    }
   }
-
-  const item = JSON.parse(itemString);
-  const contextData = contextDataString ? JSON.parse(contextDataString) : {};
-  const messages = messagesString ? JSON.parse(messagesString) : [];
-
-  console.log('Loaded local data for itemId:', itemId, 'Item:', item);
-
-  return { item, contextData, messages };
+  console.log('No data found in local storage for key:', key);
+  return null;
 };
 
 // Function to clear local data
@@ -285,9 +280,7 @@ export const saveDraft = async (item) => {
 // Function to delete a draft
 export const deleteDraft = async (id) => {
   try {
-    console.log('Deleting draft with id:', id);
     const response = await axios.delete(`${API_URL}/drafts/${id}`);
-    console.log('Delete response:', response.data);
     return response.data;
   } catch (error) {
     console.error('Error deleting draft:', error);
@@ -302,7 +295,6 @@ export const fetchDrafts = async () => {
       `http://localhost:${process.env.REACT_APP_BACKEND_PORT}/api/drafts`
     );
     const data = await response.json();
-    console.log('Drafts fetched from API:', data);
     return data;
   } catch (error) {
     console.error('Error fetching drafts:', error);
@@ -324,58 +316,35 @@ export const handleDraftSaveWithImages = async (
   currentItemId,
   backendPort
 ) => {
-  console.log(
-    'handleDraftSaveWithImages: Starting save process for item:',
-    item
-  );
   if (!currentItemId) {
     console.error('Cannot save draft without a valid item ID');
     return;
   }
 
   try {
-    const formData = new FormData();
     const itemCopy = { ...item };
 
-    console.log('Images before processing:', itemCopy.images);
-
-    // Process images
     if (itemCopy.images && itemCopy.images.length > 0) {
-      itemCopy.images.forEach((image, index) => {
-        if (image.file) {
-          console.log(`Appending new image file: ${image.file.name}`);
-          formData.append(`newImages`, image.file);
-          formData.append(
-            `newImageData`,
-            JSON.stringify({
-              index,
-              tempPath: image.tempPath,
-              filename: image.filename,
-            })
-          );
-        } else if (image.url) {
-          console.log(`Existing image URL: ${image.url}`);
-          formData.append(`existingImages`, image.url);
-        }
-      });
-    } else {
-      console.log('No images to process');
+      itemCopy.images = itemCopy.images.map((image) => ({
+        id: image.id,
+        url: image.url,
+        filename: image.filename,
+        isNew: image.isNew,
+      }));
     }
 
-    // Send the original images array structure
-    formData.append(
-      'draftData',
-      JSON.stringify({ ...itemCopy, messages, itemId: currentItemId })
-    );
-
-    console.log('FormData prepared, sending to server...');
+    const draftData = JSON.stringify({
+      ...itemCopy,
+      messages,
+      itemId: currentItemId,
+    });
 
     const response = await axios.post(
       `http://localhost:${backendPort}/api/save-draft`,
-      formData,
+      { draftData },
       {
         headers: {
-          'Content-Type': 'multipart/form-data',
+          'Content-Type': 'application/json',
         },
       }
     );
@@ -384,25 +353,29 @@ export const handleDraftSaveWithImages = async (
       throw new Error('Failed to save draft');
     }
 
-    const savedDraft = response.data.item;
-    console.log('Draft saved successfully. Server response:', savedDraft);
-    return savedDraft;
+    return response.data.item;
   } catch (error) {
     console.error('Error saving draft:', error);
     throw error;
   }
 };
 
-export const saveToLocalStorage = (draft) => {
-  localStorage.setItem(
-    'currentItem',
-    JSON.stringify({
-      ...draft,
-      images: draft.images.map((img) => ({ url: img })), // Convert image strings to objects with url property
-    })
-  );
-  if (draft.messages) {
-    localStorage.setItem('messages', JSON.stringify(draft.messages));
+export const saveToLocalStorage = (item) => {
+  console.log('Saving item to local storage:', item);
+  if (!item || !item.itemId) {
+    console.error('Invalid item or missing itemId:', item);
+    return false;
+  }
+  const key = `item_${item.itemId}`;
+  const dataToSave = JSON.stringify({ item });
+  console.log('Data being saved:', dataToSave);
+  try {
+    localStorage.setItem(key, dataToSave);
+    console.log('Item saved to local storage with key:', key);
+    return true;
+  } catch (error) {
+    console.error('Error saving to local storage:', error);
+    return false;
   }
 };
 
@@ -415,18 +388,16 @@ export const handleManualSave = async (
   setHasUnsavedChanges,
   setLastAutoSave
 ) => {
-  console.log('Starting manual save process...');
-  console.log('Current item state:', item);
-  console.log('Current uploadedImages:', uploadedImages);
-
   const formData = new FormData();
 
-  // Combine existing images from item and new uploaded images
   const combinedImages = [
-    ...(item.images || []),
-    ...uploadedImages.filter(
-      (img) => !item.images.some((existingImg) => existingImg.id === img.id)
-    ),
+    ...item.images.filter((img) => !img.isNew),
+    ...uploadedImages.map((img) => ({
+      id: img.id,
+      url: img.url,
+      filename: img.filename,
+      isNew: img.isNew,
+    })),
   ];
 
   const updatedItem = {
@@ -436,17 +407,13 @@ export const handleManualSave = async (
 
   formData.append('draftData', JSON.stringify(updatedItem));
 
-  // Append new images if they exist
   uploadedImages.forEach((img) => {
     if (img.file && img.isNew) {
       formData.append('images', img.file, img.filename);
     }
   });
 
-  console.log('Item data being saved:', updatedItem);
-
   try {
-    console.log('Sending save request to server...');
     const response = await axios.post(
       `http://localhost:${backendPort}/api/save-draft`,
       formData,
@@ -456,10 +423,8 @@ export const handleManualSave = async (
         },
       }
     );
-    console.log('Server response:', response.data);
 
     if (response.data.item) {
-      console.log('Manual save successful:', response.data.item);
       setItem(response.data.item);
       setUploadedImages(response.data.item.images || []);
       setHasUnsavedChanges(false);
@@ -509,52 +474,35 @@ export const updateItem = (
 };
 
 // Function to handle file upload
-export const handleFileUpload = async (
-  file,
-  backendPort,
-  item,
-  setUploadedImages,
-  imageName
-) => {
-  const formData = new FormData();
-  formData.append('image', file);
-  formData.append('itemId', item.itemId);
-  formData.append('filename', imageName);
-
+export const handleFileUpload = async (file, itemId) => {
   try {
-    const response = await axios.post(
-      `http://localhost:${backendPort}/api/draft-image/upload`,
-      formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      }
-    );
+    console.log('Uploading file:', file.name);
+    const formData = new FormData();
+    formData.append('image', file);
+    formData.append('itemId', itemId);
 
-    const currentImageURL = `http://localhost:${backendPort}${response.data.imageUrl}`;
+    const response = await axios.post(`/api/draft-image/upload`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
 
-    const newImage = {
-      id: Date.now().toString(),
-      url: currentImageURL,
-      filename: imageName,
-      isNew: true,
-    };
+    console.log('Upload response:', response.data);
 
-    setUploadedImages((prevImages) => [...prevImages, newImage]);
-
-    return { newImage, response };
+    if (response.data && response.data.url) {
+      return response.data;
+    } else {
+      throw new Error('Unexpected response format');
+    }
   } catch (error) {
-    console.error('Error uploading image:', error);
+    console.error('Error uploading file:', error);
     throw error;
   }
 };
 
 export const deleteAllDrafts = async () => {
   try {
-    console.log('Deleting all drafts');
     const response = await axios.delete(`${API_URL}/drafts`);
-    console.log('Delete all drafts response:', response.data);
     return response.data;
   } catch (error) {
     console.error('Error deleting all drafts:', error);
@@ -575,10 +523,12 @@ export const useAutosave = (
   const debouncedAutoSave = useCallback(
     debounce((currentItem, currentUploadedImages) => {
       if (currentItem && currentItem.itemId) {
-        console.log('Debounced auto-save triggered');
         const dataToSave = {
           ...currentItem,
-          images: currentUploadedImages,
+          images:
+            currentUploadedImages.length > 0
+              ? currentUploadedImages
+              : currentItem.images,
         };
 
         handleAutoSave(
@@ -589,15 +539,16 @@ export const useAutosave = (
           setUploadedImages,
           setHasUnsavedChanges,
           setLastAutoSave,
-          (savedData) => {
-            console.log('Auto-save successful', savedData);
+          () => {
+            console.log('Autosave successful');
           },
           (error) => {
+            // Keeping this error log for debugging purposes
             console.error('Error auto-saving:', error);
           }
         );
       }
-    }, 5000), // Debounce for 5 seconds
+    }, 5000),
     [
       backendPort,
       setItem,
