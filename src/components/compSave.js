@@ -189,14 +189,28 @@ export const handleAutoSave = async (
 
 // Function to handle local save
 export const handleLocalSave = (item, contextData, messages, ItemId) => {
-  if (!item || !ItemId) {
-    console.error('Cannot save item without a valid item or ItemId');
+  console.log('handleLocalSave called with:', {
+    item,
+    contextData,
+    messages,
+    ItemId,
+  });
+
+  if (!item) {
+    console.error('Cannot save item: item is null or undefined');
+    return;
+  }
+
+  const effectiveItemId = ItemId || item.ItemId || item.itemId;
+
+  if (!effectiveItemId) {
+    console.error('Cannot save item: no valid ItemId found', { item, ItemId });
     return;
   }
 
   const itemToSave = {
     ...item,
-    ItemId, // Ensure ItemId is included in the saved item
+    ItemId: effectiveItemId,
     images: item.images
       ? item.images.map((img) => ({
           id: img.id,
@@ -207,32 +221,33 @@ export const handleLocalSave = (item, contextData, messages, ItemId) => {
       : [],
   };
 
-  localStorage.setItem(`item_${ItemId}`, JSON.stringify(itemToSave));
+  console.log(
+    `Saving item to localStorage with key: item_${effectiveItemId}`,
+    itemToSave
+  );
+  localStorage.setItem(`item_${effectiveItemId}`, JSON.stringify(itemToSave));
   localStorage.setItem(
-    `contextData_${ItemId}`,
+    `contextData_${effectiveItemId}`,
     JSON.stringify(contextData || {})
   );
-  localStorage.setItem(`messages_${ItemId}`, JSON.stringify(messages || []));
+  localStorage.setItem(
+    `messages_${effectiveItemId}`,
+    JSON.stringify(messages || [])
+  );
+  console.log('Item saved successfully to localStorage');
 };
 
 // Function to load local data based on itemId
 export const loadLocalData = (itemId) => {
   try {
-    const storedItem = localStorage.getItem(`item_${itemId}`);
-    if (storedItem) {
-      const parsedItem = JSON.parse(storedItem);
-      console.log('Loaded local data:', parsedItem);
-      return {
-        item: parsedItem,
-        uploadedImages: Array.isArray(parsedItem.images)
-          ? parsedItem.images
-          : [],
-      };
-    }
+    const storageKey = `item_${itemId}`;
+    const data = localStorage.getItem(storageKey);
+    console.log(`Loading data from localStorage with key: ${storageKey}`, data);
+    return data ? JSON.parse(data) : null;
   } catch (error) {
-    console.error('Error loading local data:', error);
+    console.error('Error loading data from localStorage:', error);
+    return null;
   }
-  return null;
 };
 
 // Function to clear local data
@@ -389,22 +404,24 @@ export const handleDraftSaveWithImages = async (
   }
 };
 
-export const saveToLocalStorage = (item) => {
-  console.log('Saving item to local storage:', item);
-  if (!item || !item.ItemId) {
-    console.error('Invalid item or missing ItemId:', item);
-    return false;
-  }
-  const key = `item_${item.ItemId}`;
-  const dataToSave = JSON.stringify({ item });
-  console.log('Data being saved:', dataToSave);
+export const saveToLocalStorage = (itemId, data) => {
   try {
-    localStorage.setItem(key, dataToSave);
-    console.log('Item saved to local storage with key:', key);
-    return true;
+    if (!itemId) {
+      console.error('Invalid itemId:', itemId);
+      return;
+    }
+    const storageKey = `item_${itemId}`;
+    const dataToSave = {
+      ...data,
+      images: data.images || [], // Ensure images array is included
+    };
+    console.log(
+      `Saving data to localStorage with key: ${storageKey}`,
+      dataToSave
+    );
+    localStorage.setItem(storageKey, JSON.stringify(dataToSave));
   } catch (error) {
-    console.error('Error saving to local storage:', error);
-    return false;
+    console.error('Error saving data to localStorage:', error);
   }
 };
 

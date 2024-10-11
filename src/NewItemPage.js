@@ -91,8 +91,9 @@ const loadItemData = (itemId) => {
   return loadLocalData(itemId);
 };
 
-function NewItemPage({ ItemId, setItemId }) {
-  console.log('ItemId:', ItemId);
+function NewItemPage({ setItemId }) {
+  const { ItemId } = useParams(); // Add this line
+  console.log('ItemId from URL params:', ItemId);
   const navigate = useNavigate();
 
   if (ItemId === null) {
@@ -162,34 +163,50 @@ function NewItemPage({ ItemId, setItemId }) {
   // useEffect Hook: Load or Create Item
   // ---------------------------------
   useEffect(() => {
-    if (!ItemId) {
-      console.error('No ItemId available');
-      // Handle this error, maybe redirect to the home page
-      return;
-    }
-
-    console.log('NewItemPage useEffect triggered with ItemId:', ItemId);
-
-    const loadItem = async () => {
-      let loadedItem = await loadLocalData(ItemId);
-      if (loadedItem) {
-        console.log('Loaded existing item from local storage:', loadedItem);
-        setItem(loadedItem);
-        // Initialize other state variables based on loadedItem
-        setName(loadedItem.name || '');
-        setDescription(loadedItem.description || '');
-        // ... initialize other state variables
-      } else {
-        console.error(
-          'Item not found in localStorage. This should not happen.'
-        );
-        // Handle this unexpected case, perhaps by redirecting to the home page
+    const loadData = async () => {
+      if (!ItemId) {
+        console.error('No ItemId available');
         navigate('/');
+        return;
+      }
+
+      try {
+        const localData = await loadLocalData(ItemId);
+        console.log('Local data loaded:', localData);
+
+        if (localData) {
+          setItem(localData);
+          setName(localData.name || '');
+          setDescription(localData.description || '');
+          // Ensure we're setting the images array correctly
+          setUploadedImages(localData.images || []);
+          console.log('Setting uploaded images:', localData.images || []);
+          setContextData(localData.contextData || {});
+          setMessages(localData.messages || []);
+        } else {
+          console.log('No local data found, initializing with defaults');
+          const defaultItem = createDefaultItem(ItemId);
+          setItem(defaultItem);
+          setName(defaultItem.name || '');
+          setDescription(defaultItem.description || '');
+          setUploadedImages([]);
+          setContextData({});
+          setMessages([]);
+        }
+      } catch (error) {
+        console.error('Error loading local data:', error);
+        const defaultItem = createDefaultItem(ItemId);
+        setItem(defaultItem);
+        setName(defaultItem.name || '');
+        setDescription(defaultItem.description || '');
+        setUploadedImages([]);
+        setContextData({});
+        setMessages([]);
       }
     };
 
-    loadItem();
-  }, [ItemId]);
+    loadData();
+  }, [ItemId, navigate]);
 
   // Optimize the loadDraft function
   const loadDraft = (draftData) => {
@@ -575,37 +592,6 @@ function NewItemPage({ ItemId, setItemId }) {
       }
     }
   };
-
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const localData = loadItemData(ItemId);
-        console.log('Local data loaded:', localData);
-
-        if (localData) {
-          setItem(localData.item || createDefaultItem(ItemId));
-          console.log('Loaded images:', localData.uploadedImages);
-          setUploadedImages((prevImages) => {
-            console.log('Previous images:', prevImages);
-            return Array.isArray(localData.uploadedImages)
-              ? localData.uploadedImages
-              : [];
-          });
-          // ... load other data
-        } else {
-          console.log('No local data found, initializing with defaults');
-          setItem(createDefaultItem(ItemId));
-          setUploadedImages([]);
-        }
-      } catch (error) {
-        console.error('Error loading local data:', error);
-        setItem(createDefaultItem(ItemId));
-        setUploadedImages([]);
-      }
-    };
-
-    loadData();
-  }, [ItemId]);
 
   useEffect(() => {
     console.log('uploadedImages updated:', uploadedImages);
@@ -1019,7 +1005,6 @@ function NewItemPage({ ItemId, setItemId }) {
 }
 
 NewItemPage.propTypes = {
-  ItemId: PropTypes.string,
   setItemId: PropTypes.func.isRequired,
 };
 

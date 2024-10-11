@@ -71,15 +71,23 @@ function ViewItemsPage({ currentItemId }) {
     clearLocalData();
     console.log('Local data cleared');
 
-    console.log('Saving draft to local storage:', draft);
-    saveToLocalStorage(draft);
+    const itemId = draft.itemId || draft._id;
+    console.log('Saving draft to local storage with itemId:', itemId);
+
+    // Ensure images are included in the saved draft
+    const draftToSave = {
+      ...draft,
+      images: draft.images || [],
+    };
+
+    saveToLocalStorage(itemId, draftToSave);
 
     // Verify that the data was saved correctly
-    const savedData = loadLocalData(draft.itemId);
+    const savedData = loadLocalData(itemId);
     console.log('Verified saved data:', savedData);
 
     if (savedData) {
-      navigate(`/new-item/${draft.itemId || draft._id}`);
+      navigate(`/new-item/${itemId}`);
       console.log('Navigating to draft edit page');
     } else {
       console.error('Failed to save draft to local storage');

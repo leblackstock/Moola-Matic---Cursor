@@ -3,7 +3,6 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
-import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import session from 'express-session';
 import { fileURLToPath } from 'url';
@@ -199,3 +198,6 @@ app.use((req, res, next) => {
   console.log(`Route not found: ${req.method} ${req.url}`);
   res.status(404).json({ error: 'Route not found' });
 });
+
+// Add this line to use the chatHandler
+app.use('/api', chatHandler);

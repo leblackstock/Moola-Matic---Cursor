@@ -6,7 +6,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
 import mongoose from 'mongoose';
-import axios from 'axios'; // If needed for custom HTTP requests
 import { DraftItem } from '../models/DraftItem.js'; // Import the DraftItem model
 import {
   interactWithMoolaMaticAssistant as interactWithAssistant,
