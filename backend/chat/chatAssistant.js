@@ -10,7 +10,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Load environment variables from .env file
-dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
+dotenv.config({ path: path.resolve(__dirname, '..', '..', '.env') });
 
 // Validate essential environment variables
 const { OPENAI_API_KEY, MOOLA_MATIC_ASSISTANT_ID } = process.env;
@@ -31,6 +31,8 @@ if (!MOOLA_MATIC_ASSISTANT_ID) {
 const client = new OpenAI({
   apiKey: OPENAI_API_KEY,
 });
+
+console.log('API Key loaded:', OPENAI_API_KEY ? 'Yes' : 'No');
 
 /**
  * Creates a user message object.
@@ -283,10 +285,15 @@ const interactWithMoolaMaticAssistant = async (messages, contextData) => {
     // Pass both threadId and runId to getAssistantResponse
     const assistantResponse = await getAssistantResponse(threadId, runId);
 
-    // Update contextData directly here
-    if (contextData) {
-      contextData.lastInteraction = new Date().toISOString();
-      // Add any other context updates here
+    // Ensure contextData is an object
+    const context =
+      typeof contextData === 'string' ? JSON.parse(contextData) : contextData;
+
+    // Update contextData
+    if (context && typeof context === 'object') {
+      context.lastInteraction = new Date().toISOString();
+    } else {
+      console.warn('contextData is not an object, skipping update');
     }
 
     return assistantResponse; // Just return the response content

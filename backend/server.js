@@ -6,10 +6,7 @@ import dotenv from 'dotenv';
 import helmet from 'helmet';
 import session from 'express-session';
 import { fileURLToPath } from 'url';
-import {
-  chatHandler,
-  interactWithMoolaMaticAssistant,
-} from './chat/chatHandler.js';
+import { chatHandler } from './chat/chatHandler.js';
 import itemsRouter from './routes/items.js';
 import tempImageRouter from './api/apiTempImage.js';
 import purchaseImageRouter from './api/apiPurchaseImage.js';
@@ -106,27 +103,8 @@ app.use('/api/items', itemsRouter);
 app.use('/api/temp-images', tempImageRouter);
 app.use('/api/purchase-images', purchaseImageRouter);
 
-// Example Chat Route
-app.post('/chat', async (req, res) => {
-  try {
-    const { userMessage, sessionId } = req.body;
-    const assistantResponse = await interactWithMoolaMaticAssistant(
-      userMessage,
-      sessionId
-    );
-
-    if (typeof assistantResponse !== 'string') {
-      throw new Error('Invalid response from chat handler');
-    }
-
-    return res.json({ content: assistantResponse });
-  } catch (error) {
-    logger.error('Error in /chat:', error);
-    return res.status(500).json({
-      error: 'Failed to process chat with Moola-Matic. Please try again later.',
-    });
-  }
-});
+// Add this line to use the chatHandler (move it here)
+app.use('/api', chatHandler);
 
 // Logout Route
 app.post('/api/logout', (req, res) => {
@@ -198,6 +176,3 @@ app.use((req, res, next) => {
   console.log(`Route not found: ${req.method} ${req.url}`);
   res.status(404).json({ error: 'Route not found' });
 });
-
-// Add this line to use the chatHandler
-app.use('/api', chatHandler);

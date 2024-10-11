@@ -127,3 +127,7 @@ uploads/drafts/*
 !uploads/drafts/.gitkeep
 uploads/purchased/*
 !uploads/purchased/.gitkeep
+
+# Include backend/uploads/drafts
+!moola-matic_react/backend/uploads/drafts
+!moola-matic_react/backend/uploads/drafts/*

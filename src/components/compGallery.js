@@ -10,11 +10,9 @@ import {
   ErrorImagePlaceholder,
 } from './compStyles.js';
 
-import { getImageUrl } from '../helpers/itemGen.js'; // Import getImageUrl from itemGen.js
+import { getImageUrl } from '../helpers/itemGen.js';
 
 const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
-
-// Remove the duplicate getImageUrl function declaration
 
 export const UploadedImagesGallery = ({
   images,
@@ -23,7 +21,7 @@ export const UploadedImagesGallery = ({
   onDelete,
   itemId,
 }) => {
-  const [retryCount, setRetryCount] = React.useState({});
+  const imagesArray = Array.isArray(images) ? images : [];
 
   const retryImage = (imageId) => {
     setRetryCount((prev) => ({
@@ -37,7 +35,7 @@ export const UploadedImagesGallery = ({
     return <div>Error: Unable to display images</div>;
   }
 
-  const validImages = images.filter(
+  const validImages = imagesArray.filter(
     (image) => image && typeof image === 'object' && image.filename
   );
 
@@ -62,9 +60,9 @@ export const UploadedImagesGallery = ({
                 alt={`Uploaded image ${image.filename || 'unnamed'}`}
                 onError={(e) => {
                   console.error(`Failed to load image: ${imageUrl}`);
-                  e.target.onerror = null; // Prevent infinite loop
-                  e.target.style.display = 'none'; // Hide the broken image
-                  e.target.parentElement.style.backgroundColor = '#f0f0f0'; // Change background color
+                  e.target.onerror = null;
+                  e.target.style.display = 'none';
+                  e.target.parentElement.style.backgroundColor = '#f0f0f0';
                 }}
               />
             ) : (
@@ -73,7 +71,6 @@ export const UploadedImagesGallery = ({
             <HoverDeleteButton
               onClick={(e) => {
                 e.stopPropagation();
-                console.log('Deleting image:', image);
                 onDelete(image);
               }}
             >
@@ -107,14 +104,15 @@ export const DraftItemGallery = ({ items, onSelect, onDelete }) => {
   return (
     <GalleryContainer>
       {items.map((item, index) => {
-        console.log('Draft item:', item);
+        // Improved image URL selection logic
         const imageUrl =
           item.imageUrl ||
           (item.images &&
-            item.images[0] &&
+            item.images.length > 0 &&
             getImageUrl(item.itemId, item.images[0].filename)) ||
-          getImageUrl(item.itemId, item.filename);
-        console.log('Draft image URL:', imageUrl);
+          (item.filename && getImageUrl(item.itemId, item.filename)) ||
+          null;
+
         const uniqueKey = `${item.itemId || item._id || ''}-${index}`;
         return (
           <ImageContainer key={uniqueKey} onClick={() => onSelect(item)}>
@@ -135,7 +133,6 @@ export const DraftItemGallery = ({ items, onSelect, onDelete }) => {
             <HoverDeleteButton
               onClick={(e) => {
                 e.stopPropagation();
-                console.log('Deleting draft:', item);
                 onDelete(item);
               }}
             >
@@ -192,7 +189,6 @@ export const PurchasedItemGallery = ({ items, onSelect, onDelete }) => {
             <HoverDeleteButton
               onClick={(e) => {
                 e.stopPropagation();
-                console.log('Deleting purchased item:', item);
                 onDelete(item);
               }}
             >

@@ -82,13 +82,25 @@ const getBase64 = (file) => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
-    reader.onload = () => resolve(reader.result);
+    reader.onload = () => {
+      const base64String = reader.result.split(',')[1];
+      resolve(base64String);
+    };
     reader.onerror = (error) => reject(error);
   });
 };
 
 const loadItemData = (itemId) => {
   return loadLocalData(itemId);
+};
+
+const fileToBase64 = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = (error) => reject(error);
+  });
 };
 
 function NewItemPage({ setItemId }) {
@@ -127,11 +139,7 @@ function NewItemPage({ setItemId }) {
   const [isLoading, setIsLoading] = useState(false);
   const [imageUploaded, setImageUploaded] = useState(false);
   const [imagePreview, setImagePreview] = useState('');
-  const [uploadedImages, setUploadedImages] = useState(() => {
-    const initialImages = loadLocalData(ItemId)?.uploadedImages;
-    console.log('Initial uploadedImages:', initialImages);
-    return Array.isArray(initialImages) ? initialImages : [];
-  });
+  const [uploadedImages, setUploadedImages] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
   const [showImageModal, setShowImageModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -143,6 +151,7 @@ function NewItemPage({ setItemId }) {
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState('');
   const [imageURL, setImageURL] = useState('');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
@@ -152,6 +161,7 @@ function NewItemPage({ setItemId }) {
   const debouncedAutoSave = useAutosave(
     item,
     uploadedImages,
+    messages,
     backendPort,
     setItem,
     setUploadedImages,
@@ -179,7 +189,9 @@ function NewItemPage({ setItemId }) {
           setName(localData.name || '');
           setDescription(localData.description || '');
           // Ensure we're setting the images array correctly
-          setUploadedImages(localData.images || []);
+          setUploadedImages(
+            Array.isArray(localData.images) ? localData.images : []
+          );
           console.log('Setting uploaded images:', localData.images || []);
           setContextData(localData.contextData || {});
           setMessages(localData.messages || []);
@@ -383,22 +395,15 @@ function NewItemPage({ setItemId }) {
     }
   };
 
-  // Keep the first declaration of fileToBase64 (around line 365)
-  const fileToBase64 = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result.split(',')[1]);
-      reader.onerror = (error) => reject(error);
-    });
-  };
-
   const handleFileChangeWrapper = (event) => {
     handleFileChange(
       event,
       item,
       setItem,
-      setUploadedImages,
+      (newImages) => {
+        console.log('Setting uploaded images:', newImages);
+        setUploadedImages(Array.isArray(newImages) ? newImages : []);
+      },
       setHasUnsavedChanges,
       setImageUploaded
     );
@@ -514,56 +519,78 @@ function NewItemPage({ setItemId }) {
   };
 
   // Update the updateItem function
-  const updateItem = useCallback(
-    (field, value) => {
-      setItem((prevItem) => {
-        if (!prevItem) {
-          console.error('updateItem: prevItem is null');
-          return null;
+  const updateItem = (field, value) => {
+    setItem((prevItem) => {
+      const newItem = { ...prevItem };
+      const fields = field.split('.');
+      let current = newItem;
+      for (let i = 0; i < fields.length - 1; i++) {
+        if (!current[fields[i]]) {
+          current[fields[i]] = {};
         }
-
-        let updatedItem = { ...prevItem };
-
-        // Handle nested fields
-        if (field.includes('.')) {
-          const [parentField, childField] = field.split('.');
-          updatedItem[parentField] = {
-            ...updatedItem[parentField],
-            [childField]: value,
-          };
-        } else {
-          updatedItem[field] = value;
-        }
-
-        console.log('updateItem: Updating item:', updatedItem);
-        handleLocalSave(updatedItem, contextData, messages, ItemId);
-        setHasUnsavedChanges(true);
-        return updatedItem;
-      });
-    },
-    [contextData, messages, ItemId]
-  );
+        current = current[fields[i]];
+      }
+      current[fields[fields.length - 1]] = value;
+      return newItem;
+    });
+    setHasUnsavedChanges(true);
+  };
 
   // Add this new function to handle image analysis
   const handleAnalyzeImages = async () => {
+    if (uploadedImages.length === 0) {
+      setNotificationMessage('Please upload at least one image to analyze.');
+      setShowNotification(true);
+      return;
+    }
+
     setIsAnalyzing(true);
     try {
-      if (!description) {
-        throw new Error(
-          'Please provide a description before analyzing images.'
-        );
+      const base64Images = await Promise.all(
+        uploadedImages.map(async (image) => {
+          const response = await fetch(image.url);
+          const blob = await response.blob();
+          return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result.split(',')[1]);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+        })
+      );
+
+      if (base64Images.length === 0) {
+        throw new Error('No images available for analysis');
       }
 
-      const formData = new FormData();
-      formData.append('itemId', ItemId);
-      formData.append('description', description);
-      formData.append('base64Images', JSON.stringify(base64Images));
+      const analysisResult = await analyzeImagesWithAssistant(
+        base64Images,
+        item.description,
+        item.itemId,
+        item.sellerNotes,
+        JSON.stringify(contextData)
+      );
 
-      const result = await analyzeImagesWithAssistant(formData);
-      setAnalysisResult(result);
+      // Update the item state with the analysis results
+      setItem((prevItem) => ({
+        ...prevItem,
+        ...analysisResult.item,
+      }));
+
+      // Update messages with the analysis advice
+      setMessages((prevMessages) => [
+        ...prevMessages,
+        { role: 'assistant', content: analysisResult.advice },
+      ]);
+
+      setNotificationMessage('Image analysis completed successfully!');
+      setShowNotification(true);
     } catch (error) {
       console.error('Error analyzing images:', error);
-      setErrorMessage(error.message);
+      setNotificationMessage(
+        'An error occurred while analyzing the images. Please try again.'
+      );
+      setShowNotification(true);
     } finally {
       setIsAnalyzing(false);
     }
@@ -616,12 +643,19 @@ function NewItemPage({ setItemId }) {
 
     try {
       console.log('Saving draft:', item);
-      const itemToSave = { ...item, itemId: ItemId };
-      const savedDraft = await saveDraft(itemToSave, contextData, messages);
+      console.log('Messages to save:', messages); // Log messages before saving
+      const savedDraft = await handleManualSave(
+        item,
+        uploadedImages,
+        messages,
+        backendPort,
+        setItem,
+        setUploadedImages,
+        setHasUnsavedChanges,
+        setLastAutoSave
+      );
       console.log('Draft saved successfully:', savedDraft);
-
-      // Update the item state with the saved draft
-      setItem(savedDraft);
+      console.log('Saved messages:', savedDraft.messages); // Log saved messages
 
       // Show a success notification
       setNotificationMessage('Draft saved successfully!');
@@ -644,7 +678,10 @@ function NewItemPage({ setItemId }) {
   return (
     <PageContainer>
       {showNotification && (
-        <StyledNotification>{notificationMessage}</StyledNotification>
+        <StyledNotification>
+          {notificationMessage}
+          <button onClick={() => setShowNotification(false)}>Close</button>
+        </StyledNotification>
       )}
 
       <StyledHeader>
@@ -685,14 +722,14 @@ function NewItemPage({ setItemId }) {
             </GlowingButton>
             <GlowingButton
               onClick={handleAnalyzeImages}
-              disabled={isLoading || uploadedImages.length === 0}
+              disabled={isLoading || isAnalyzing || uploadedImages.length === 0}
             >
-              <i className="fas fa-search"></i> Analyze Images
+              {isAnalyzing ? 'Analyzing...' : 'Analyze Images'}
             </GlowingButton>
           </ButtonContainer>
 
           <UploadedImagesGallery
-            images={uploadedImages}
+            images={uploadedImages || []} // Ensure it's always an array
             onSelect={handleImageSelect}
             selectedImage={selectedImage}
             onDelete={handleDeleteImageWrapper}

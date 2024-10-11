@@ -1,10 +1,13 @@
 // frontend/src/api/chat.js
 
+import axios from 'axios';
+
 // Determine the API URL based on the environment
+const BACKEND_PORT = process.env.REACT_APP_BACKEND_PORT || 3001;
 const API_URL =
   process.env.NODE_ENV === 'production'
     ? '/api'
-    : `http://localhost:${process.env.REACT_APP_BACKEND_PORT || 3001}/api`;
+    : `http://localhost:${BACKEND_PORT}/api`;
 
 // Add this at the top of the file
 let contextData = null;
@@ -167,32 +170,35 @@ export const handleImageChat = async (
   // ... implementation of handleImageChat (formerly chatImages)
 };
 
-export const analyzeImagesWithAssistant = async (formData) => {
+export const analyzeImagesWithAssistant = async (
+  base64Images,
+  description,
+  itemId,
+  sellerNotes,
+  contextData
+) => {
+  if (!base64Images || base64Images.length === 0) {
+    throw new Error('At least one image is required');
+  }
+
   try {
-    // Log the formData entries (without logging the actual image data)
-    for (let [key, value] of formData.entries()) {
-      if (key !== 'base64Images') {
-        console.log(key, value);
-      } else {
-        console.log(key, 'Base64 image data (not logged)');
+    const response = await axios.post(
+      `${API_URL}/analyze-images`, // Use API_URL instead of hardcoding the URL
+      {
+        images: base64Images,
+        description,
+        itemId,
+        sellerNotes,
+        contextData,
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+        },
       }
-    }
+    );
 
-    const response = await fetch(`${API_URL}/analyze-images`, {
-      method: 'POST',
-      body: formData,
-      credentials: 'include',
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(
-        errorData.error || `HTTP error! status: ${response.status}`
-      );
-    }
-
-    const data = await response.json();
-    return data;
+    return response.data;
   } catch (error) {
     console.error('Error in analyzeImagesWithAssistant:', error);
     throw error;

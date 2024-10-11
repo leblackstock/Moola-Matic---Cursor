@@ -3,7 +3,7 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { interactWithMoolaMaticAssistant } from './chatHandler.js'; // Updated import statement
+import { interactWithMoolaMaticAssistant } from './chatAssistant.js'; // Updated import statement
 
 // Resolve __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);

@@ -272,6 +272,7 @@ router.get('/drafts', async (req, res) => {
 router.delete('/drafts/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const deleteImages = req.query.deleteImages === 'true';
     console.log('Attempting to delete draft with ID:', id);
 
     let result;
@@ -287,6 +288,27 @@ router.delete('/drafts/:id', async (req, res) => {
       console.log('Draft not found for deletion');
       return res.status(404).json({ error: 'Draft not found' });
     }
+
+    if (deleteImages) {
+      // Delete the image folder
+      const imageFolderPath = path.join(
+        __dirname,
+        '..',
+        'uploads',
+        'drafts',
+        result.itemId
+      );
+      if (
+        await fs
+          .access(imageFolderPath)
+          .then(() => true)
+          .catch(() => false)
+      ) {
+        await fs.rm(imageFolderPath, { recursive: true, force: true });
+        console.log(`Deleted image folder: ${imageFolderPath}`);
+      }
+    }
+
     console.log('Draft deleted successfully:', result);
     res.json({ message: 'Draft deleted successfully', deletedDraft: result });
   } catch (error) {
@@ -300,11 +322,33 @@ router.delete('/drafts/:id', async (req, res) => {
 // DELETE /api/items/drafts - Delete all drafts
 router.delete('/drafts', async (req, res) => {
   try {
+    const deleteImages = req.query.deleteImages === 'true';
+
+    const drafts = await DraftItem.find({});
     await DraftItem.deleteMany({});
+
+    if (deleteImages) {
+      const draftsFolderPath = path.join(__dirname, '..', 'uploads', 'drafts');
+      for (const draft of drafts) {
+        const imageFolderPath = path.join(draftsFolderPath, draft.itemId);
+        if (
+          await fs
+            .access(imageFolderPath)
+            .then(() => true)
+            .catch(() => false)
+        ) {
+          await fs.rm(imageFolderPath, { recursive: true, force: true });
+          console.log(`Deleted image folder: ${imageFolderPath}`);
+        }
+      }
+    }
+
     res.json({ message: 'All drafts deleted successfully' });
   } catch (error) {
     console.error('Error deleting all drafts:', error);
-    res.status(500).json({ error: 'Failed to delete all drafts' });
+    res
+      .status(500)
+      .json({ error: 'Failed to delete all drafts', details: error.message });
   }
 });
 

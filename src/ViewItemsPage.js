@@ -8,6 +8,7 @@ import {
   saveToLocalStorage,
   loadLocalData, // Add this import
   saveDraft, // Add this import
+  deleteAllDrafts, // Add this import
 } from './components/compSave.js';
 import {
   PageContainer,
@@ -163,7 +164,7 @@ function ViewItemsPage({ currentItemId }) {
     ) {
       try {
         console.log('Deleting all drafts...');
-        await deleteAllDrafts();
+        await deleteAllDrafts(true); // Pass true to also delete associated images
         console.log('All drafts deleted successfully');
         setDrafts([]);
         console.log('Drafts state cleared');
@@ -193,26 +194,18 @@ function ViewItemsPage({ currentItemId }) {
       >
         DEBUG: Delete All Drafts
       </StyledButton>
-      {drafts.length > 0 ? (
-        <DraftItemGallery
-          items={drafts}
-          onSelect={handleDraftClick}
-          onDelete={handleDeleteDraft}
-          onSave={handleSaveDraft}
-        />
-      ) : (
-        <p>No drafts available</p>
-      )}
+      <DraftItemGallery
+        items={drafts}
+        onSelect={handleDraftClick}
+        onDelete={handleDeleteDraft}
+        onSave={handleSaveDraft}
+      />
 
       <h3>Purchased Items</h3>
-      {purchasedItems.length > 0 ? (
-        <PurchasedItemGallery
-          items={purchasedItems}
-          onSelect={(item) => console.log('Selected purchased item:', item)}
-        />
-      ) : (
-        <p>No purchased items available</p>
-      )}
+      <PurchasedItemGallery
+        items={purchasedItems}
+        onSelect={(item) => console.log('Selected purchased item:', item)}
+      />
     </PageContainer>
   );
 }

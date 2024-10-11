@@ -139,6 +139,7 @@ export const handleDraftSave = async (
 export const handleAutoSave = async (
   item,
   uploadedImages,
+  messages,
   backendPort,
   setItem,
   setUploadedImages,
@@ -152,18 +153,32 @@ export const handleAutoSave = async (
       throw new Error('Item or itemId is missing');
     }
 
+    // Create a Set of image URLs to ensure uniqueness
+    const uniqueImageUrls = new Set(item.images.map((img) => img.url));
+
     const draftData = {
       ...item,
-      images: uploadedImages.map((image) => ({
-        id: image.id,
-        url: image.url,
-        filename: image.filename,
-        isNew: image.isNew,
-      })),
+      images: [
+        ...item.images.filter((img) => uniqueImageUrls.has(img.url)),
+        ...uploadedImages
+          .filter((img) => !uniqueImageUrls.has(img.url))
+          .map((image) => ({
+            id: image.id,
+            url: image.url,
+            filename: image.filename,
+            isNew: image.isNew,
+          })),
+      ],
+      messages: Array.isArray(messages) ? messages : [],
     };
 
+    console.log('Autosaving data:', JSON.stringify(draftData, null, 2));
+
+    const port = Number(backendPort) || 3001;
+    const url = `http://localhost:${port}/api/items/autosave-draft`;
+
     const response = await axios.post(
-      `http://localhost:${backendPort}/api/items/autosave-draft`,
+      url,
       { draftData },
       {
         headers: {
@@ -176,13 +191,26 @@ export const handleAutoSave = async (
       setItem(response.data.item);
       setUploadedImages(response.data.item.images || []);
       setHasUnsavedChanges(false);
-      setLastAutoSave(new Date());
+      if (typeof setLastAutoSave === 'function') {
+        setLastAutoSave(new Date());
+      } else {
+        console.warn('setLastAutoSave is not a function');
+      }
       onSuccess(response.data);
+      console.log('Autosave completed successfully'); // This log is now more prominent
     } else {
       throw new Error('Invalid response format from server');
     }
   } catch (error) {
     console.error('Error during autosave:', error);
+    if (error.response) {
+      console.error('Server responded with:', error.response.data);
+      console.error('Status code:', error.response.status);
+    } else if (error.request) {
+      console.error('No response received:', error.request);
+    } else {
+      console.error('Error setting up request:', error.message);
+    }
     onError(error);
   }
 };
@@ -208,6 +236,17 @@ export const handleLocalSave = (item, contextData, messages, ItemId) => {
     return;
   }
 
+  // Validate messages
+  const validMessages = Array.isArray(messages)
+    ? messages.filter(
+        (msg) =>
+          typeof msg === 'object' &&
+          msg !== null &&
+          'role' in msg &&
+          'content' in msg
+      )
+    : [];
+
   const itemToSave = {
     ...item,
     ItemId: effectiveItemId,
@@ -219,6 +258,7 @@ export const handleLocalSave = (item, contextData, messages, ItemId) => {
           isNew: img.isNew,
         }))
       : [],
+    messages: validMessages,
   };
 
   console.log(
@@ -230,11 +270,8 @@ export const handleLocalSave = (item, contextData, messages, ItemId) => {
     `contextData_${effectiveItemId}`,
     JSON.stringify(contextData || {})
   );
-  localStorage.setItem(
-    `messages_${effectiveItemId}`,
-    JSON.stringify(messages || [])
-  );
   console.log('Item saved successfully to localStorage');
+  console.log('Validated messages saved:', validMessages);
 };
 
 // Function to load local data based on itemId
@@ -275,28 +312,20 @@ export const updateContextData = (ItemId, newData) => {
 };
 
 // Function to save a draft (for ViewItemsPage)
-export const saveDraft = async (item, contextData, messages) => {
+export const saveDraft = async (draftData, contextData, messages) => {
   try {
-    console.log('Saving draft:', { item, uploadedImages: item.images });
-
-    // Ensure itemId is present
-    if (!item.itemId) {
-      throw new Error('itemId is required to save a draft');
+    if (!draftData || !draftData.itemId) {
+      throw new Error('itemId is required in draftData');
     }
 
-    const response = await axios.post(`${API_URL}/api/items/save-draft`, item);
+    const response = await axios.post(`${API_URL}/api/items/autosave-draft`, {
+      draftData,
+      contextData,
+      messages,
+    });
 
-    if (!response.data || !response.data.item) {
-      throw new Error('Failed to save draft to database');
-    }
-
-    const savedItem = response.data.item;
-
-    // Save locally
-    handleLocalSave(savedItem, contextData, messages, savedItem.itemId);
-
-    console.log('Draft saved successfully:', savedItem);
-    return savedItem;
+    console.log('Draft saved successfully:', response.data);
+    return response.data.item; // Make sure this includes the updated images
   } catch (error) {
     console.error('Error saving draft:', error);
     throw error;
@@ -307,11 +336,12 @@ export const saveDraft = async (item, contextData, messages) => {
 export const deleteDraft = async (draftId) => {
   try {
     const response = await axios.delete(
-      `${API_URL}/api/items/drafts/${draftId}`
+      `${API_URL}/api/items/drafts/${draftId}?deleteImages=true`
     );
+    console.log('Draft and associated images deleted successfully');
     return response.data;
   } catch (error) {
-    console.error('Error deleting draft:', error);
+    console.error('Error deleting draft and images:', error);
     throw error;
   }
 };
@@ -428,32 +458,57 @@ export const saveToLocalStorage = (itemId, data) => {
 export const handleManualSave = async (
   item,
   uploadedImages,
+  messages,
   backendPort,
   setItem,
   setUploadedImages,
   setHasUnsavedChanges,
   setLastAutoSave
 ) => {
+  // Create a Set of image URLs to ensure uniqueness
+  const uniqueImageUrls = new Set(item.images.map((img) => img.url));
+
   const combinedImages = [
-    ...item.images.filter((img) => !img.isNew),
-    ...uploadedImages.map((img) => ({
-      id: img.id,
-      url: img.url,
-      filename: img.filename,
-      isNew: img.isNew,
-    })),
+    ...item.images.filter((img) => uniqueImageUrls.has(img.url)),
+    ...uploadedImages
+      .filter((img) => !uniqueImageUrls.has(img.url))
+      .map((img) => ({
+        id: img.id,
+        url: img.url,
+        filename: img.filename,
+        isNew: img.isNew,
+      })),
   ];
+
+  // Validate and format messages
+  const validMessages = Array.isArray(messages)
+    ? messages.filter(
+        (msg) =>
+          typeof msg === 'object' &&
+          msg !== null &&
+          'role' in msg &&
+          'content' in msg
+      )
+    : [];
 
   const updatedItem = {
     ...item,
     images: combinedImages,
+    messages: validMessages, // Include validated messages in the updatedItem
   };
 
   try {
     let savedItem;
     if (item._id) {
       // If the item has an _id, it already exists in the database, so update it
-      savedItem = await updateItem(item._id, updatedItem);
+      savedItem = await updateItem(
+        item._id,
+        updatedItem,
+        {},
+        validMessages,
+        handleLocalSave,
+        setHasUnsavedChanges
+      );
     } else {
       // If the item doesn't have an _id, it's new, so create it
       savedItem = await createItem(updatedItem);
@@ -463,6 +518,7 @@ export const handleManualSave = async (
     setUploadedImages(savedItem.images || []);
     setHasUnsavedChanges(false);
     setLastAutoSave(new Date());
+    console.log('Saved item with messages:', savedItem.messages);
     return savedItem;
   } catch (error) {
     console.error('Error during manual save:', error);
@@ -480,12 +536,30 @@ export const updateItem = async (
   setHasUnsavedChanges
 ) => {
   try {
+    // Create a Set of image URLs to ensure uniqueness
+    const uniqueImageUrls = new Set(itemData.images.map((img) => img.url));
+
+    const updatedItemData = {
+      ...itemData,
+      images: itemData.images.filter((img) => uniqueImageUrls.has(img.url)),
+    };
+
     // Update local state
-    handleLocalSave(itemData, contextData, messages);
-    setHasUnsavedChanges(true);
+    if (typeof handleLocalSave === 'function') {
+      handleLocalSave(updatedItemData, contextData, messages);
+    } else {
+      console.warn('handleLocalSave is not a function, skipping local save');
+    }
+
+    if (typeof setHasUnsavedChanges === 'function') {
+      setHasUnsavedChanges(true);
+    }
 
     // Update in database
-    const response = await axios.put(`${API_URL}/api/items/${id}`, itemData);
+    const response = await axios.put(
+      `${API_URL}/api/items/${id}`,
+      updatedItemData
+    );
     console.log('Item updated:', response.data);
     return response.data;
   } catch (error) {
@@ -521,9 +595,12 @@ export const handleFileUpload = async (file, itemId) => {
   }
 };
 
-export const deleteAllDrafts = async () => {
+export const deleteAllDrafts = async (deleteImages = true) => {
   try {
-    const response = await axios.delete(`${API_URL}/api/items/drafts`);
+    const response = await axios.delete(`${API_URL}/api/items/drafts`, {
+      params: { deleteImages },
+    });
+    console.log('All drafts deleted successfully');
     return response.data;
   } catch (error) {
     console.error('Error deleting all drafts:', error);
@@ -535,6 +612,7 @@ export const deleteAllDrafts = async () => {
 export const useAutosave = (
   item,
   uploadedImages,
+  messages,
   backendPort,
   setItem,
   setUploadedImages,
@@ -542,33 +620,44 @@ export const useAutosave = (
   setLastAutoSave
 ) => {
   const debouncedAutoSave = useCallback(
-    debounce((currentItem, currentUploadedImages) => {
+    debounce(async (currentItem, currentUploadedImages, currentMessages) => {
       if (currentItem && currentItem.itemId) {
-        const dataToSave = {
-          ...currentItem,
-          images:
-            currentUploadedImages.length > 0
-              ? currentUploadedImages
-              : currentItem.images,
-        };
+        try {
+          // Validate messages
+          const validMessages = Array.isArray(currentMessages)
+            ? currentMessages.filter(
+                (msg) =>
+                  typeof msg === 'object' &&
+                  msg !== null &&
+                  'role' in msg &&
+                  'content' in msg
+              )
+            : [];
 
-        handleAutoSave(
-          dataToSave,
-          currentUploadedImages,
-          backendPort,
-          setItem,
-          setUploadedImages,
-          setHasUnsavedChanges,
-          setLastAutoSave,
-          () => {
-            console.log('Autosave successful');
-          },
-          (error) => {
-            console.error('Error auto-saving:', error);
-          }
-        );
+          // Prepare the item data for saving
+          const itemToSave = {
+            ...currentItem,
+            images: currentUploadedImages,
+            messages: validMessages,
+          };
+
+          // Save the item
+          const savedItem = await saveDraft(itemToSave, {}, validMessages);
+
+          // Update state
+          setItem(savedItem);
+          setUploadedImages(savedItem.images || []);
+          setHasUnsavedChanges(false);
+          setLastAutoSave(new Date());
+
+          console.log('Autosave successful');
+          console.log('uploadedImages updated:', savedItem.images);
+          console.log('Validated messages saved:', savedItem.messages);
+        } catch (error) {
+          console.error('Error auto-saving:', error);
+        }
       }
-    }, 30000), // Changed to 30000 milliseconds (30 seconds)
+    }, 15000),
     [
       backendPort,
       setItem,
@@ -580,9 +669,18 @@ export const useAutosave = (
 
   useEffect(() => {
     if (item && item.itemId) {
-      debouncedAutoSave(item, uploadedImages);
+      debouncedAutoSave(item, uploadedImages, messages);
     }
-  }, [item, uploadedImages, debouncedAutoSave]);
+
+    const intervalId = setInterval(() => {
+      if (item && item.itemId) {
+        console.log('Attempting autosave...');
+        debouncedAutoSave(item, uploadedImages, messages);
+      }
+    }, 15000);
+
+    return () => clearInterval(intervalId);
+  }, [item, uploadedImages, messages, debouncedAutoSave]);
 
   return debouncedAutoSave;
 };
