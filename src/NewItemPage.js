@@ -1,6 +1,6 @@
 // frontend/src/NewItemPage.js
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { debounce } from 'lodash'; // Change this line
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -17,7 +17,7 @@ import axios from 'axios';
 import { UploadedImagesGallery } from './components/compGallery.js';
 import PropTypes from 'prop-types';
 import ChatComp from './components/compChat.js';
-import { generateDraftFilename } from './components/compSave.js';
+
 import {
   handleDraftSave,
   handleAutoSave,
@@ -65,7 +65,17 @@ import {
   ModalButton,
   MainContentArea,
   ButtonContainer,
+  WarningBoxOverlay,
+  WarningBox,
+  WarningBoxButtons,
+  WarningButton,
 } from './components/compStyles.js';
+
+import {
+  generateDraftFilename,
+  getNextSequentialNumber,
+  getImageUrl,
+} from './helpers/itemGen.js';
 
 // Helper functions
 const getBase64 = (file) => {
@@ -81,14 +91,33 @@ const loadItemData = (itemId) => {
   return loadLocalData(itemId);
 };
 
-function NewItemPage({ setMostRecentItemId, currentItemId }) {
-  const { itemId } = useParams();
+function NewItemPage({ ItemId, setItemId }) {
+  console.log('ItemId:', ItemId);
   const navigate = useNavigate();
 
-  // ----------------------------
-  // Unconditionally declare Hooks
-  // ----------------------------
+  if (ItemId === null) {
+    return (
+      <WarningBoxOverlay>
+        <WarningBox>
+          <StyledTitle>Oops! No Item Found</StyledTitle>
+          <StyledSubtitle>
+            It looks like we couldn't find an item to work with. Let's head back
+            and start fresh!
+          </StyledSubtitle>
+          <WarningBoxButtons>
+            <WarningButton onClick={() => navigate('/')}>
+              OK, Take Me Back
+            </WarningButton>
+          </WarningBoxButtons>
+        </WarningBox>
+      </WarningBoxOverlay>
+    );
+  }
+
+  // State declarations
   const [item, setItem] = useState(null);
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [contextData, setContextData] = useState({});
   const [messages, setMessages] = useState([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -97,7 +126,11 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
   const [isLoading, setIsLoading] = useState(false);
   const [imageUploaded, setImageUploaded] = useState(false);
   const [imagePreview, setImagePreview] = useState('');
-  const [uploadedImages, setUploadedImages] = useState([]);
+  const [uploadedImages, setUploadedImages] = useState(() => {
+    const initialImages = loadLocalData(ItemId)?.uploadedImages;
+    console.log('Initial uploadedImages:', initialImages);
+    return Array.isArray(initialImages) ? initialImages : [];
+  });
   const [selectedImage, setSelectedImage] = useState(null);
   const [showImageModal, setShowImageModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -106,9 +139,8 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
   const [imageInput, setImageInput] = useState('');
   const [imageAnalysis, setImageAnalysis] = useState(null);
   const [imageAnalyzed, setImageAnalyzed] = useState(false);
-  const [imageAnalysisPrompt, setImageAnalysisPrompt] = useState('');
-  const [isPromptLoaded, setIsPromptLoaded] = useState(false);
   const [showNotification, setShowNotification] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState('');
   const [imageURL, setImageURL] = useState('');
 
   const fileInputRef = useRef(null);
@@ -130,38 +162,34 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
   // useEffect Hook: Load or Create Item
   // ---------------------------------
   useEffect(() => {
-    console.log('NewItemPage useEffect triggered with itemId:', itemId);
-    const loadedData = loadLocalData(itemId);
-    console.log('Loaded data from local storage:', loadedData);
-    if (loadedData && loadedData.item) {
-      console.log('Setting item state with loaded data:', loadedData.item);
-      setItem(loadedData.item);
-      console.log('Setting uploaded images:', loadedData.item.images || []);
-      setUploadedImages(loadedData.item.images || []);
-      setContextData(loadedData.contextData || {});
-      setMessages(loadedData.messages || []);
-    } else {
-      console.log('Creating new item with ID:', itemId);
-      const newItem = createDefaultItem(itemId);
-      console.log('New item created:', newItem);
-      setItem(newItem);
-      setUploadedImages([]);
+    if (!ItemId) {
+      console.error('No ItemId available');
+      // Handle this error, maybe redirect to the home page
+      return;
     }
 
-    // Fetch the image analysis prompt
-    const fetchImageAnalysisPrompt = async () => {
-      try {
-        const response = await axios.get(
-          `http://localhost:${backendPort}/api/image-analysis-prompt`
+    console.log('NewItemPage useEffect triggered with ItemId:', ItemId);
+
+    const loadItem = async () => {
+      let loadedItem = await loadLocalData(ItemId);
+      if (loadedItem) {
+        console.log('Loaded existing item from local storage:', loadedItem);
+        setItem(loadedItem);
+        // Initialize other state variables based on loadedItem
+        setName(loadedItem.name || '');
+        setDescription(loadedItem.description || '');
+        // ... initialize other state variables
+      } else {
+        console.error(
+          'Item not found in localStorage. This should not happen.'
         );
-        setImageAnalysisPrompt(response.data.IMAGE_ANALYSIS_PROMPT);
-      } catch (error) {
-        console.error('Error fetching image analysis prompt:', error);
+        // Handle this unexpected case, perhaps by redirecting to the home page
+        navigate('/');
       }
     };
 
-    fetchImageAnalysisPrompt();
-  }, [itemId, backendPort]);
+    loadItem();
+  }, [ItemId]);
 
   // Optimize the loadDraft function
   const loadDraft = (draftData) => {
@@ -182,10 +210,10 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
   // useEffect Hook: Save to localStorage
   // ----------------------------
   useEffect(() => {
-    if (item) {
-      handleLocalSave(item, contextData, messages);
+    if (item && ItemId) {
+      handleLocalSave(item, contextData, messages, ItemId);
     }
-  }, [item, contextData, messages]);
+  }, [item, contextData, messages, ItemId]);
 
   // ----------------------------
   // useEffect Hook: Clear localStorage on unmount
@@ -197,27 +225,6 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
       }
     };
   }, [item, contextData, messages]);
-
-  // ----------------------------
-  // useEffect Hook: Fetch Image Analysis Prompt
-  // ----------------------------
-  useEffect(() => {
-    const fetchImageAnalysisPrompt = async () => {
-      try {
-        const response = await fetch('/api/image-analysis-prompt');
-        if (!response.ok) {
-          throw new Error('Failed to fetch IMAGE_ANALYSIS_PROMPT');
-        }
-        const data = await response.json();
-        setImageAnalysisPrompt(data.IMAGE_ANALYSIS_PROMPT);
-        setIsPromptLoaded(true);
-      } catch (error) {
-        console.error('Error fetching IMAGE_ANALYSIS_PROMPT:', error);
-      }
-    };
-
-    fetchImageAnalysisPrompt();
-  }, []);
 
   // ----------------------------
   // useEffect Hook: Set Selected Image if Needed
@@ -359,7 +366,7 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
     }
   };
 
-  // Helper function to convert File to base64
+  // Keep the first declaration of fileToBase64 (around line 365)
   const fileToBase64 = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -369,49 +376,15 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
     });
   };
 
-  // Optimize the handleFileChange function
-  const handleFileChange = async (event) => {
-    console.log('handleFileChange called');
-    const files = event.target.files;
-    if (files && files.length > 0 && item.itemId) {
-      try {
-        console.log('Processing files:', files.length);
-        const existingFilenames = new Set(
-          item.images?.map((img) => img.filename) || []
-        );
-        const newImages = await Promise.all(
-          Array.from(files).map(async (file) => {
-            try {
-              console.log('Uploading file:', file.name);
-              const uploadedImage = await handleFileUpload(file, item.itemId);
-              console.log('Upload result:', uploadedImage);
-              return uploadedImage &&
-                !existingFilenames.has(uploadedImage.filename)
-                ? uploadedImage
-                : null;
-            } catch (error) {
-              console.error(`Error uploading file ${file.name}:`, error);
-              return null;
-            }
-          })
-        );
-
-        const validNewImages = newImages.filter(Boolean);
-        console.log('Valid new images:', validNewImages);
-
-        if (validNewImages.length > 0) {
-          setItem((prevItem) => ({
-            ...prevItem,
-            images: [...(prevItem.images || []), ...validNewImages],
-          }));
-          setUploadedImages((prevImages) => [...prevImages, ...validNewImages]);
-          setHasUnsavedChanges(true);
-          setImageUploaded(true);
-        }
-      } catch (error) {
-        console.error('Error processing images:', error);
-      }
-    }
+  const handleFileChangeWrapper = (event) => {
+    handleFileChange(
+      event,
+      item,
+      setItem,
+      setUploadedImages,
+      setHasUnsavedChanges,
+      setImageUploaded
+    );
   };
 
   // Send Image Message
@@ -482,7 +455,7 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
   const handleImageSelect = (event) => {
     console.log('Image select triggered');
     console.log('Selected files:', event.target.files);
-    handleFileChange(event);
+    handleFileChangeWrapper(event);
   };
 
   const handleImageButtonClick = () => {
@@ -523,54 +496,59 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
     );
   };
 
-  const updateItem = (field, value) => {
-    setItem((prevItem) => {
-      const updatedItem = { ...prevItem, [field]: value };
-      handleLocalSave(updatedItem, contextData, messages);
-      setHasUnsavedChanges(true);
-      debouncedAutoSave(updatedItem, uploadedImages);
-      return updatedItem;
-    });
-  };
+  // Update the updateItem function
+  const updateItem = useCallback(
+    (field, value) => {
+      setItem((prevItem) => {
+        if (!prevItem) {
+          console.error('updateItem: prevItem is null');
+          return null;
+        }
+
+        let updatedItem = { ...prevItem };
+
+        // Handle nested fields
+        if (field.includes('.')) {
+          const [parentField, childField] = field.split('.');
+          updatedItem[parentField] = {
+            ...updatedItem[parentField],
+            [childField]: value,
+          };
+        } else {
+          updatedItem[field] = value;
+        }
+
+        console.log('updateItem: Updating item:', updatedItem);
+        handleLocalSave(updatedItem, contextData, messages, ItemId);
+        setHasUnsavedChanges(true);
+        return updatedItem;
+      });
+    },
+    [contextData, messages, ItemId]
+  );
 
   // Add this new function to handle image analysis
   const handleAnalyzeImages = async () => {
-    if (!uploadedImages.length) {
-      alert('Please upload at least one image before analyzing.');
-      return;
-    }
-
-    setIsLoading(true);
-
+    setIsAnalyzing(true);
     try {
+      if (!description) {
+        throw new Error(
+          'Please provide a description before analyzing images.'
+        );
+      }
+
       const formData = new FormData();
-      uploadedImages.forEach((image, index) => {
-        formData.append('images', image.file || image.url);
-      });
-      formData.append('description', item.description || '');
-      formData.append('itemId', item.itemId);
+      formData.append('itemId', ItemId);
+      formData.append('description', description);
+      formData.append('base64Images', JSON.stringify(base64Images));
 
       const result = await analyzeImagesWithAssistant(formData);
-
-      updateItem({
-        ...result.item,
-        itemId: item.itemId,
-      });
-
-      setMessages((prevMessages) => [
-        ...prevMessages,
-        {
-          role: 'assistant',
-          content: result.advice,
-          source: 'moola-matic',
-          status: 'completed',
-        },
-      ]);
+      setAnalysisResult(result);
     } catch (error) {
       console.error('Error analyzing images:', error);
-      alert('An error occurred while analyzing the images. Please try again.');
+      setErrorMessage(error.message);
     } finally {
-      setIsLoading(false);
+      setIsAnalyzing(false);
     }
   };
 
@@ -598,16 +576,89 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
     }
   };
 
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const localData = loadItemData(ItemId);
+        console.log('Local data loaded:', localData);
+
+        if (localData) {
+          setItem(localData.item || createDefaultItem(ItemId));
+          console.log('Loaded images:', localData.uploadedImages);
+          setUploadedImages((prevImages) => {
+            console.log('Previous images:', prevImages);
+            return Array.isArray(localData.uploadedImages)
+              ? localData.uploadedImages
+              : [];
+          });
+          // ... load other data
+        } else {
+          console.log('No local data found, initializing with defaults');
+          setItem(createDefaultItem(ItemId));
+          setUploadedImages([]);
+        }
+      } catch (error) {
+        console.error('Error loading local data:', error);
+        setItem(createDefaultItem(ItemId));
+        setUploadedImages([]);
+      }
+    };
+
+    loadData();
+  }, [ItemId]);
+
+  useEffect(() => {
+    console.log('uploadedImages updated:', uploadedImages);
+  }, [uploadedImages]);
+
+  const handleSaveDraft = async () => {
+    if (!item) {
+      console.error('No item to save');
+      setNotificationMessage('Error: Unable to save draft (no item data)');
+      setShowNotification(true);
+      setTimeout(() => setShowNotification(false), 3000);
+      return;
+    }
+
+    if (!ItemId) {
+      console.error('Missing ItemId');
+      setNotificationMessage('Error: Unable to save draft (missing ItemId)');
+      setShowNotification(true);
+      setTimeout(() => setShowNotification(false), 3000);
+      return;
+    }
+
+    try {
+      console.log('Saving draft:', item);
+      const itemToSave = { ...item, itemId: ItemId };
+      const savedDraft = await saveDraft(itemToSave, contextData, messages);
+      console.log('Draft saved successfully:', savedDraft);
+
+      // Update the item state with the saved draft
+      setItem(savedDraft);
+
+      // Show a success notification
+      setNotificationMessage('Draft saved successfully!');
+      setShowNotification(true);
+      setTimeout(() => setShowNotification(false), 3000);
+    } catch (error) {
+      console.error('Error saving draft:', error);
+      setNotificationMessage(`Error saving draft: ${error.message}`);
+      setShowNotification(true);
+      setTimeout(() => setShowNotification(false), 3000);
+    }
+  };
+
   if (!item) {
     return <div>Loading...</div>;
   }
 
+  console.log('Current ItemId:', ItemId);
+
   return (
     <PageContainer>
       {showNotification && (
-        <StyledNotification>
-          Item successfully saved as draft
-        </StyledNotification>
+        <StyledNotification>{notificationMessage}</StyledNotification>
       )}
 
       <StyledHeader>
@@ -627,8 +678,8 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
             updateItem={updateItem}
             messages={messages}
             setMessages={setMessages}
-            currentItemId={item?.itemId} // Use optional chaining
-            onFileChange={handleFileChange} // Add this prop
+            ItemId={item?.itemId} // Use optional chaining
+            onFileChange={handleFileChangeWrapper} // Add this prop
             isLoading={isLoading}
             onStartLoading={handleStartLoading}
             onEndLoading={handleEndLoading}
@@ -659,7 +710,7 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
             onSelect={handleImageSelect}
             selectedImage={selectedImage}
             onDelete={handleDeleteImageWrapper}
-            itemId={item.itemId}
+            itemId={ItemId}
           />
 
           {/* Image Selection Modal */}
@@ -681,21 +732,25 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
           {/* Hidden File Inputs */}
           <input
             type="file"
-            ref={cameraInputRef}
+            ref={fileInputRef}
             style={{ display: 'none' }}
+            multiple
             accept="image/*"
-            capture="environment"
-            onChange={handleFileChange}
-            multiple // Add this attribute
+            onChange={(e) => {
+              console.log('File input change event triggered');
+              handleFileChange(setUploadedImages, ItemId)(e);
+            }}
           />
 
           <input
             type="file"
-            ref={fileInputRef}
-            accept="image/*"
+            id="images"
             multiple
-            onChange={handleImageSelect}
-            style={{ display: 'none' }}
+            accept="image/*"
+            onChange={(e) => {
+              console.log('File input change event triggered');
+              handleFileChange(setUploadedImages, ItemId)(e);
+            }}
           />
 
           <StyledForm onSubmit={handleSubmit}>
@@ -705,8 +760,8 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
               <StyledInput
                 type="text"
                 id="name"
-                value={item.name || ''}
-                onChange={(e) => updateItem('name', e.target.value)}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 required
               />
             </StyledFormGroup>
@@ -715,8 +770,8 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
               <StyledLabel htmlFor="description">Description</StyledLabel>
               <StyledTextarea
                 id="description"
-                value={item.description || ''}
-                onChange={(e) => updateItem('description', e.target.value)}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
                 rows="3"
               />
             </StyledFormGroup>
@@ -950,19 +1005,7 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
             <StyledButton type="submit">Save Item</StyledButton>
           </StyledForm>
 
-          <StyledButton
-            onClick={() => {
-              if (item && item.itemId) {
-                debouncedAutoSave(item, uploadedImages);
-                setShowNotification(true);
-                setTimeout(() => setShowNotification(false), 3000); // Hide notification after 3 seconds
-              } else {
-                console.error('Cannot save: item or itemId is missing');
-              }
-            }}
-          >
-            Save Draft
-          </StyledButton>
+          <StyledButton onClick={handleSaveDraft}>Save Draft</StyledButton>
 
           {lastAutoSave && (
             <p>Last auto-save: {lastAutoSave.toLocaleTimeString()}</p>
@@ -976,8 +1019,8 @@ function NewItemPage({ setMostRecentItemId, currentItemId }) {
 }
 
 NewItemPage.propTypes = {
-  setMostRecentItemId: PropTypes.func.isRequired,
-  currentItemId: PropTypes.string,
+  ItemId: PropTypes.string,
+  setItemId: PropTypes.func.isRequired,
 };
 
 export default NewItemPage;

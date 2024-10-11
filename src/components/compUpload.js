@@ -1,146 +1,77 @@
 // frontend/src/components/compUpload.js
 
 import axios from 'axios';
-import { generateDraftFilename } from './compSave.js';
+import {
+  generateDraftFilename,
+  getNextSequentialNumber,
+  getImageUrl,
+  getGeneratedItemId,
+} from '../helpers/itemGen.js';
 
 // Function to handle file upload
-export const handleFileUpload = async (
-  file,
-  backendPort,
-  item,
-  sequentialNumber
-) => {
-  console.log('Uploading file:', file.name, 'for item:', item.itemId);
-  const formData = new FormData();
-  formData.append('image', file);
-  formData.append('itemId', item.itemId);
-
-  const uniqueFilename = generateDraftFilename(
-    item.itemId,
-    sequentialNumber,
-    file.name
-  );
-  console.log('Generated unique filename:', uniqueFilename);
-  formData.append('filename', uniqueFilename);
-
+export const handleFileUpload = async (file, itemId) => {
   try {
-    console.log(
-      'Sending request to:',
-      `http://localhost:${backendPort}/api/draft-image/upload`
+    // Get the next sequential number from the server
+    const response = await axios.get(
+      `/api/items/draft-images/next-sequence/${itemId}`
     );
-    const response = await axios.post(
-      `http://localhost:${backendPort}/api/draft-image/upload`,
+    const nextSequentialNumber = response.data.nextSequentialNumber;
+
+    const formData = new FormData();
+    formData.append('image', file);
+    formData.append('itemId', itemId);
+    formData.append('sequentialNumber', nextSequentialNumber);
+
+    const uploadResponse = await axios.post(
+      '/api/items/draft-images/upload',
       formData,
       {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        headers: { 'Content-Type': 'multipart/form-data' },
       }
     );
 
-    console.log('Server response:', response.data);
-
-    const newImage = {
-      id: `image-${Date.now()}`,
-      url: `http://localhost:${backendPort}${response.data.url}`,
-      filename: uniqueFilename, // Use the generated filename here
-      isNew: true,
-    };
-
-    console.log('New image created:', newImage);
-    return { newImage, response: response.data };
+    return uploadResponse.data;
   } catch (error) {
-    console.error('Error uploading image:', error);
-    if (error.response) {
-      console.error('Server error response:', error.response.data);
-    }
-    throw error;
+    console.error('Error uploading file:', error);
+    return null;
   }
 };
 
 // Function to handle file change (multiple file upload)
-export const handleFileChange = async (
-  event,
-  item,
-  backendPort,
-  setItem,
-  setUploadedImages,
-  setHasUnsavedChanges,
-  setImageUploaded
-) => {
-  const files = event.target.files;
-  if (files && files.length > 0) {
-    if (!item.itemId) {
-      console.error('Item ID is missing');
-      return;
-    }
+export const handleFileChange = (setUploadedImages, itemId) => async (e) => {
+  const files = Array.from(e.target.files);
+  console.log('Files selected:', files);
 
-    try {
-      const newImages = [];
-      const existingFilenames = new Set(
-        item.images?.map((img) => img.filename) || []
-      );
-
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const sequentialNumber = (item.images?.length || 0) + i + 1;
-
-        const { newImage } = await handleFileUpload(
-          file,
-          backendPort,
-          item,
-          sequentialNumber
-        );
-
-        if (newImage && !existingFilenames.has(newImage.filename)) {
-          newImages.push(newImage);
-          existingFilenames.add(newImage.filename);
-        }
-      }
-
-      if (newImages.length > 0) {
-        setItem((prevItem) => ({
-          ...prevItem,
-          images: [...(prevItem.images || []), ...newImages],
-        }));
-
-        setUploadedImages((prevImages) => [...prevImages, ...newImages]);
-        setHasUnsavedChanges(true);
-        setImageUploaded(true);
-      }
-    } catch (error) {
-      console.error('Error processing images:', error);
-    }
+  if (!files.length) {
+    console.log('No files selected');
+    return;
   }
-};
-
-// Function to handle image deletion
-export const handleDeleteImage = (
-  imageToDelete,
-  setItem,
-  setUploadedImages,
-  setHasUnsavedChanges
-) => {
-  setItem((prevItem) => ({
-    ...prevItem,
-    images: prevItem.images.filter((img) => img.id !== imageToDelete.id),
-  }));
-
-  setUploadedImages((prevImages) =>
-    prevImages.filter((img) => img.id !== imageToDelete.id)
-  );
-
-  setHasUnsavedChanges(true);
-};
-
-// Function to delete image from frontend
-export const deleteImageFromFrontend = async (image) => {
-  // Extract the filename from the image object
-  const filename = image.filename || image.url.split('/').pop();
-
-  console.log(`Attempting to delete frontend image: ${filename}`);
 
   try {
+    console.log('Starting file upload process');
+    const uploadedImages = await handleMultipleFileUploads(files, itemId);
+    console.log('Uploaded images:', uploadedImages);
+
+    setUploadedImages((prevImages) => {
+      console.log('Previous images:', prevImages);
+      const updatedImages = Array.isArray(prevImages)
+        ? [...prevImages, ...uploadedImages]
+        : uploadedImages;
+      console.log('Updated images:', updatedImages);
+      return updatedImages;
+    });
+  } catch (error) {
+    console.error('Error handling file change:', error);
+  }
+};
+// Function to process frontend image deletion
+export const processFrontendImageDeletion = (image) => {
+  try {
+    // Extract the filename from the image object
+    const filename = image.filename || image.url.split('/').pop();
+
+    console.log(`Attempting to delete frontend image: ${filename}`);
+
     // Here, we're not making an API call. Instead, we'll return the filename
     // so it can be used to update the UI
     return { success: true, filename };
@@ -156,7 +87,6 @@ export const handleImageDeletion = async (
   setItem,
   setUploadedImages,
   setHasUnsavedChanges,
-  backendPort,
   item // Renamed from draftData to item
 ) => {
   console.log('Image to delete:', imageToDelete);
@@ -167,18 +97,20 @@ export const handleImageDeletion = async (
     }
 
     // Delete the image from the server
-    await deleteImageFromServer(imageToDelete, backendPort, item.itemId);
+    await deleteImageFromServer(imageToDelete, item.itemId);
 
     // Update the UI
-    const updatedImages = item.images.filter(
-      (img) => img.id !== imageToDelete.id
-    );
-    setItem((prevItem) => ({
-      ...prevItem,
-      images: updatedImages,
-    }));
-    setUploadedImages(updatedImages);
-    setHasUnsavedChanges(true);
+    setItem((prevItem) => {
+      const updatedImages = prevItem.images.filter(
+        (img) => img.id !== imageToDelete.id
+      );
+      setUploadedImages(updatedImages);
+      setHasUnsavedChanges(true);
+      return {
+        ...prevItem,
+        images: updatedImages,
+      };
+    });
 
     console.log('Image deleted successfully from UI and server');
   } catch (error) {
@@ -188,15 +120,15 @@ export const handleImageDeletion = async (
 };
 
 // Updated function to delete image from server
-export const deleteImageFromServer = async (image, backendPort, itemId) => {
+export const deleteImageFromServer = async (image, itemId) => {
   try {
-    console.log('Deleting image from server:', { image, backendPort, itemId });
+    console.log('Deleting image from server:', { image, itemId });
     if (!itemId) {
       console.error('ItemId is undefined when trying to delete image');
       throw new Error('ItemId is required to delete an image');
     }
     const response = await axios.delete(
-      `http://localhost:${backendPort}/api/draft-image/${itemId}/${image.filename}`
+      `/api/items/draft-images/delete/${itemId}/${image.filename}`
     );
     console.log('Image deleted from server:', response.data);
     return response.data;
@@ -209,4 +141,11 @@ export const deleteImageFromServer = async (image, backendPort, itemId) => {
     }
     throw error;
   }
+};
+
+// Function to handle multiple file uploads
+export const handleMultipleFileUploads = async (files, itemId) => {
+  const uploadPromises = files.map((file) => handleFileUpload(file, itemId));
+  const results = await Promise.all(uploadPromises);
+  return results.filter((result) => result !== null);
 };

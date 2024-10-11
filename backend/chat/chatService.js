@@ -3,7 +3,7 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import chatHandler from './chatHandler.js'; // Updated import statement
+import { interactWithMoolaMaticAssistant } from './chatHandler.js'; // Updated import statement
 
 // Resolve __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -44,11 +44,15 @@ export const manageContext = async (messages) => {
  */
 export const handleMoolaMaticChat = async (messages, session) => {
   try {
-    // Interact with the assistant, passing the session
-    const assistantResponse = await interactWithMoolaMaticAssistant(
-      messages,
-      session
-    );
+    if (!messages || !Array.isArray(messages)) {
+      throw new Error('Invalid messages format');
+    }
+    // Use the interactWithMoolaMaticAssistant function
+    const assistantResponse = await interactWithMoolaMaticAssistant({
+      action: 'process_messages',
+      messages: messages,
+      session: session,
+    });
     return assistantResponse;
   } catch (error) {
     console.error('Error in handleMoolaMaticChat:', error);

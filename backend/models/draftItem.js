@@ -3,7 +3,11 @@ import mongoose from 'mongoose';
 const draftItemSchema = new mongoose.Schema(
   {
     // Basic item information
-    itemId: { type: String, unique: true, required: true },
+    itemId: {
+      type: String,
+      required: true,
+      unique: true,
+    },
     name: String,
     description: String,
     category: String,

@@ -2,14 +2,14 @@
 
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types'; // Import PropTypes
-import { Route, Routes, useNavigate, Link } from 'react-router-dom';
+import { Route, Routes, useNavigate, Link, Navigate } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import moolaMaticLogo from './Images/Moola-Matic Logo 01.jpeg';
 import NewItemPage from './NewItemPage.js';
 import ViewItemsPage from './ViewItemsPage.js';
-import { v4 as uuidv4 } from 'uuid';
-import { handleNewItem, handleLocalSave } from './components/compSave.js';
+import { handleLocalSave } from './components/compSave.js';
+import { saveToLocalStorage } from './components/compSave.js';
 import {
   PageContainer,
   StyledButton,
@@ -33,8 +33,15 @@ import {
   ButtonContainer,
 } from './components/compStyles.js';
 
-// Export the UUID generation function
-export const generateItemId = () => uuidv4();
+// Add this import near the top of the file
+import {
+  generateItemId,
+  createDefaultItem,
+  resetItemGeneration,
+  createNewItem,
+} from './helpers/itemGen.js';
+
+import { getCurrentItemId } from './helpers/itemGen.js';
 
 /**
  * Sidebar Component
@@ -107,7 +114,7 @@ WarningBoxModal.propTypes = {
  * LandingPage Component
  * The home page of the application where users can start adding new items or view existing ones.
  */
-function LandingPage({ handleNewItem, setCurrentItemId, setMostRecentItemId }) {
+function LandingPage({ setItemId }) {
   const navigate = useNavigate();
   const [showWarning, setShowWarning] = useState(false);
 
@@ -115,29 +122,52 @@ function LandingPage({ handleNewItem, setCurrentItemId, setMostRecentItemId }) {
     setShowWarning(true);
   };
 
-  const handleProceed = () => {
+  const handleGoBack = () => {
+    setShowWarning(false);
+  };
+
+  // Add this function to check if an item exists in localStorage
+  const checkItemInLocalStorage = (itemId) => {
+    const item = localStorage.getItem(`item_${itemId}`);
+    return item !== null;
+  };
+
+  const handleProceed = async () => {
     console.log('handleProceed: User confirmed, creating new item');
     setShowWarning(false);
 
     // Clear all unsaved variables
-    setCurrentItemId(null);
-    setMostRecentItemId(null);
+    setItemId(null);
     localStorage.clear();
     sessionStorage.clear();
 
-    // Create a new itemId
-    const newItemId = generateItemId();
-    console.log('handleProceed: Generated new itemId:', newItemId);
-    setCurrentItemId(newItemId);
-    setMostRecentItemId(newItemId);
+    // Reset the item generation state
+    resetItemGeneration();
 
-    // Navigate to the new item page
-    console.log('handleProceed: Navigating to:', `/new-item/${newItemId}`);
-    navigate(`/new-item/${newItemId}`);
-  };
+    try {
+      // Create a new item using the centralized function
+      const newItemId = await createNewItem();
+      console.log('handleProceed: New item created with ID:', newItemId);
 
-  const handleGoBack = () => {
-    setShowWarning(false);
+      // Set the new ItemId
+      setItemId(newItemId);
+
+      // Check if the item exists in localStorage
+      const itemExists = checkItemInLocalStorage(newItemId);
+      if (itemExists) {
+        console.log('Item found in localStorage. Proceeding with navigation.');
+        console.log('About to navigate...');
+        // Navigate to the new item page
+        navigate(`/new-item/${newItemId}`);
+        console.log('Navigation called');
+      } else {
+        console.error('Item not found in localStorage. Navigation aborted.');
+        // Handle the error appropriately, maybe show an error message to the user
+      }
+    } catch (error) {
+      console.error('Error creating new item:', error);
+      // Handle the error appropriately
+    }
   };
 
   return (
@@ -174,9 +204,7 @@ function LandingPage({ handleNewItem, setCurrentItemId, setMostRecentItemId }) {
 
 // Update PropTypes
 LandingPage.propTypes = {
-  handleNewItem: PropTypes.func.isRequired,
-  setCurrentItemId: PropTypes.func.isRequired,
-  setMostRecentItemId: PropTypes.func.isRequired,
+  setItemId: PropTypes.func.isRequired,
 };
 
 /**
@@ -252,66 +280,36 @@ function NotFound() {
  * The root component of the application that sets up routing, state management, and context persistence.
  */
 function App() {
-  return <AppContent />;
-}
-
-function AppContent() {
   const [currentItemId, setCurrentItemId] = useState(null);
-  const [mostRecentItemId, setMostRecentItemId] = useState(null);
-  const navigate = useNavigate();
 
-  // Add this function to handle logout
+  const updateCurrentItemId = async (newItemId) => {
+    setCurrentItemId(newItemId);
+    // You might want to add logic here to update the itemId in itemGen as well
+  };
+
   const handleLogout = () => {
-    // Implement your logout logic here
-    // For example:
-    // Clear any user-related data from localStorage
-    localStorage.removeItem('mostRecentItemId');
-    // Reset state
     setCurrentItemId(null);
-    setMostRecentItemId(null);
-    // Navigate to the home page or login page
+    localStorage.removeItem('currentItemId');
     navigate('/');
   };
 
-  useEffect(() => {
-    if (mostRecentItemId) {
-      localStorage.setItem('mostRecentItemId', mostRecentItemId);
-    }
-  }, [mostRecentItemId]);
-
-  const handleNewItemClick = () => {
-    console.log('handleNewItemClick: Creating new item');
-    // Clear all unsaved variables
-    setCurrentItemId(null);
-    setMostRecentItemId(null);
-    localStorage.clear(); // This clears all localStorage items
-    sessionStorage.clear(); // Clear any session storage as well
-
-    // Create a new itemId
-    const newItemId = generateItemId();
-    setCurrentItemId(newItemId);
-    setMostRecentItemId(newItemId);
-
-    // Navigate to the new item page
-    navigate(`/new-item/${newItemId}`);
-
-    console.log('handleNewItemClick: New item created with ID:', newItemId);
-
-    return newItemId;
+  const checkItemInLocalStorage = (itemId) => {
+    const item = localStorage.getItem(`item_${itemId}`);
+    return item !== null;
   };
 
   const handleChangeItem = () => {
-    if (mostRecentItemId) {
-      setCurrentItemId(mostRecentItemId);
-      navigate(`/new-item/${mostRecentItemId}`);
+    if (currentItemId) {
+      navigate(`/new-item/${currentItemId}`);
     } else {
-      handleNewItemClick();
+      navigate('/');
     }
   };
 
-  useEffect(() => {
-    console.log('App: currentItemId changed to:', currentItemId);
-  }, [currentItemId]);
+  const handleSetItemId = (newItemId) => {
+    console.log('Setting new ItemId:', newItemId);
+    setCurrentItemId(newItemId);
+  };
 
   return (
     <ErrorBoundary>
@@ -324,33 +322,34 @@ function AppContent() {
           <Routes>
             <Route
               path="/"
-              element={
-                <LandingPage
-                  handleNewItem={handleNewItemClick}
-                  setCurrentItemId={setCurrentItemId}
-                  setMostRecentItemId={setMostRecentItemId}
-                />
-              }
+              element={<LandingPage setItemId={handleSetItemId} />}
             />
             <Route
               path="/new-item"
               element={
+                currentItemId ? (
+                  <NewItemPage
+                    ItemId={currentItemId}
+                    setItemId={handleSetItemId}
+                  />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              }
+            />
+            <Route
+              path="/new-item/:ItemId"
+              element={
                 <NewItemPage
-                  setMostRecentItemId={setMostRecentItemId}
-                  currentItemId={currentItemId}
+                  ItemId={currentItemId || ''}
+                  setItemId={handleSetItemId}
                 />
               }
             />
             <Route
-              path="/new-item/:itemId"
-              element={
-                <NewItemPage
-                  setMostRecentItemId={setMostRecentItemId}
-                  currentItemId={currentItemId}
-                />
-              }
+              path="/view-items"
+              element={<ViewItemsPage currentItemId={currentItemId || ''} />}
             />
-            <Route path="/view-items" element={<ViewItemsPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </MainContent>

@@ -1,26 +1,20 @@
 // frontend/src/components/compGallery.js
 
 import React from 'react';
+import PropTypes from 'prop-types';
 import {
   GalleryContainer,
   ImageContainer,
   StyledImage,
   HoverDeleteButton,
   ErrorImagePlaceholder,
-  DraftItemOverlay, // Make sure this line is present
 } from './compStyles.js';
 
-import PropTypes from 'prop-types';
+import { getImageUrl } from '../helpers/itemGen.js'; // Import getImageUrl from itemGen.js
 
-const backendPort = process.env.REACT_APP_BACKEND_PORT || 3001;
+const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
 
-const getImageUrl = (itemId, filename) => {
-  if (!itemId || !filename) {
-    console.error('Invalid itemId or filename:', { itemId, filename });
-    return null;
-  }
-  return `http://localhost:${backendPort}/uploads/drafts/${itemId}/${filename}`;
-};
+// Remove the duplicate getImageUrl function declaration
 
 export const UploadedImagesGallery = ({
   images,
@@ -66,15 +60,11 @@ export const UploadedImagesGallery = ({
               <StyledImage
                 src={imageUrl}
                 alt={`Uploaded image ${image.filename || 'unnamed'}`}
-                onError={() => {
-                  if ((retryCount[image.id] || 0) < 3) {
-                    console.log(`Retrying image: ${imageUrl}`);
-                    setTimeout(() => retryImage(image.id), 2000);
-                  } else {
-                    console.error(
-                      `Failed to load image after retries: ${imageUrl}`
-                    );
-                  }
+                onError={(e) => {
+                  console.error(`Failed to load image: ${imageUrl}`);
+                  e.target.onerror = null; // Prevent infinite loop
+                  e.target.style.display = 'none'; // Hide the broken image
+                  e.target.parentElement.style.backgroundColor = '#f0f0f0'; // Change background color
                 }}
               />
             ) : (
@@ -96,48 +86,52 @@ export const UploadedImagesGallery = ({
   );
 };
 
-export const DraftItemGallery = ({ items, onSelect, onDelete }) => {
-  console.log('Rendering DraftItemGallery with items:', items);
-  const [retryCount, setRetryCount] = React.useState({});
+UploadedImagesGallery.propTypes = {
+  images: PropTypes.arrayOf(
+    PropTypes.shape({
+      id: PropTypes.string,
+      filename: PropTypes.string,
+    })
+  ).isRequired,
+  onSelect: PropTypes.func.isRequired,
+  selectedImage: PropTypes.object,
+  onDelete: PropTypes.func.isRequired,
+  itemId: PropTypes.string.isRequired,
+};
 
-  const retryImage = (itemId) => {
-    setRetryCount((prev) => ({
-      ...prev,
-      [itemId]: (prev[itemId] || 0) + 1,
-    }));
-  };
+export const DraftItemGallery = ({ items, onSelect, onDelete }) => {
+  if (items.length === 0) {
+    return <div>No drafts available</div>;
+  }
 
   return (
-    <GalleryContainer $isDraftGallery>
+    <GalleryContainer>
       {items.map((item, index) => {
-        console.log('Rendering draft item:', item);
+        console.log('Draft item:', item);
         const imageUrl =
-          item.images && item.images.length > 0
-            ? getImageUrl(item.itemId, item.images[0].filename)
-            : null;
-        console.log('Image URL for draft item:', imageUrl);
-        const displayText = (item.name || item.itemId || '').slice(-6);
+          item.imageUrl ||
+          (item.images &&
+            item.images[0] &&
+            getImageUrl(item.itemId, item.images[0].filename)) ||
+          getImageUrl(item.itemId, item.filename);
+        console.log('Draft image URL:', imageUrl);
+        const uniqueKey = `${item.itemId || item._id || ''}-${index}`;
         return (
-          <ImageContainer key={item.itemId} onClick={() => onSelect(item)}>
+          <ImageContainer key={uniqueKey} onClick={() => onSelect(item)}>
             {imageUrl ? (
               <StyledImage
                 src={imageUrl}
-                alt={`Draft item ${index + 1}`}
-                onError={() => {
-                  if ((retryCount[item.itemId] || 0) < 3) {
-                    console.log(`Retrying image: ${imageUrl}`);
-                    setTimeout(() => retryImage(item.itemId), 2000);
-                  } else {
-                    console.error(
-                      `Failed to load image after retries: ${imageUrl}`
-                    );
-                  }
+                alt={`Draft image ${item.name || 'unnamed'}`}
+                onError={(e) => {
+                  console.error(`Failed to load image: ${imageUrl}`);
+                  e.target.onerror = null;
+                  e.target.style.display = 'none';
+                  e.target.parentElement.style.backgroundColor = '#f0f0f0';
                 }}
               />
             ) : (
               <ErrorImagePlaceholder>No Image</ErrorImagePlaceholder>
             )}
-            <DraftItemOverlay>{displayText}</DraftItemOverlay>
             <HoverDeleteButton
               onClick={(e) => {
                 e.stopPropagation();
@@ -154,16 +148,74 @@ export const DraftItemGallery = ({ items, onSelect, onDelete }) => {
   );
 };
 
-UploadedImagesGallery.propTypes = {
-  images: PropTypes.array.isRequired,
+DraftItemGallery.propTypes = {
+  items: PropTypes.arrayOf(
+    PropTypes.shape({
+      itemId: PropTypes.string,
+      _id: PropTypes.string,
+      imageUrl: PropTypes.string,
+      filename: PropTypes.string,
+      name: PropTypes.string,
+    })
+  ).isRequired,
   onSelect: PropTypes.func.isRequired,
-  selectedImage: PropTypes.object,
   onDelete: PropTypes.func.isRequired,
-  itemId: PropTypes.string.isRequired,
 };
 
-DraftItemGallery.propTypes = {
-  items: PropTypes.array.isRequired,
+export const PurchasedItemGallery = ({ items, onSelect, onDelete }) => {
+  if (items.length === 0) {
+    return <div>No purchased items available</div>;
+  }
+
+  return (
+    <GalleryContainer>
+      {items.map((item, index) => {
+        const imageUrl =
+          item.imageUrl || getImageUrl(item.itemId, item.filename);
+        const uniqueKey = `${item.id || item._id || ''}-${index}`;
+        return (
+          <ImageContainer key={uniqueKey} onClick={() => onSelect(item)}>
+            {imageUrl ? (
+              <StyledImage
+                src={imageUrl}
+                alt={`Purchased item ${item.name || 'unnamed'}`}
+                onError={(e) => {
+                  console.error(`Failed to load image: ${imageUrl}`);
+                  e.target.onerror = null;
+                  e.target.style.display = 'none';
+                  e.target.parentElement.style.backgroundColor = '#f0f0f0';
+                }}
+              />
+            ) : (
+              <ErrorImagePlaceholder>No Image</ErrorImagePlaceholder>
+            )}
+            <HoverDeleteButton
+              onClick={(e) => {
+                e.stopPropagation();
+                console.log('Deleting purchased item:', item);
+                onDelete(item);
+              }}
+            >
+              ×
+            </HoverDeleteButton>
+          </ImageContainer>
+        );
+      })}
+    </GalleryContainer>
+  );
+};
+
+PurchasedItemGallery.propTypes = {
+  items: PropTypes.arrayOf(
+    PropTypes.shape({
+      id: PropTypes.string,
+      _id: PropTypes.string,
+      itemId: PropTypes.string,
+      imageUrl: PropTypes.string,
+      filename: PropTypes.string,
+      name: PropTypes.string,
+    })
+  ).isRequired,
   onSelect: PropTypes.func.isRequired,
   onDelete: PropTypes.func.isRequired,
 };

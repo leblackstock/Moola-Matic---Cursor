@@ -13,21 +13,21 @@ export const generateDraftFilename = (
   const fileExtension = originalFilename.includes('.')
     ? originalFilename.split('.').pop().toLowerCase()
     : 'jpg';
-  const paddedSequentialNumber = String(sequentialNumber).padStart(1, '0');
+  const paddedSequentialNumber = String(sequentialNumber).padStart(2, '0');
   return `Draft-${itemId.slice(-6)}-${paddedSequentialNumber}.${fileExtension}`;
 };
 
 // Define API_URL
 const BACKEND_PORT = process.env.REACT_APP_BACKEND_PORT || 3001;
-const API_URL = `http://localhost:${BACKEND_PORT}/api`;
+const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
 
 // Function to create a default item
-export const createDefaultItem = (itemId) => {
-  if (!itemId) {
+export const createDefaultItem = (ItemId) => {
+  if (!ItemId) {
     throw new Error('ItemId is required when creating a new item');
   }
   return {
-    itemId: itemId,
+    ItemId: ItemId,
     name: '',
     description: '',
     category: '',
@@ -65,27 +65,21 @@ export const createDefaultItem = (itemId) => {
 };
 
 // Function to handle new item creation
-export const handleNewItem = (
-  itemId,
-  setCurrentItemId,
-  setMostRecentItemId,
-  navigate
-) => {
-  const newItem = createDefaultItem(itemId);
+export const handleNewItem = (ItemId, setItemId, navigate) => {
+  const newItem = createDefaultItem(ItemId);
 
   // Clear any existing local storage for this new item
-  localStorage.removeItem(`item_${itemId}`);
-  localStorage.removeItem(`contextData_${itemId}`);
-  localStorage.removeItem(`messages_${itemId}`);
+  localStorage.removeItem(`item_${ItemId}`);
+  localStorage.removeItem(`contextData_${ItemId}`);
+  localStorage.removeItem(`messages_${ItemId}`);
 
   // Save the new empty item to local storage
   handleLocalSave(newItem, {}, []);
 
-  setCurrentItemId(itemId);
-  setMostRecentItemId(itemId);
+  setItemId(ItemId);
 
-  navigate(`/new-item/${itemId}`);
-  return itemId;
+  navigate(`/new-item/${ItemId}`);
+  return ItemId;
 };
 
 // Function to handle draft save
@@ -169,7 +163,7 @@ export const handleAutoSave = async (
     };
 
     const response = await axios.post(
-      `http://localhost:${backendPort}/api/autosave-draft`,
+      `http://localhost:${backendPort}/api/items/autosave-draft`,
       { draftData },
       {
         headers: {
@@ -194,51 +188,50 @@ export const handleAutoSave = async (
 };
 
 // Function to handle local save
-export const handleLocalSave = (item, contextData, messages) => {
-  if (!item || !item.itemId) {
-    console.error('Cannot save item without a valid itemId');
+export const handleLocalSave = (item, contextData, messages, ItemId) => {
+  if (!item || !ItemId) {
+    console.error('Cannot save item without a valid item or ItemId');
     return;
   }
 
   const itemToSave = {
     ...item,
-    images: item.images.map((img) => ({
-      id: img.id,
-      url: img.url,
-      filename: img.filename,
-      isNew: img.isNew,
-    })),
+    ItemId, // Ensure ItemId is included in the saved item
+    images: item.images
+      ? item.images.map((img) => ({
+          id: img.id,
+          url: img.url,
+          filename: img.filename,
+          isNew: img.isNew,
+        }))
+      : [],
   };
 
-  localStorage.setItem(`item_${item.itemId}`, JSON.stringify(itemToSave));
+  localStorage.setItem(`item_${ItemId}`, JSON.stringify(itemToSave));
   localStorage.setItem(
-    `contextData_${item.itemId}`,
-    JSON.stringify(contextData)
+    `contextData_${ItemId}`,
+    JSON.stringify(contextData || {})
   );
-  localStorage.setItem(`messages_${item.itemId}`, JSON.stringify(messages));
+  localStorage.setItem(`messages_${ItemId}`, JSON.stringify(messages || []));
 };
 
 // Function to load local data based on itemId
 export const loadLocalData = (itemId) => {
-  console.log('Loading local data for itemId:', itemId);
-  if (!itemId) {
-    console.error('Invalid itemId:', itemId);
-    return null;
-  }
-  const key = `item_${itemId}`;
-  const storedData = localStorage.getItem(key);
-  console.log('Retrieved data from local storage:', storedData);
-  if (storedData) {
-    try {
-      const parsedData = JSON.parse(storedData);
-      console.log('Parsed local data:', parsedData);
-      return parsedData;
-    } catch (error) {
-      console.error('Error parsing stored data:', error);
-      return null;
+  try {
+    const storedItem = localStorage.getItem(`item_${itemId}`);
+    if (storedItem) {
+      const parsedItem = JSON.parse(storedItem);
+      console.log('Loaded local data:', parsedItem);
+      return {
+        item: parsedItem,
+        uploadedImages: Array.isArray(parsedItem.images)
+          ? parsedItem.images
+          : [],
+      };
     }
+  } catch (error) {
+    console.error('Error loading local data:', error);
   }
-  console.log('No data found in local storage for key:', key);
   return null;
 };
 
@@ -249,16 +242,16 @@ export const clearLocalData = () => {
 };
 
 // Function to update context data
-export const updateContextData = (itemId, newData) => {
+export const updateContextData = (ItemId, newData) => {
   try {
     const prevData =
-      JSON.parse(localStorage.getItem(`contextData_${itemId}`)) || {};
+      JSON.parse(localStorage.getItem(`contextData_${ItemId}`)) || {};
     const updatedData = {
       ...prevData,
       ...newData,
-      itemId: itemId,
+      ItemId: ItemId,
     };
-    localStorage.setItem(`contextData_${itemId}`, JSON.stringify(updatedData));
+    localStorage.setItem(`contextData_${ItemId}`, JSON.stringify(updatedData));
     return updatedData;
   } catch (error) {
     console.error('Error updating context data:', error);
@@ -267,20 +260,40 @@ export const updateContextData = (itemId, newData) => {
 };
 
 // Function to save a draft (for ViewItemsPage)
-export const saveDraft = async (item) => {
-  const response = await fetch('/api/save-draft', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(item),
-  });
-  if (!response.ok) throw new Error('Failed to save draft.');
-  return await response.json();
+export const saveDraft = async (item, contextData, messages) => {
+  try {
+    console.log('Saving draft:', { item, uploadedImages: item.images });
+
+    // Ensure itemId is present
+    if (!item.itemId) {
+      throw new Error('itemId is required to save a draft');
+    }
+
+    const response = await axios.post(`${API_URL}/api/items/save-draft`, item);
+
+    if (!response.data || !response.data.item) {
+      throw new Error('Failed to save draft to database');
+    }
+
+    const savedItem = response.data.item;
+
+    // Save locally
+    handleLocalSave(savedItem, contextData, messages, savedItem.itemId);
+
+    console.log('Draft saved successfully:', savedItem);
+    return savedItem;
+  } catch (error) {
+    console.error('Error saving draft:', error);
+    throw error;
+  }
 };
 
 // Function to delete a draft
-export const deleteDraft = async (id) => {
+export const deleteDraft = async (draftId) => {
   try {
-    const response = await axios.delete(`${API_URL}/drafts/${id}`);
+    const response = await axios.delete(
+      `${API_URL}/api/items/drafts/${draftId}`
+    );
     return response.data;
   } catch (error) {
     console.error('Error deleting draft:', error);
@@ -291,22 +304,38 @@ export const deleteDraft = async (id) => {
 // Function to fetch drafts
 export const fetchDrafts = async () => {
   try {
-    const response = await fetch(
-      `http://localhost:${process.env.REACT_APP_BACKEND_PORT}/api/drafts`
-    );
-    const data = await response.json();
-    return data;
+    console.log('Fetching drafts from:', `${API_URL}/api/items/drafts`);
+    const response = await axios.get(`${API_URL}/api/items/drafts`);
+    console.log('Fetched drafts:', response.data);
+
+    if (Array.isArray(response.data)) {
+      return response.data;
+    } else {
+      console.warn('Unexpected response format:', response.data);
+      return [];
+    }
   } catch (error) {
-    console.error('Error fetching drafts:', error);
-    throw error;
+    console.error(
+      'Error fetching drafts:',
+      error.response?.data || error.message
+    );
+    // You might want to throw the error here instead of returning an empty array,
+    // depending on how you want to handle errors in the calling component
+    return [];
   }
 };
 
 // Function to fetch items
 export const fetchItems = async () => {
-  const response = await fetch('/api/items');
-  if (!response.ok) throw new Error('Failed to fetch items.');
-  return await response.json();
+  try {
+    console.log('Fetching items from:', `${API_URL}/api/items`);
+    const response = await axios.get(`${API_URL}/api/items`);
+    console.log('Fetched items:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching items:', error);
+    return [];
+  }
 };
 
 // Function to handle draft save with image processing
@@ -362,11 +391,11 @@ export const handleDraftSaveWithImages = async (
 
 export const saveToLocalStorage = (item) => {
   console.log('Saving item to local storage:', item);
-  if (!item || !item.itemId) {
-    console.error('Invalid item or missing itemId:', item);
+  if (!item || !item.ItemId) {
+    console.error('Invalid item or missing ItemId:', item);
     return false;
   }
-  const key = `item_${item.itemId}`;
+  const key = `item_${item.ItemId}`;
   const dataToSave = JSON.stringify({ item });
   console.log('Data being saved:', dataToSave);
   try {
@@ -388,8 +417,6 @@ export const handleManualSave = async (
   setHasUnsavedChanges,
   setLastAutoSave
 ) => {
-  const formData = new FormData();
-
   const combinedImages = [
     ...item.images.filter((img) => !img.isNew),
     ...uploadedImages.map((img) => ({
@@ -405,72 +432,49 @@ export const handleManualSave = async (
     images: combinedImages,
   };
 
-  formData.append('draftData', JSON.stringify(updatedItem));
-
-  uploadedImages.forEach((img) => {
-    if (img.file && img.isNew) {
-      formData.append('images', img.file, img.filename);
-    }
-  });
-
   try {
-    const response = await axios.post(
-      `http://localhost:${backendPort}/api/save-draft`,
-      formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      }
-    );
-
-    if (response.data.item) {
-      setItem(response.data.item);
-      setUploadedImages(response.data.item.images || []);
-      setHasUnsavedChanges(false);
-      setLastAutoSave(new Date());
-      return response.data.item;
+    let savedItem;
+    if (item._id) {
+      // If the item has an _id, it already exists in the database, so update it
+      savedItem = await updateItem(item._id, updatedItem);
     } else {
-      console.error('Manual save failed: Unexpected response format');
-      throw new Error('Unexpected response format');
+      // If the item doesn't have an _id, it's new, so create it
+      savedItem = await createItem(updatedItem);
     }
+
+    setItem(savedItem);
+    setUploadedImages(savedItem.images || []);
+    setHasUnsavedChanges(false);
+    setLastAutoSave(new Date());
+    return savedItem;
   } catch (error) {
     console.error('Error during manual save:', error);
     throw error;
   }
 };
 
-export const updateItem = (
-  prevItem,
-  field,
-  value,
+// Update the existing updateItem function to handle both state updates and database updates
+export const updateItem = async (
+  id,
+  itemData,
   contextData,
   messages,
   handleLocalSave,
   setHasUnsavedChanges
 ) => {
-  if (!prevItem) {
-    console.error('updateItem: prevItem is null');
-    return null;
+  try {
+    // Update local state
+    handleLocalSave(itemData, contextData, messages);
+    setHasUnsavedChanges(true);
+
+    // Update in database
+    const response = await axios.put(`${API_URL}/api/items/${id}`, itemData);
+    console.log('Item updated:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error updating item:', error);
+    throw error;
   }
-
-  let updatedItem = { ...prevItem };
-
-  // Handle nested fields
-  if (field.includes('.')) {
-    const [parentField, childField] = field.split('.');
-    updatedItem[parentField] = {
-      ...updatedItem[parentField],
-      [childField]: value,
-    };
-  } else {
-    updatedItem[field] = value;
-  }
-
-  console.log('updateItem: Updating item:', updatedItem);
-  handleLocalSave(updatedItem, contextData, messages); // Save after each update
-  setHasUnsavedChanges(true);
-  return updatedItem;
 };
 
 // Function to handle file upload
@@ -502,7 +506,7 @@ export const handleFileUpload = async (file, itemId) => {
 
 export const deleteAllDrafts = async () => {
   try {
-    const response = await axios.delete(`${API_URL}/drafts`);
+    const response = await axios.delete(`${API_URL}/api/items/drafts`);
     return response.data;
   } catch (error) {
     console.error('Error deleting all drafts:', error);
@@ -543,12 +547,11 @@ export const useAutosave = (
             console.log('Autosave successful');
           },
           (error) => {
-            // Keeping this error log for debugging purposes
             console.error('Error auto-saving:', error);
           }
         );
       }
-    }, 5000),
+    }, 30000), // Changed to 30000 milliseconds (30 seconds)
     [
       backendPort,
       setItem,
@@ -565,4 +568,33 @@ export const useAutosave = (
   }, [item, uploadedImages, debouncedAutoSave]);
 
   return debouncedAutoSave;
+};
+
+export const loadItemData = loadLocalData; // Assuming these are the same function
+
+// Add a new function to create an item in the database
+export const createItem = async (itemData) => {
+  try {
+    const response = await axios.post(`${API_URL}/api/items`, itemData);
+    console.log('Item created:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Error creating item:', error);
+    throw error;
+  }
+};
+
+export const fetchAllItems = async () => {
+  try {
+    const response = await fetch('/api/items');
+    if (!response.ok) {
+      throw new Error('Network response was not ok');
+    }
+    const data = await response.json();
+    console.log('Raw data from fetchAllItems:', data);
+    return data;
+  } catch (error) {
+    console.error('Error fetching all items:', error);
+    throw error;
+  }
 };

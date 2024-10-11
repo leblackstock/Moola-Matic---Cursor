@@ -1030,3 +1030,61 @@ export const ErrorImagePlaceholder = styled.div`
   box-sizing: border-box;
   font-size: 14px;
 `;
+
+export const PurchasedItemContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 10px;
+  width: 200px;
+  cursor: pointer;
+  transition: transform 0.2s;
+
+  &:hover {
+    transform: scale(1.05);
+  }
+`;
+
+export const PurchasedItemDetails = styled.div`
+  padding: 10px;
+  background-color: #f8f8f8;
+
+  h4 {
+    margin: 0 0 5px 0;
+    font-size: 16px;
+  }
+
+  p {
+    margin: 0;
+    font-size: 14px;
+    color: #666;
+  }
+`;
+
+export const ItemOverlay = styled.div`
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 10px;
+  transform: translateY(100%);
+  transition: transform 0.3s ease-in-out;
+
+  ${ImageContainer}:hover & {
+    transform: translateY(0);
+  }
+
+  h4 {
+    margin: 0 0 5px 0;
+    font-size: 16px;
+  }
+
+  p {
+    margin: 0 0 5px 0;
+    font-size: 12px;
+  }
+`;

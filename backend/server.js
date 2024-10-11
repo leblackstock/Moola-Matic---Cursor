@@ -1,6 +1,5 @@
 import express from 'express';
 import cors from 'cors';
-// import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
@@ -8,17 +7,18 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import session from 'express-session';
 import { fileURLToPath } from 'url';
-import chatHandler from './chat/chatHandler.js';
+import {
+  chatHandler,
+  interactWithMoolaMaticAssistant,
+} from './chat/chatHandler.js';
 import itemsRouter from './routes/items.js';
+import tempImageRouter from './api/apiTempImage.js';
+import purchaseImageRouter from './api/apiPurchaseImage.js';
 import connectDB from './config/database.js';
 import MongoStore from 'connect-mongo';
 import logger from '../src/helpers/logger.js';
 
 import { handleMoolaMaticChat, manageContext } from './chat/chatService.js';
-
-import tempImageRouter from './api/apiTempImage.js';
-import draftImageRouter from './api/apiDraftImage.js';
-import purchaseImageRouter from './api/apiPurchaseImage.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,6 +27,7 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 const BACKEND_PORT = process.env.BACKEND_PORT || 3001;
 const FRONTEND_PORT = process.env.FRONTEND_PORT || 3000;
+const frontendUrl = `http://localhost:${FRONTEND_PORT}`;
 
 const assistantId = process.env.MOOLA_MATIC_ASSISTANT_ID;
 
@@ -38,12 +39,11 @@ if (!assistantId) {
 const app = express();
 app.set('trust proxy', 1);
 
-connectDB();
-
+// Middleware setup
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-const frontendUrl = `http://localhost:${process.env.FRONTEND_PORT}`;
+// Add this line to enable CORS
 app.use(
   cors({
     origin: frontendUrl,
@@ -53,7 +53,8 @@ app.use(
   })
 );
 
-app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+// Add this before your route definitions
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use(
   helmet({
@@ -81,66 +82,44 @@ app.use(
   })
 );
 
+// Session setup
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || 'default_secret',
+    secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     store: MongoStore.create({
       mongoUrl: process.env.MONGODB_URI,
-      ttl: 14 * 24 * 60 * 60,
+      ttl: 14 * 24 * 60 * 60, // 14 days
+      autoRemove: 'interval',
+      autoRemoveInterval: 10, // In minutes. Default
     }),
     cookie: {
       secure: process.env.NODE_ENV === 'production',
       httpOnly: true,
-      maxAge: 14 * 24 * 60 * 60 * 1000,
-      sameSite: 'strict',
+      maxAge: 14 * 24 * 60 * 60 * 1000, // 14 days
     },
   })
 );
 
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 200,
-  message: 'Too many requests from this IP, please try again after 15 minutes.',
-});
-app.use('/api/', apiLimiter);
+// Mount Routers
+app.use('/api/items', itemsRouter);
+app.use('/api/temp-images', tempImageRouter);
+app.use('/api/purchase-images', purchaseImageRouter);
 
-// const storage = multer.diskStorage({
-//   destination: function (req, file, cb) {
-//     cb(null, path.join(__dirname, '..', 'uploads', 'drafts'));
-//   },
-//   filename: function (req, file, cb) {
-//     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-//     cb(
-//       null,
-//       file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname)
-//     );
-//   },
-// });
-
-// const upload = multer({ storage: storage });
-
-app.use('/api', itemsRouter);
-app.use('/api/temp-image', tempImageRouter);
-app.use('/api/draft-image', draftImageRouter);
-app.use('/api/purchase-image', purchaseImageRouter);
-app.use('/api', chatHandler);
-
-app.get('/', (req, res) => {
-  res.send('Backend server is running!');
-});
-
-app.post('/api/chat', async (req, res) => {
-  const { messages } = req.body;
-  const contextData = req.session;
-
+// Example Chat Route
+app.post('/chat', async (req, res) => {
   try {
-    const managedMessages = await manageContext(messages);
-    const assistantResponse = await handleMoolaMaticChat(
-      managedMessages,
-      contextData
+    const { userMessage, sessionId } = req.body;
+    const assistantResponse = await interactWithMoolaMaticAssistant(
+      userMessage,
+      sessionId
     );
+
+    if (typeof assistantResponse !== 'string') {
+      throw new Error('Invalid response from chat handler');
+    }
+
     return res.json({ content: assistantResponse });
   } catch (error) {
     logger.error('Error in /chat:', error);
@@ -150,6 +129,7 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
+// Logout Route
 app.post('/api/logout', (req, res) => {
   const uploadedImages = req.session.uploadedImages || [];
 
@@ -175,14 +155,47 @@ app.post('/api/logout', (req, res) => {
   });
 });
 
+// Global Error Handler
 app.use((err, req, res, next) => {
   logger.error('Unhandled error:', err);
   res.status(500).json({ error: 'An internal server error occurred.' });
 });
 
-app.listen(BACKEND_PORT, () => {
-  logger.info(`Backend server is running on http://localhost:${BACKEND_PORT}`);
-  logger.info(
-    `Frontend is expected to run on http://localhost:${FRONTEND_PORT}`
-  );
+// Start the Server
+const startServer = async () => {
+  try {
+    await connectDB();
+    app.listen(BACKEND_PORT, () => {
+      logger.info(
+        `Backend server is running on http://localhost:${BACKEND_PORT}`
+      );
+      logger.info(
+        `Frontend is expected to run on http://localhost:${FRONTEND_PORT}`
+      );
+    });
+  } catch (error) {
+    logger.error('Failed to connect to MongoDB:', error);
+    process.exit(1);
+  }
+};
+
+startServer();
+
+app.use((req, res, next) => {
+  console.log(`Received request: ${req.method} ${req.url}`);
+  next();
+});
+
+// Log all routes
+console.log('Available routes:');
+app._router.stack.forEach(function (r) {
+  if (r.route && r.route.path) {
+    console.log(r.route.path);
+  }
+});
+
+// 404 Error Handler (move this to the end)
+app.use((req, res, next) => {
+  console.log(`Route not found: ${req.method} ${req.url}`);
+  res.status(404).json({ error: 'Route not found' });
 });

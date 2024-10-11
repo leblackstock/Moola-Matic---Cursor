@@ -52,10 +52,9 @@ function ChatComp({
   const [localImagePreview, setLocalImagePreview] = useState(
     propImagePreview || ''
   );
-  const [imageAnalysisPrompt, setImageAnalysisPrompt] = useState('');
-  const [isPromptLoaded, setIsPromptLoaded] = useState(false);
+
+  // Add this line to define the messagesContainerRef
   const messagesContainerRef = useRef(null);
-  const fileInputRef = useRef(null);
 
   // Use propImagePreview or localImagePreview as needed
   const currentImagePreview = propImagePreview || localImagePreview;
@@ -65,30 +64,13 @@ function ChatComp({
     setLocalImagePreview(propImagePreview || '');
   }, [propImagePreview]);
 
+  // Add this useEffect to scroll to the bottom of the chat
   useEffect(() => {
     if (messagesContainerRef.current) {
       messagesContainerRef.current.scrollTop =
         messagesContainerRef.current.scrollHeight;
     }
   }, [messages]);
-
-  useEffect(() => {
-    const fetchImageAnalysisPrompt = async () => {
-      try {
-        const response = await fetch('/api/image-analysis-prompt');
-        if (!response.ok) {
-          throw new Error('Failed to fetch IMAGE_ANALYSIS_PROMPT');
-        }
-        const data = await response.json();
-        setImageAnalysisPrompt(data.IMAGE_ANALYSIS_PROMPT);
-        setIsPromptLoaded(true);
-      } catch (error) {
-        console.error('Error fetching IMAGE_ANALYSIS_PROMPT:', error);
-      }
-    };
-
-    fetchImageAnalysisPrompt();
-  }, []);
 
   // Helper function to convert File to base64
   const getBase64 = (file) => {
@@ -103,18 +85,16 @@ function ChatComp({
   const sendMessage = async () => {
     if (!message.trim()) return;
 
+    const newUserMessage = { role: 'user', content: message };
+    setMessages((prevMessages) => [...prevMessages, newUserMessage]);
     setMessage('');
     onStartLoading();
 
     try {
-      const response = await handleChatWithAssistant(
-        [...messages, { role: 'user', content: message }],
-        currentItemId
-      );
+      const response = await handleChatWithAssistant(message);
 
       setMessages((prevMessages) => [
         ...prevMessages,
-        { role: 'user', content: message },
         {
           role: 'assistant',
           content: response.content,
@@ -134,6 +114,7 @@ function ChatComp({
           role: 'assistant',
           content:
             'I apologize, but I encountered an error while processing your request. Please try again or contact support if the issue persists.',
+          status: 'error',
         },
       ]);
     } finally {

@@ -8,6 +8,11 @@ import multer from 'multer';
 import mongoose from 'mongoose';
 import axios from 'axios'; // If needed for custom HTTP requests
 import { DraftItem } from '../models/DraftItem.js'; // Import the DraftItem model
+import {
+  interactWithMoolaMaticAssistant as interactWithAssistant,
+  createUserMessage,
+  createAssistantMessage,
+} from './chatAssistant.js';
 
 // Resolve __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -201,7 +206,7 @@ const validateAssistantResponse = (response) => {
 const uploadImageToAssistant = async (imageBuffer, filename) => {
   try {
     // Use the Assistant API's file upload method
-    const file = await interactWithMoolaMaticAssistant({
+    const file = await interactWithAssistant({
       action: 'upload_file',
       purpose: 'vision',
       file: imageBuffer,
@@ -225,7 +230,7 @@ const uploadImageToAssistant = async (imageBuffer, filename) => {
  */
 const sendMessagesToAssistant = async (messages) => {
   try {
-    const response = await interactWithMoolaMaticAssistant(messages);
+    const response = await interactWithAssistant(messages);
     return response;
   } catch (error) {
     console.error(
@@ -233,41 +238,6 @@ const sendMessagesToAssistant = async (messages) => {
       error.response?.data || error.message
     );
     throw new Error('Failed to interact with Assistant.');
-  }
-};
-
-/**
- * Interacts with the Moola-Matic Assistant API.
- * @param {Object} params - Parameters for the assistant interaction.
- * @returns {Promise<Object>} - Response from the Assistant API.
- */
-const interactWithMoolaMaticAssistant = async (params) => {
-  // Implementation depends on your specific Assistant API
-  // This is a placeholder implementation
-  try {
-    switch (params.action) {
-      case 'upload_file':
-        // Handle file upload
-        break;
-      case 'create_thread':
-        // Handle thread creation
-        break;
-      case 'add_message':
-        // Handle adding a message to a thread
-        break;
-      case 'create_run':
-        // Handle creating a run
-        break;
-      case 'poll_run':
-        // Handle polling for run completion
-        break;
-      default:
-        throw new Error(`Unknown action: ${params.action}`);
-    }
-    // Return appropriate response based on the action
-  } catch (error) {
-    console.error('Error in interactWithMoolaMaticAssistant:', error);
-    throw error;
   }
 };
 
@@ -289,7 +259,7 @@ const analyzeImages = async (imageBuffers, description, itemId) => {
     console.log('Uploaded images to Assistant. File IDs:', fileIds);
 
     // Step 2: Create a new thread
-    const threadId = await interactWithMoolaMaticAssistant({
+    const threadId = await interactWithAssistant({
       action: 'create_thread',
       assistant_id: MOOLA_MATIC_ASSISTANT_ID,
     });
@@ -312,7 +282,7 @@ const analyzeImages = async (imageBuffers, description, itemId) => {
 
     // Add messages to the thread
     for (const msg of allMessages) {
-      await interactWithMoolaMaticAssistant({
+      await interactWithAssistant({
         action: 'add_message',
         thread_id: threadId,
         role: msg.role,
@@ -321,7 +291,7 @@ const analyzeImages = async (imageBuffers, description, itemId) => {
     }
 
     // Step 4: Initiate a run
-    const runId = await interactWithMoolaMaticAssistant({
+    const runId = await interactWithAssistant({
       action: 'create_run',
       thread_id: threadId,
       assistant_id: MOOLA_MATIC_ASSISTANT_ID,
@@ -329,7 +299,7 @@ const analyzeImages = async (imageBuffers, description, itemId) => {
     console.log('Run created with ID:', runId);
 
     // Step 5: Poll for the run's completion
-    const assistantResponse = await interactWithMoolaMaticAssistant({
+    const assistantResponse = await interactWithAssistant({
       action: 'poll_run',
       thread_id: threadId,
       run_id: runId,
@@ -357,14 +327,14 @@ router.post(
   '/analyze-images',
   upload.array('images', 10), // Allow up to 10 images; adjust as needed
   async (req, res) => {
-    console.log(
-      'analyze-images route: Received request for item with ID:',
-      req.body.itemId
-    );
+    console.log('analyze-images route: Received request body:', req.body);
+    console.log('analyze-images route: Received files:', req.files);
+
     const { description, itemId } = req.body;
 
     // Validate required fields
     if (!description || !itemId) {
+      console.error('Missing description or itemId:', { description, itemId });
       return res.status(400).json({ error: 'Missing description or itemId.' });
     }
 
@@ -387,14 +357,14 @@ router.post(
       );
 
       // Step 2: Create a new thread
-      const threadId = await interactWithMoolaMaticAssistant({
+      const threadId = await interactWithAssistant({
         action: 'create_thread',
         assistant_id: MOOLA_MATIC_ASSISTANT_ID,
       });
 
       // Step 3: Add image messages to the thread
       for (const fileId of fileIds) {
-        await interactWithMoolaMaticAssistant({
+        await interactWithAssistant({
           action: 'add_message',
           thread_id: threadId,
           role: 'user',
@@ -403,7 +373,7 @@ router.post(
       }
 
       // Step 4: Add the image analysis prompt
-      await interactWithMoolaMaticAssistant({
+      await interactWithAssistant({
         action: 'add_message',
         thread_id: threadId,
         role: 'user',
@@ -411,14 +381,14 @@ router.post(
       });
 
       // Step 5: Run the assistant
-      const runId = await interactWithMoolaMaticAssistant({
+      const runId = await interactWithAssistant({
         action: 'create_run',
         thread_id: threadId,
         assistant_id: MOOLA_MATIC_ASSISTANT_ID,
       });
 
       // Step 6: Wait for the run to complete and get the response
-      const assistantResponse = await interactWithMoolaMaticAssistant({
+      const assistantResponse = await interactWithAssistant({
         action: 'poll_run',
         thread_id: threadId,
         run_id: runId,
@@ -464,6 +434,39 @@ router.post(
   }
 );
 
-// At the end of the file, replace the existing export with:
-export { router as chatHandler };
+// Add this new route for text-only chat
+router.post('/chat', async (req, res) => {
+  console.log('Received chat request:', req.body);
+  const { message, contextData } = req.body;
+
+  if (!message) {
+    console.log('Error: Message is required');
+    return res.status(400).json({ error: 'Message is required' });
+  }
+
+  try {
+    console.log('Processing message:', message);
+    const userMessage = createUserMessage(message);
+    const response = await interactWithAssistant([userMessage], contextData);
+    console.log('Assistant response:', response);
+
+    const assistantMessage = createAssistantMessage(response);
+
+    res.json({
+      message: assistantMessage,
+      contextData: contextData, // Return updated context data
+    });
+  } catch (error) {
+    console.error('Error in chat handler:', error);
+    res
+      .status(500)
+      .json({ error: 'An error occurred while processing your request' });
+  }
+});
+
+// Export the router and the interactWithMoolaMaticAssistant function
+export {
+  router as chatHandler,
+  interactWithAssistant as interactWithMoolaMaticAssistant,
+};
 export default router;

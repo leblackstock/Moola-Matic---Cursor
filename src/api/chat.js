@@ -36,29 +36,24 @@ export const createAssistantMessage = (content) => ({
  */
 export const handleChatWithAssistant = async (messageInput) => {
   try {
-    let messageArray;
+    let message;
     if (typeof messageInput === 'string') {
-      // If it's a string, convert it to a single-message array
-      messageArray = [{ role: 'user', content: messageInput }];
-    } else if (Array.isArray(messageInput)) {
-      // If it's already an array, use it as is
-      messageArray = messageInput;
+      message = messageInput;
+    } else if (Array.isArray(messageInput) && messageInput.length > 0) {
+      message = messageInput[messageInput.length - 1].content;
     } else {
-      // If it's neither a string nor an array, throw an error
-      throw new Error(
-        'Invalid message format. Expected a string or an array of message objects.'
-      );
+      throw new Error('Invalid message format.');
     }
 
-    console.log('Sending messages to Moola-Matic:', messageArray);
+    console.log('Sending message to Moola-Matic:', message);
 
     const response = await fetch(`${API_URL}/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ messages: messageArray, contextData }),
-      credentials: 'include', // Include cookies for session management
+      body: JSON.stringify({ message, contextData }),
+      credentials: 'include',
     });
 
     if (!response.ok) {
@@ -71,10 +66,10 @@ export const handleChatWithAssistant = async (messageInput) => {
     const data = await response.json();
     console.log('Received response from server:', data);
 
-    // Update contextData here if needed
+    // Update contextData
     contextData = data.contextData || null;
 
-    return { content: data.content, status: data.status };
+    return { content: data.message.content, status: 'success' };
   } catch (error) {
     console.error('Error in handleChatWithAssistant:', error);
     return {
@@ -174,6 +169,15 @@ export const handleImageChat = async (
 
 export const analyzeImagesWithAssistant = async (formData) => {
   try {
+    // Log the formData entries (without logging the actual image data)
+    for (let [key, value] of formData.entries()) {
+      if (key !== 'base64Images') {
+        console.log(key, value);
+      } else {
+        console.log(key, 'Base64 image data (not logged)');
+      }
+    }
+
     const response = await fetch(`${API_URL}/analyze-images`, {
       method: 'POST',
       body: formData,
