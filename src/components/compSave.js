@@ -217,13 +217,6 @@ export const handleAutoSave = async (
 
 // Function to handle local save
 export const handleLocalSave = (item, contextData, messages, ItemId) => {
-  console.log('handleLocalSave called with:', {
-    item,
-    contextData,
-    messages,
-    ItemId,
-  });
-
   if (!item) {
     console.error('Cannot save item: item is null or undefined');
     return;
@@ -261,17 +254,11 @@ export const handleLocalSave = (item, contextData, messages, ItemId) => {
     messages: validMessages,
   };
 
-  console.log(
-    `Saving item to localStorage with key: item_${effectiveItemId}`,
-    itemToSave
-  );
   localStorage.setItem(`item_${effectiveItemId}`, JSON.stringify(itemToSave));
   localStorage.setItem(
     `contextData_${effectiveItemId}`,
     JSON.stringify(contextData || {})
   );
-  console.log('Item saved successfully to localStorage');
-  console.log('Validated messages saved:', validMessages);
 };
 
 // Function to load local data based on itemId
@@ -279,7 +266,6 @@ export const loadLocalData = (itemId) => {
   try {
     const storageKey = `item_${itemId}`;
     const data = localStorage.getItem(storageKey);
-    console.log(`Loading data from localStorage with key: ${storageKey}`, data);
     return data ? JSON.parse(data) : null;
   } catch (error) {
     console.error('Error loading data from localStorage:', error);
@@ -318,6 +304,22 @@ export const saveDraft = async (draftData, contextData, messages) => {
       throw new Error('itemId is required in draftData');
     }
 
+    // Handle the purchaseRecommendation field
+    if (draftData.finalRecommendation) {
+      if (
+        draftData.finalRecommendation.purchaseRecommendation === 'Unknown' ||
+        draftData.finalRecommendation.purchaseRecommendation === ''
+      ) {
+        draftData.finalRecommendation.purchaseRecommendation = null;
+      } else if (
+        typeof draftData.finalRecommendation.purchaseRecommendation === 'string'
+      ) {
+        draftData.finalRecommendation.purchaseRecommendation =
+          draftData.finalRecommendation.purchaseRecommendation.toLowerCase() ===
+          'true';
+      }
+    }
+
     const response = await axios.post(`${API_URL}/api/items/autosave-draft`, {
       draftData,
       contextData,
@@ -325,7 +327,7 @@ export const saveDraft = async (draftData, contextData, messages) => {
     });
 
     console.log('Draft saved successfully:', response.data);
-    return response.data.item; // Make sure this includes the updated images
+    return response.data.item;
   } catch (error) {
     console.error('Error saving draft:', error);
     throw error;
@@ -619,8 +621,8 @@ export const useAutosave = (
   setHasUnsavedChanges,
   setLastAutoSave
 ) => {
-  const debouncedAutoSave = useCallback(
-    debounce(async (currentItem, currentUploadedImages, currentMessages) => {
+  const autoSave = useCallback(
+    async (currentItem, currentUploadedImages, currentMessages) => {
       if (currentItem && currentItem.itemId) {
         try {
           // Validate messages
@@ -641,6 +643,24 @@ export const useAutosave = (
             messages: validMessages,
           };
 
+          // Handle the purchaseRecommendation field
+          if (itemToSave.finalRecommendation) {
+            if (
+              itemToSave.finalRecommendation.purchaseRecommendation ===
+                'Unknown' ||
+              itemToSave.finalRecommendation.purchaseRecommendation === ''
+            ) {
+              itemToSave.finalRecommendation.purchaseRecommendation = null;
+            } else if (
+              typeof itemToSave.finalRecommendation.purchaseRecommendation ===
+              'string'
+            ) {
+              itemToSave.finalRecommendation.purchaseRecommendation =
+                itemToSave.finalRecommendation.purchaseRecommendation.toLowerCase() ===
+                'true';
+            }
+          }
+
           // Save the item
           const savedItem = await saveDraft(itemToSave, {}, validMessages);
 
@@ -649,15 +669,16 @@ export const useAutosave = (
           setUploadedImages(savedItem.images || []);
           setHasUnsavedChanges(false);
           setLastAutoSave(new Date());
-
-          console.log('Autosave successful');
-          console.log('uploadedImages updated:', savedItem.images);
-          console.log('Validated messages saved:', savedItem.messages);
         } catch (error) {
           console.error('Error auto-saving:', error);
+          // Schedule a retry after 15 seconds
+          setTimeout(() => {
+            console.log('Retrying autosave...');
+            autoSave(currentItem, currentUploadedImages, currentMessages);
+          }, 15000);
         }
       }
-    }, 15000),
+    },
     [
       backendPort,
       setItem,
@@ -667,6 +688,8 @@ export const useAutosave = (
     ]
   );
 
+  const debouncedAutoSave = useCallback(debounce(autoSave, 15000), [autoSave]);
+
   useEffect(() => {
     if (item && item.itemId) {
       debouncedAutoSave(item, uploadedImages, messages);
@@ -674,7 +697,6 @@ export const useAutosave = (
 
     const intervalId = setInterval(() => {
       if (item && item.itemId) {
-        console.log('Attempting autosave...');
         debouncedAutoSave(item, uploadedImages, messages);
       }
     }, 15000);

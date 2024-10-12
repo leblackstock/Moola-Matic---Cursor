@@ -9,6 +9,9 @@ const API_URL =
     ? '/api'
     : `http://localhost:${BACKEND_PORT}/api`;
 
+export const API_BASE_URL =
+  process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001';
+
 // Add this at the top of the file
 let contextData = null;
 
@@ -171,36 +174,29 @@ export const handleImageChat = async (
 };
 
 export const analyzeImagesWithAssistant = async (
-  base64Images,
+  imageUrls,
   description,
   itemId,
   sellerNotes,
   contextData
 ) => {
-  if (!base64Images || base64Images.length === 0) {
-    throw new Error('At least one image is required');
-  }
-
   try {
+    console.log('Sending images to analyze:', imageUrls);
+    const payload = { images: imageUrls };
+    console.log('Sending payload:', JSON.stringify(payload, null, 2));
     const response = await axios.post(
-      `${API_URL}/analyze-images`, // Use API_URL instead of hardcoding the URL
-      {
-        images: base64Images,
-        description,
-        itemId,
-        sellerNotes,
-        contextData,
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
+      `${API_BASE_URL}/api/analyze-images`,
+      payload
     );
-
+    console.log('Server response:', response.data);
     return response.data;
   } catch (error) {
-    console.error('Error in analyzeImagesWithAssistant:', error);
+    console.error('Error in analyzeImagesWithAssistant: ', error);
+    if (error.response) {
+      console.error('Response data:', error.response.data);
+      console.error('Response status:', error.response.status);
+      console.error('Response headers:', error.response.headers);
+    }
     throw error;
   }
 };

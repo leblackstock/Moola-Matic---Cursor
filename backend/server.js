@@ -7,6 +7,7 @@ import helmet from 'helmet';
 import session from 'express-session';
 import { fileURLToPath } from 'url';
 import { chatHandler } from './chat/chatHandler.js';
+import combineAnalysis from './chat/chatCombineAnalysis.js'; // Import the new route
 import itemsRouter from './routes/items.js';
 import tempImageRouter from './api/apiTempImage.js';
 import purchaseImageRouter from './api/apiPurchaseImage.js';
@@ -15,6 +16,7 @@ import MongoStore from 'connect-mongo';
 import logger from '../src/helpers/logger.js';
 
 import { handleMoolaMaticChat, manageContext } from './chat/chatService.js';
+import { processImages } from './utils/imageProcessor.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -39,7 +41,7 @@ app.set('trust proxy', 1);
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Add this line to enable CORS
+// CORS configuration
 app.use(
   cors({
     origin: frontendUrl,
@@ -49,9 +51,10 @@ app.use(
   })
 );
 
-// Add this before your route definitions
+// Serve static files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Security with Helmet
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -88,7 +91,7 @@ app.use(
       mongoUrl: process.env.MONGODB_URI,
       ttl: 14 * 24 * 60 * 60, // 14 days
       autoRemove: 'interval',
-      autoRemoveInterval: 10, // In minutes. Default
+      autoRemoveInterval: 10, // In minutes
     }),
     cookie: {
       secure: process.env.NODE_ENV === 'production',
@@ -98,13 +101,18 @@ app.use(
   })
 );
 
+// Logging incoming requests
+app.use((req, res, next) => {
+  console.log(`Received request: ${req.method} ${req.url}`);
+  next();
+});
+
 // Mount Routers
 app.use('/api/items', itemsRouter);
 app.use('/api/temp-images', tempImageRouter);
 app.use('/api/purchase-images', purchaseImageRouter);
-
-// Add this line to use the chatHandler (move it here)
 app.use('/api', chatHandler);
+app.use('/api', combineAnalysis); // Mount the new combineAnalysis route
 
 // Logout Route
 app.post('/api/logout', (req, res) => {
@@ -138,6 +146,47 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'An internal server error occurred.' });
 });
 
+// 404 Error Handler (move this before startServer)
+app.use((req, res, next) => {
+  console.log(`Route not found: ${req.method} ${req.url}`);
+  res.status(404).json({ error: 'Route not found' });
+});
+
+// Improved route logging
+console.log('Available routes:');
+function print(path, layer) {
+  if (layer.route) {
+    layer.route.stack.forEach(
+      print.bind(null, path.concat(split(layer.route.path)))
+    );
+  } else if (layer.name === 'router' && layer.handle.stack) {
+    layer.handle.stack.forEach(
+      print.bind(null, path.concat(split(layer.regexp)))
+    );
+  } else if (layer.method) {
+    console.log(
+      '%s /%s',
+      layer.method.toUpperCase(),
+      path.concat(split(layer.regexp)).filter(Boolean).join('/')
+    );
+  }
+}
+
+function split(thing) {
+  if (typeof thing === 'string') return thing.split('/');
+  if (thing.fast_slash) return '';
+  var match = thing
+    .toString()
+    .replace('\\/?', '')
+    .replace('(?=\\/|$)', '$')
+    .match(/^\/\^((?:\\[.*+?^${}()|[\]\\\/]|[^.*+?^${}()|[\]\\\/])*)\$\//);
+  return match
+    ? match[1].replace(/\\(.)/g, '$1').split('/')
+    : '<complex:' + thing.toString() + '>';
+}
+
+app._router.stack.forEach(print.bind(null, []));
+
 // Start the Server
 const startServer = async () => {
   try {
@@ -158,21 +207,27 @@ const startServer = async () => {
 
 startServer();
 
-app.use((req, res, next) => {
-  console.log(`Received request: ${req.method} ${req.url}`);
-  next();
-});
+app.post('/api/analyze-images', async (req, res) => {
+  try {
+    console.log('Received request body:', req.body);
+    const { images } = req.body;
 
-// Log all routes
-console.log('Available routes:');
-app._router.stack.forEach(function (r) {
-  if (r.route && r.route.path) {
-    console.log(r.route.path);
+    if (!images || !Array.isArray(images) || images.length === 0) {
+      console.error('Invalid images data received:', images);
+      return res.status(400).json({ error: 'No valid images provided' });
+    }
+
+    console.log('Received image paths:', images);
+
+    const processedImages = await processImages(images);
+
+    console.log('Processed images:', processedImages);
+
+    res.json({ result: processedImages });
+  } catch (error) {
+    console.error('Error processing images:', error);
+    res
+      .status(500)
+      .json({ error: 'Failed to process images', details: error.message });
   }
-});
-
-// 404 Error Handler (move this to the end)
-app.use((req, res, next) => {
-  console.log(`Route not found: ${req.method} ${req.url}`);
-  res.status(404).json({ error: 'Route not found' });
 });

@@ -14,11 +14,11 @@ const draftItemSchema = new mongoose.Schema(
 
     // Item details
     itemDetails: {
-      type: { type: String, required: false }, // Change this line to make it optional
+      type: { type: String, required: false },
       brand: String,
       condition: String,
       rarity: String,
-      authenticityConfirmed: { type: Boolean, default: false },
+      authenticityConfirmed: { type: Boolean, default: null },
       packagingAccessories: String,
     },
 
@@ -56,7 +56,10 @@ const draftItemSchema = new mongoose.Schema(
 
     // Recommendation
     finalRecommendation: {
-      purchaseRecommendation: Boolean,
+      purchaseRecommendation: {
+        type: mongoose.Schema.Types.Mixed,
+        default: null,
+      },
       detailedBreakdown: String,
     },
 
@@ -73,4 +76,6 @@ const draftItemSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-export const DraftItem = mongoose.model('DraftItem', draftItemSchema);
+// Check if the model already exists before defining it
+export const DraftItem =
+  mongoose.models.DraftItem || mongoose.model('DraftItem', draftItemSchema);

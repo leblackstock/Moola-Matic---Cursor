@@ -4,6 +4,10 @@ import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { convertImageToBase64 } from '../utils/imageProcessor.js';
+import axios from 'axios';
+import FormData from 'form-data'; // Import form-data
+import fs from 'fs/promises';
 
 // Resolve __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -138,32 +142,20 @@ const createRun = async (threadId, assistantId) => {
  * @param {String} runId - ID of the run
  * @returns {Promise<Object>} - Run object
  */
-const waitForRunCompletion = async (threadId, runId, timeout = 60000) => {
-  // 60 seconds timeout
-  try {
-    const interval = 1000; // 1 second
-    let elapsed = 0;
+const waitForRunCompletion = async (threadId, runId) => {
+  let runStatus;
+  do {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    runStatus = await client.beta.threads.runs.retrieve(threadId, runId);
+    console.log(`Run status: ${runStatus.status}`);
 
-    let run = await client.beta.threads.runs.retrieve(threadId, runId);
-
-    while (run.status === 'queued' || run.status === 'in_progress') {
-      if (elapsed >= timeout) {
-        throw new Error('Run timed out while waiting for completion.');
-      }
-      await new Promise((resolve) => setTimeout(resolve, interval)); // Wait for 1 second
-      run = await client.beta.threads.runs.retrieve(threadId, runId);
-      elapsed += interval;
+    if (runStatus.status === 'failed') {
+      console.error('Run failed. Error:', runStatus.last_error);
+      throw new Error(
+        `Run failed with status: ${runStatus.status}. Error: ${runStatus.last_error?.message || 'Unknown error'}`
+      );
     }
-
-    if (run.status === 'completed') {
-      return run;
-    } else {
-      throw new Error(`Run failed with status: ${run.status}`);
-    }
-  } catch (error) {
-    console.error('Error waiting for run completion:', error);
-    throw error;
-  }
+  } while (runStatus.status !== 'completed');
 };
 
 /**
@@ -254,7 +246,11 @@ const formatContextData = (contextData) => {
  * @param {Object} session - Express session object
  * @returns {Promise<string>} - Moola-Matic's response content
  */
-const interactWithMoolaMaticAssistant = async (messages, contextData) => {
+const interactWithMoolaMaticAssistant = async (
+  messages,
+  contextData,
+  imagePaths = []
+) => {
   try {
     // Retrieve the Moola-Matic assistant first
     const assistant = await retrieveMoolaMaticAssistant();
@@ -276,6 +272,32 @@ const interactWithMoolaMaticAssistant = async (messages, contextData) => {
         formattedContextData.role,
         formattedContextData.content
       );
+    }
+
+    // Process and upload images
+    if (imagePaths.length > 0) {
+      const fileIds = await Promise.all(imagePaths.map(uploadImage));
+      const validFileIds = fileIds.filter((id) => id !== null);
+      console.log('Uploaded file IDs:', validFileIds);
+
+      // Add image analysis request to the thread
+      if (validFileIds.length > 0) {
+        const imageContent = validFileIds.map((fileId) => ({
+          type: 'image_file',
+          image_file: { file_id: fileId },
+        }));
+
+        await client.beta.threads.messages.create(threadId, {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: 'Please analyze these images and provide details about the item(s) shown.',
+            },
+            ...imageContent,
+          ],
+        });
+      }
     }
 
     // Create a run using the retrieved assistant
@@ -303,6 +325,47 @@ const interactWithMoolaMaticAssistant = async (messages, contextData) => {
   }
 };
 
+async function uploadImage(imagePath) {
+  const fileName = path.basename(imagePath);
+  console.log(`Attempting to upload image: ${fileName}`);
+
+  try {
+    const base64String = await convertImageToBase64(imagePath);
+    console.log(`Image converted to base64: ${fileName}`);
+
+    const formData = new FormData();
+    const buffer = Buffer.from(base64String, 'base64');
+    formData.append('file', buffer, {
+      filename: fileName,
+      contentType: 'image/jpeg', // Adjust if using different image types
+    });
+    formData.append('purpose', 'vision');
+
+    console.log('Sending request to OpenAI API...');
+    const response = await axios.post(
+      'https://api.openai.com/v1/files',
+      formData,
+      {
+        headers: {
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          ...formData.getHeaders(),
+        },
+      }
+    );
+
+    console.log('Response received from OpenAI API');
+    const fileId = response.data.id;
+    console.log(`Image ${fileName} uploaded successfully. File ID: ${fileId}`);
+    return fileId;
+  } catch (error) {
+    console.error(
+      `Error uploading image ${fileName}:`,
+      error.response ? error.response.data : error.message
+    );
+    return null;
+  }
+}
+
 // Consolidated export at the bottom
 export {
   interactWithMoolaMaticAssistant,
@@ -310,5 +373,5 @@ export {
   createAssistantMessage,
   waitForRunCompletion,
   getAssistantResponse,
-  formatContextData, // Add this line
+  formatContextData,
 };

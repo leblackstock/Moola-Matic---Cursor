@@ -425,10 +425,25 @@ router.post('/save-draft', async (req, res) => {
 // POST /api/items/autosave-draft - Autosave a draft item
 router.post('/autosave-draft', async (req, res) => {
   try {
-    const { draftData } = req.body;
+    const { draftData, contextData, messages } = req.body;
 
-    if (!draftData || !draftData.itemId) {
-      return res.status(400).json({ error: 'itemId is required in draftData' });
+    // Handle the purchaseRecommendation field
+    if (
+      draftData.finalRecommendation &&
+      draftData.finalRecommendation.purchaseRecommendation !== undefined
+    ) {
+      if (
+        draftData.finalRecommendation.purchaseRecommendation === 'Unknown' ||
+        draftData.finalRecommendation.purchaseRecommendation === ''
+      ) {
+        draftData.finalRecommendation.purchaseRecommendation = null;
+      } else if (
+        typeof draftData.finalRecommendation.purchaseRecommendation === 'string'
+      ) {
+        draftData.finalRecommendation.purchaseRecommendation =
+          draftData.finalRecommendation.purchaseRecommendation.toLowerCase() ===
+          'true';
+      }
     }
 
     let draft = await DraftItem.findOneAndUpdate(
@@ -442,7 +457,7 @@ router.post('/autosave-draft', async (req, res) => {
       }
     );
 
-    console.log('Draft autosaved:', draft);
+    console.log('Draft autosaved');
     res.status(200).json({ item: draft });
   } catch (error) {
     console.error('Error autosaving draft:', error);

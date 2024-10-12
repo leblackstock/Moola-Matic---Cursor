@@ -77,6 +77,11 @@ import {
   getImageUrl,
 } from './helpers/itemGen.js';
 
+import CombineAnalyses from './components/compCombineAnalyses.js';
+
+export const API_BASE_URL =
+  process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001';
+
 // Helper functions
 const getBase64 = (file) => {
   return new Promise((resolve, reject) => {
@@ -104,8 +109,7 @@ const fileToBase64 = (file) => {
 };
 
 function NewItemPage({ setItemId }) {
-  const { ItemId } = useParams(); // Add this line
-  console.log('ItemId from URL params:', ItemId);
+  const { ItemId } = useParams();
   const navigate = useNavigate();
 
   if (ItemId === null) {
@@ -182,7 +186,7 @@ function NewItemPage({ setItemId }) {
 
       try {
         const localData = await loadLocalData(ItemId);
-        console.log('Local data loaded:', localData);
+        // console.log('Local data loaded:', localData);
 
         if (localData) {
           setItem(localData);
@@ -192,11 +196,11 @@ function NewItemPage({ setItemId }) {
           setUploadedImages(
             Array.isArray(localData.images) ? localData.images : []
           );
-          console.log('Setting uploaded images:', localData.images || []);
+          // console.log('Setting uploaded images:', localData.images || []);
           setContextData(localData.contextData || {});
           setMessages(localData.messages || []);
         } else {
-          console.log('No local data found, initializing with defaults');
+          // console.log('No local data found, initializing with defaults');
           const defaultItem = createDefaultItem(ItemId);
           setItem(defaultItem);
           setName(defaultItem.name || '');
@@ -376,7 +380,7 @@ function NewItemPage({ setItemId }) {
 
     try {
       const response = await fetch(
-        `http://localhost:${backendPort}/api/analyze-image`,
+        `http://localhost:${backendPort}/api/analyze-images`,
         {
           method: 'POST',
           body: formData,
@@ -518,7 +522,7 @@ function NewItemPage({ setItemId }) {
     );
   };
 
-  // Update the updateItem function
+  // Update this function to handle nested updates
   const updateItem = (field, value) => {
     setItem((prevItem) => {
       const newItem = { ...prevItem };
@@ -536,7 +540,7 @@ function NewItemPage({ setItemId }) {
     setHasUnsavedChanges(true);
   };
 
-  // Add this new function to handle image analysis
+  // Update the handleAnalyzeImages function
   const handleAnalyzeImages = async () => {
     if (uploadedImages.length === 0) {
       setNotificationMessage('Please upload at least one image to analyze.');
@@ -546,47 +550,82 @@ function NewItemPage({ setItemId }) {
 
     setIsAnalyzing(true);
     try {
-      const base64Images = await Promise.all(
-        uploadedImages.map(async (image) => {
-          const response = await fetch(image.url);
-          const blob = await response.blob();
-          return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result.split(',')[1]);
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-          });
-        })
-      );
+      const imageUrls = uploadedImages.map((image) => image.url);
 
-      if (base64Images.length === 0) {
-        throw new Error('No images available for analysis');
-      }
-
-      const analysisResult = await analyzeImagesWithAssistant(
-        base64Images,
+      // Step 1: Collect all JSON responses
+      const analysisResults = await analyzeImagesWithAssistant(
+        imageUrls,
         item.description,
         item.itemId,
         item.sellerNotes,
         JSON.stringify(contextData)
       );
 
-      // Update the item state with the analysis results
+      console.log('Raw analysis results:', analysisResults);
+
+      // Step 2: Use combineAnalyses to combine and summarize the results
+      const combinedAnalysis = await CombineAnalyses(analysisResults);
+
+      console.log('Combined analysis:', combinedAnalysis);
+
+      // Step 3: Map the combined analysis to your form fields
+      const mappedResult = {
+        itemDetails: {
+          type: combinedAnalysis.itemDetails?.type || 'Unknown',
+          brand: combinedAnalysis.itemDetails?.brand || 'Unknown',
+          condition: combinedAnalysis.itemDetails?.condition || 'Unknown',
+          rarity: combinedAnalysis.itemDetails?.rarity || 'Unknown',
+          authenticityConfirmed:
+            combinedAnalysis.itemDetails?.authenticityConfirmed || null,
+          packagingAccessories:
+            combinedAnalysis.itemDetails?.packagingAccessories || 'None',
+        },
+        financials: {
+          purchasePrice: combinedAnalysis.financials?.purchasePrice || 0,
+          cleaningRepairCosts:
+            combinedAnalysis.financials?.cleaningRepairCosts || 0,
+          estimatedShippingCosts:
+            combinedAnalysis.financials?.estimatedShippingCosts || 0,
+          platformFees: combinedAnalysis.financials?.platformFees || 0,
+          expectedProfit: combinedAnalysis.financials?.expectedProfit || 0,
+          estimatedValue: combinedAnalysis.financials?.estimatedValue || 0,
+        },
+        marketAnalysis: {
+          marketDemand:
+            combinedAnalysis.marketAnalysis?.marketDemand || 'Unknown',
+          historicalPriceTrends:
+            combinedAnalysis.marketAnalysis?.historicalPriceTrends || 'Unknown',
+          marketSaturation:
+            combinedAnalysis.marketAnalysis?.marketSaturation || 'Unknown',
+          salesVelocity:
+            combinedAnalysis.marketAnalysis?.salesVelocity || 'Unknown',
+        },
+        finalRecommendation: {
+          purchaseRecommendation:
+            combinedAnalysis.finalRecommendation?.purchaseRecommendation ||
+            'Unknown',
+          detailedBreakdown:
+            combinedAnalysis.finalRecommendation?.detailedBreakdown ||
+            'No additional notes provided',
+        },
+      };
+
+      // Update the item state with the mapped results
       setItem((prevItem) => ({
         ...prevItem,
-        ...analysisResult.item,
+        ...mappedResult,
       }));
 
       // Update messages with the analysis advice
       setMessages((prevMessages) => [
         ...prevMessages,
-        { role: 'assistant', content: analysisResult.advice },
+        {
+          role: 'assistant',
+          content: `Analysis complete. ${mappedResult.finalRecommendation.detailedBreakdown}`,
+        },
       ]);
-
-      setNotificationMessage('Image analysis completed successfully!');
-      setShowNotification(true);
     } catch (error) {
-      console.error('Error analyzing images:', error);
+      console.error('Error in handleAnalyzeImages:', error);
       setNotificationMessage(
         'An error occurred while analyzing the images. Please try again.'
       );
@@ -621,7 +660,7 @@ function NewItemPage({ setItemId }) {
   };
 
   useEffect(() => {
-    console.log('uploadedImages updated:', uploadedImages);
+    //  console.log('uploadedImages updated:', uploadedImages);
   }, [uploadedImages]);
 
   const handleSaveDraft = async () => {
@@ -643,7 +682,7 @@ function NewItemPage({ setItemId }) {
 
     try {
       console.log('Saving draft:', item);
-      console.log('Messages to save:', messages); // Log messages before saving
+      console.log('Messages to save:', messages);
       const savedDraft = await handleManualSave(
         item,
         uploadedImages,
@@ -655,9 +694,8 @@ function NewItemPage({ setItemId }) {
         setLastAutoSave
       );
       console.log('Draft saved successfully:', savedDraft);
-      console.log('Saved messages:', savedDraft.messages); // Log saved messages
+      console.log('Saved messages:', savedDraft.messages);
 
-      // Show a success notification
       setNotificationMessage('Draft saved successfully!');
       setShowNotification(true);
       setTimeout(() => setShowNotification(false), 3000);
@@ -669,11 +707,18 @@ function NewItemPage({ setItemId }) {
     }
   };
 
+  const handlePurchaseRecommendationChange = (value) => {
+    updateItem(
+      'finalRecommendation.purchaseRecommendation',
+      value === 'true' ? true : value === 'false' ? false : null
+    );
+  };
+
   if (!item) {
     return <div>Loading...</div>;
   }
 
-  console.log('Current ItemId:', ItemId);
+  //console.log('Current ItemId:', ItemId);
 
   return (
     <PageContainer>
@@ -760,7 +805,6 @@ function NewItemPage({ setItemId }) {
             multiple
             accept="image/*"
             onChange={(e) => {
-              console.log('File input change event triggered');
               handleFileChange(setUploadedImages, ItemId)(e);
             }}
           />
@@ -771,7 +815,6 @@ function NewItemPage({ setItemId }) {
             multiple
             accept="image/*"
             onChange={(e) => {
-              console.log('File input change event triggered');
               handleFileChange(setUploadedImages, ItemId)(e);
             }}
           />
@@ -1022,6 +1065,37 @@ function NewItemPage({ setItemId }) {
                 value={item.sellerNotes || ''}
                 onChange={(e) => updateItem('sellerNotes', e.target.value)}
                 rows="3"
+              />
+            </StyledFormGroup>
+
+            <StyledFormGroup>
+              <StyledLabel htmlFor="purchaseRecommendation">
+                Purchase Recommendation
+              </StyledLabel>
+              <StyledSelect
+                id="purchaseRecommendation"
+                value={
+                  item.finalRecommendation?.purchaseRecommendation ?? 'Unknown'
+                }
+                onChange={(e) =>
+                  handlePurchaseRecommendationChange(e.target.value)
+                }
+              >
+                <option value="true">Yes</option>
+                <option value="false">No</option>
+                <option value="Unknown">Unknown</option>
+              </StyledSelect>
+            </StyledFormGroup>
+
+            <StyledFormGroup>
+              <StyledLabel htmlFor="detailedBreakdown">
+                Detailed Breakdown
+              </StyledLabel>
+              <StyledTextarea
+                id="detailedBreakdown"
+                value={item.finalRecommendation?.detailedBreakdown || ''}
+                readOnly
+                rows="5"
               />
             </StyledFormGroup>
 

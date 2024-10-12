@@ -5,7 +5,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import mongoose from 'mongoose';
-import { DraftItem } from '../models/DraftItem.js'; // Import the DraftItem model
+// import { DraftItem } from '../models/DraftItem.js'; // Import the DraftItem model
 import {
   interactWithMoolaMaticAssistant,
   createUserMessage,
@@ -81,26 +81,17 @@ router.use(express.json({ limit: '20mb' })); // Increased limit for large images
  */
 router.post('/analyze-images', async (req, res) => {
   try {
-    const { images, description, itemId, sellerNotes, contextData } = req.body;
-
-    // Ensure contextData is an object
-    const parsedContextData =
-      typeof contextData === 'string' ? JSON.parse(contextData) : contextData;
-
-    const result = await sendAnalysisRequest(
-      images,
-      description,
-      itemId,
-      sellerNotes,
-      parsedContextData
+    console.log(
+      'Data received for image analysis:',
+      JSON.stringify(req.body, null, 2)
     );
-
-    res.json(result);
+    const analysisResponse = await sendAnalysisRequest(req.body);
+    res.json(analysisResponse);
   } catch (error) {
     console.error('Error processing image analysis:', error);
     res
       .status(500)
-      .json({ error: 'Internal server error', details: error.message });
+      .json({ error: 'Error processing image analysis: ' + error.message });
   }
 });
 

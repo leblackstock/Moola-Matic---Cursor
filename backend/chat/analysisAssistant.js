@@ -6,233 +6,209 @@
  * a description to the assistant and receive a consolidated JSON response.
  */
 
-import { interactWithMoolaMaticAssistant } from './chatAssistant.js';
-import { processImages } from '../utils/imageProcessor.js'; // Ensure this utility is implemented
+import {
+  interactWithMoolaMaticAssistant,
+  createUserMessage,
+} from './chatAssistant.js';
+import { processImages } from '../utils/imageProcessor.js';
+//import OpenAI from 'openai';
+//import fs from 'fs';
+//import { promises as fsPromises } from 'fs';
+//import path from 'path';
+//import { rateLimitedRequest } from '../utils/rateLimiter.js';
+import axios from 'axios';
+//import { DraftItem } from '../models/draftItem.js';
 
-// Validate essential environment variables
-const { OPENAI_API_KEY, MOOLA_MATIC_ASSISTANT_ID } = process.env;
+// const client = new OpenAI({
+//   apiKey: process.env.OPENAI_API_KEY,
+// });
 
-// Define the analysis prompt as a constant
-const ANALYSIS_PROMPT = `
-You are an expert assistant specialized in evaluating items for resale. Your task is to analyze multiple provided base64-encoded images and a detailed description of the items. Based on your comprehensive analysis, extract and summarize the necessary details into the following JSON format. Ensure that for each specified field, the information is consolidated and concise, reflecting an aggregated understanding derived from all images and the description.
+// const uploadImageToOpenAI = async (base64String, fileName) => {
+//   let tempFilePath;
+//   try {
+//     const tempDir = path.join(process.cwd(), 'temp');
+//     await fsPromises.mkdir(tempDir, { recursive: true });
+//     tempFilePath = path.join(tempDir, fileName);
 
-Analysis Objectives
+//     // Remove the data URL prefix if present
+//     const base64Data = base64String.replace(/^data:image\/\w+;base64,/, '');
+//     const buffer = Buffer.from(base64Data, 'base64');
+//     await fsPromises.writeFile(tempFilePath, buffer);
 
-Item Details Type: Determine and state the definitive type of the item, considering all images collectively. Brand: Identify the most prominent brand showcased across the images. Condition: Assess and summarize the overall condition of the item (e.g., "new," "like new," "good," "fair," "poor") based on visual indicators from all images. Rarity: Evaluate and indicate the rarity of the item by synthesizing information from the images. Authenticity Confirmed: Conclude with a clear "Yes" or "No" on the item's authenticity, based on visual evidence and any provided descriptions. Packaging and Accessories: Summarize all packaging materials and accessories visible in any of the images.
+//     const file = await rateLimitedRequest(() =>
+//       client.files.create({
+//         file: fs.createReadStream(tempFilePath),
+//         purpose: 'vision',
+//       })
+//     );
 
-Financials Purchase Price: Provide a single, accurate value representing the item's purchase price. Cleaning/Repair Costs: Aggregate and state the total estimated costs for any cleaning or repairs needed. Estimated Shipping Costs: Provide a single, consolidated value for estimated shipping expenses. Platform Fees: Provide a single value representing the fees associated with the resale platform. Expected Profit: Calculate and provide a single value indicating the expected profit from the resale.
-
-Market Analysis Market Demand: Offer a single, clear assessment of the current market demand for the item. Historical Price Trends: Summarize the historical price trends, highlighting any significant patterns or changes. Market Saturation: Provide a single assessment indicating the level of market saturation for similar items. Sales Velocity: Offer a single estimation of how quickly similar items are selling in the market.
-
-Final Recommendation Purchase Recommendation: Conclude with a definitive "Yes" or "No" recommendation on whether to proceed with the purchase. Detailed Breakdown: Provide a concise and comprehensive summary supporting the purchase recommendation, incorporating insights from all analyzed data.
-
-JSON Output Structure
-
-Provide the extracted and consolidated information in the following JSON format:
-
-{ "itemDetails": { "type": "string", "brand": "string", "condition": "string", "rarity": "string", "authenticityConfirmed": "Yes/No", "packagingAccessories": "string" }, "financials": { "purchasePrice": 0, "cleaningRepairCosts": 0, "estimatedShippingCosts": 0, "platformFees": 0, "expectedProfit": 0 }, "marketAnalysis": { "marketDemand": "string", "historicalPriceTrends": "string", "marketSaturation": "string", "salesVelocity": "string" }, "finalRecommendation": { "purchaseRecommendation": "Yes/No", "detailedBreakdown": "string" } }
-
-Notes:
-
-Consolidation:
-Ensure that each field contains only one entry, representing an aggregated analysis from all provided images and the description. Avoid repetition of information across fields; instead, synthesize the data to present a unified assessment.
-
-Clarity and Precision:
-Use clear and precise language to summarize findings. If certain fields cannot be determined due to lack of information, set them to null to indicate the absence of data.
-
-Consistency:
-Maintain a consistent format and structure in the JSON output to facilitate seamless data integration and storage.
-
-Best Practices for Generating Consolidated JSON Responses
-
-Holistic Analysis
-Review all images in conjunction with the description to form a comprehensive understanding of the item. Identify overlapping details across images to reinforce accuracy in the consolidated fields.
-
-Prioritize Information
-Determine which details are most critical for each field and prioritize their inclusion to maintain conciseness. Eliminate redundant or minor details that do not significantly impact the overall assessment.
-
-Structured Summarization
-For fields requiring summarization (e.g., Condition, Rarity), distill the essence of the observations into a single, coherent statement. Use quantitative values (e.g., monetary amounts) where applicable to provide clear and measurable data.
-
-Validation and Consistency Checks
-After generating the JSON, perform validation to ensure all required fields are present and correctly formatted. Cross-verify the summarized information against the original images and description to maintain data integrity.
-
-JSON Output Structure
-
-Provide the extracted and consolidated information in the following JSON format:
-
-{
-  "itemDetails": {
-    "type": "string",
-    "brand": "string",
-    "condition": "string",
-    "rarity": "string",
-    "authenticityConfirmed": "Yes/No",
-    "packagingAccessories": "string"
-  },
-  "financials": {
-    "purchasePrice": 0,
-    "cleaningRepairCosts": 0,
-    "estimatedShippingCosts": 0,
-    "platformFees": 0,
-    "expectedProfit": 0
-  },
-  "marketAnalysis": {
-    "marketDemand": "string",
-    "historicalPriceTrends": "string",
-    "marketSaturation": "string",
-    "salesVelocity": "string"
-  },
-  "finalRecommendation": {
-    "purchaseRecommendation": "Yes/No",
-    "detailedBreakdown": "string"
-  }
-}
-
-`;
+//     return file.id;
+//   } catch (error) {
+//     console.error('Error uploading image to OpenAI:', error);
+//     throw error;
+//   } finally {
+//     if (tempFilePath) {
+//       try {
+//         await fsPromises.unlink(tempFilePath);
+//         console.log(`Temporary file ${tempFilePath} cleaned up`);
+//       } catch (cleanupError) {
+//         console.error('Error cleaning up temporary file:', cleanupError);
+//       }
+//     }
+//   }
+// };
 
 /**
  * Sends multiple base64-encoded images and a description to the GPT assistant
  * and retrieves a consolidated JSON response.
  *
- * @param {Array<string>} base64Images - Array of base64-encoded image strings.
+ * @param {Array<string>} imagePaths - Array of image file paths.
  * @param {string} description - Description of the items.
  * @param {string} itemId - Unique identifier for the item.
  * @param {string} [sellerNotes] - Optional seller notes.
  * @param {Object} [contextData] - Optional contextual data.
- * @param {string} [analysisPrompt] - Custom analysis prompt (optional).
- * @returns {Promise<Object>} - The assistant's JSON response.
+ * @returns {Promise<Object>} - The assistant's JSON response mapped to DraftItem structure.
  */
-const sendAnalysisRequest = async (
-  base64Images,
-  description,
-  itemId,
-  sellerNotes = '',
-  contextData = {}
-) => {
-  try {
-    console.log(`Received ${base64Images.length} images for processing`);
+async function sendAnalysisRequest(data) {
+  console.log(
+    'Received data in sendAnalysisRequest:',
+    JSON.stringify(data, null, 2)
+  );
 
-    // Process images and extract relevant information
-    const imageAnalysis = await processImages(base64Images);
-    console.log(
-      'Image analysis results:',
-      JSON.stringify(imageAnalysis, null, 2)
-    );
+  const { images, description, itemId, sellerNotes } = data;
 
-    // Count successfully processed images
-    const successfulImages = imageAnalysis.filter((img) => !img.error).length;
-    const failedImages = imageAnalysis.length - successfulImages;
+  if (!Array.isArray(images) || images.length === 0) {
+    throw new Error('Invalid or missing image paths');
+  }
 
-    const message = {
-      role: 'user',
-      content: `
-Analyze the following item:
-Description: ${description || 'No description provided'}
-Item ID: ${itemId}
-Seller Notes: ${sellerNotes || 'No seller notes provided'}
-Image Analysis: ${JSON.stringify(imageAnalysis)}
+  const analysisPrompt = `
+Analyze the provided images to fill out the specified JSON structure with detailed information.
 
-Note: ${successfulImages} out of ${imageAnalysis.length} images were successfully processed. ${failedImages} images failed to process due to data corruption or invalid formats.
+# Steps
 
-Based on the provided information and image analysis, please fill out the following JSON structure with your best estimates and analysis. If a field cannot be determined, use "Unknown" for string fields and 0 for numeric fields.
+1. Review each image carefully to gather details about the item.
+2. For each attribute in the JSON structure, assess all images to determine the appropriate value.
+3. If an attribute cannot be determined or is not applicable, assign it a value of \`null\`.
+4. Use additional information such as the description, item ID, and seller notes if provided, to assist in filling out the JSON.
 
-Please provide the output in the following JSON format:
+# Output Format
+
+Provide the output strictly in the following JSON format with each field filled out accordingly:
 
 {
-  "itemDetails": {
-    "type": "string",
-    "brand": "string",
-    "condition": "string",
-    "rarity": "string",
-    "authenticityConfirmed": "Yes/No",
-    "packagingAccessories": "string"
-  },
-  "financials": {
-    "purchasePrice": 0,
-    "cleaningRepairCosts": 0,
-    "estimatedShippingCosts": 0,
-    "platformFees": 0,
-    "expectedProfit": 0
-  },
-  "marketAnalysis": {
-    "marketDemand": "string",
-    "historicalPriceTrends": "string",
-    "marketSaturation": "string",
-    "salesVelocity": "string"
-  },
-  "finalRecommendation": {
-    "purchaseRecommendation": "Yes/No",
-    "detailedBreakdown": "string"
+  "type": "string",
+  "brand": "string",
+  "condition": "string",
+  "rarity": "string",
+  "authenticityConfirmed": "Yes/No",
+  "packagingAccessories": "string",
+  "purchasePrice": 0,
+  "cleaningRepairCosts": 0,
+  "estimatedShippingCosts": 0,
+  "platformFees": 0,
+  "expectedProfit": 0,
+  "marketDemand": "string",
+  "historicalPriceTrends": "string",
+  "marketSaturation": "string",
+  "salesVelocity": "string",
+  "purchaseRecommendation": "Yes/No",
+  "detailedBreakdown": "string"
+}
+
+# Notes
+
+- Ensure all numbers are provided without quotes and any unavailable or undetermined fields are set to \`null\`.
+- Utilize any supplementary details such as description, item ID, and seller notes, even if they are not directly visible in the images.
+- If relevant, the provided number of images should be considered during the analysis process for context.
+
+Additional Information:
+Description: ${description || 'N/A'}
+Item ID: ${itemId || 'N/A'}
+Seller Notes: ${sellerNotes || 'N/A'}
+
+Note: ${images.length} images were provided for analysis.
+`;
+
+  console.log('Image paths before processing:', images);
+  const processedImages = await processImages(images);
+  console.log('Number of processed images:', processedImages.length);
+
+  const validProcessedImages = processedImages.filter(
+    (img) => img && img.base64
+  );
+  console.log('Number of valid processed images:', validProcessedImages.length);
+
+  if (validProcessedImages.length === 0) {
+    throw new Error('No valid images were processed');
+  }
+
+  const messages = [
+    createUserMessage(analysisPrompt),
+    ...validProcessedImages.map((img) => {
+      console.log(`Creating message for image: ${img.original_path}`);
+      return {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'Analyze this image:' },
+          { type: 'image_url', image_url: { url: img.base64 } },
+        ],
+      };
+    }),
+  ];
+
+  console.log('Number of messages created:', messages.length);
+
+  try {
+    const analysisResponse = await interactWithMoolaMaticAssistant(messages);
+    return analysisResponse; // Return the raw response without parsing
+  } catch (error) {
+    console.error('Error sending analysis request:', error);
+    throw error;
   }
 }
 
-Ensure the output adheres to valid JSON syntax without any comments or additional formatting outside of the given template. Each field should contain aggregated data based on all successfully processed images and provided descriptions, ensuring consistency, clarity, and precision. If some images failed to process, please mention this in your detailed breakdown.
-      `,
-    };
+/**
+ * Sends an array of JSON analysis objects to the backend endpoint /api/combine-image-analyses.
+ * @param {Array<Object>} analysisJSONs - Array of analysis JSON objects.
+ * @returns {Promise<Object>} The combined and summarized JSON response from the backend.
+ * @throws Will throw an error if the request fails or the response status is unexpected.
+ */
+const sendToBackend = async (analysisJSONs) => {
+  try {
+    const backendUrl =
+      process.env.BACKEND_URL ||
+      'http://localhost:3001/api/combine-image-analyses';
 
-    console.log(
-      'Sending message to assistant:',
-      JSON.stringify(message, null, 2)
-    );
+    const response = await axios.post(backendUrl, analysisJSONs, {
+      headers: {
+        'Content-Type': 'application/json',
+        // Include authentication headers if required
+        // 'Authorization': `Bearer ${process.env.BACKEND_API_KEY}`,
+      },
+      timeout: 5000, // 5 seconds timeout
+    });
 
-    const assistantResponse = await interactWithMoolaMaticAssistant(
-      [message],
-      contextData
-    );
-
-    console.log('Raw assistant response:', assistantResponse);
-
-    // The response should already be in JSON format, so we can parse it directly
-    try {
-      const jsonResponse = JSON.parse(assistantResponse);
-      return jsonResponse;
-    } catch (parseError) {
-      console.warn('Failed to parse JSON from response:', parseError.message);
-      return {
-        error: 'Failed to parse JSON from assistant response',
-        rawResponse: assistantResponse,
-      };
+    if (response.status === 200) {
+      console.log('Combined analysis received:', response.data);
+      return response.data;
+    } else {
+      console.error(`Unexpected response status: ${response.status}`);
+      throw new Error(`Unexpected response status: ${response.status}`);
     }
   } catch (error) {
-    console.error('Error sending analysis request:', error.message);
+    if (error.isAxiosError) {
+      console.error(
+        'Axios error while sending analyses to backend:',
+        error.message
+      );
+    } else {
+      console.error(
+        'Unexpected error while sending analyses to backend:',
+        error.message
+      );
+    }
     throw error;
   }
 };
 
-// Example usage
-(async () => {
-  try {
-    // Sample base64-encoded images (truncated for brevity)
-    const base64Images = [
-      'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...', // Image 1
-      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...', // Image 2
-      'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...', // Image 3
-    ];
-
-    // Sample data
-    const description = 'A collection of antique clocks in pristine condition.';
-    const itemId = 'unique-item-789';
-    const sellerNotes =
-      'Includes original boxes and certificates of authenticity.';
-    const contextData = {
-      lastInteraction: '2024-04-27T10:00:00Z',
-    };
-
-    // Send the analysis request
-    const result = await sendAnalysisRequest(
-      base64Images,
-      description,
-      itemId,
-      sellerNotes,
-      contextData,
-      ANALYSIS_PROMPT // Explicitly passing the analysis prompt
-    );
-
-    console.log('Consolidated JSON Response:', JSON.stringify(result, null, 2));
-  } catch (error) {
-    console.error('Analysis failed:', error);
-  }
-})();
-
-export { sendAnalysisRequest, ANALYSIS_PROMPT };
+export { sendAnalysisRequest, sendToBackend };
