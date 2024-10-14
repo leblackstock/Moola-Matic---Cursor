@@ -6,58 +6,6 @@
  * a description to the assistant and receive a consolidated JSON response.
  */
 
-import {
-  interactWithMoolaMaticAssistant,
-  createUserMessage,
-} from './chatAssistant.js';
-import { processImages } from '../utils/imageProcessor.js';
-//import OpenAI from 'openai';
-//import fs from 'fs';
-//import { promises as fsPromises } from 'fs';
-//import path from 'path';
-//import { rateLimitedRequest } from '../utils/rateLimiter.js';
-import axios from 'axios';
-//import { DraftItem } from '../models/draftItem.js';
-
-// const client = new OpenAI({
-//   apiKey: process.env.OPENAI_API_KEY,
-// });
-
-// const uploadImageToOpenAI = async (base64String, fileName) => {
-//   let tempFilePath;
-//   try {
-//     const tempDir = path.join(process.cwd(), 'temp');
-//     await fsPromises.mkdir(tempDir, { recursive: true });
-//     tempFilePath = path.join(tempDir, fileName);
-
-//     // Remove the data URL prefix if present
-//     const base64Data = base64String.replace(/^data:image\/\w+;base64,/, '');
-//     const buffer = Buffer.from(base64Data, 'base64');
-//     await fsPromises.writeFile(tempFilePath, buffer);
-
-//     const file = await rateLimitedRequest(() =>
-//       client.files.create({
-//         file: fs.createReadStream(tempFilePath),
-//         purpose: 'vision',
-//       })
-//     );
-
-//     return file.id;
-//   } catch (error) {
-//     console.error('Error uploading image to OpenAI:', error);
-//     throw error;
-//   } finally {
-//     if (tempFilePath) {
-//       try {
-//         await fsPromises.unlink(tempFilePath);
-//         console.log(`Temporary file ${tempFilePath} cleaned up`);
-//       } catch (cleanupError) {
-//         console.error('Error cleaning up temporary file:', cleanupError);
-//       }
-//     }
-//   }
-// };
-
 /**
  * Sends multiple base64-encoded images and a description to the GPT assistant
  * and retrieves a consolidated JSON response.
@@ -69,19 +17,7 @@ import axios from 'axios';
  * @param {Object} [contextData] - Optional contextual data.
  * @returns {Promise<Object>} - The assistant's JSON response mapped to DraftItem structure.
  */
-async function sendAnalysisRequest(data) {
-  console.log(
-    'Received data in sendAnalysisRequest:',
-    JSON.stringify(data, null, 2)
-  );
-
-  const { images, description, itemId, sellerNotes } = data;
-
-  if (!Array.isArray(images) || images.length === 0) {
-    throw new Error('Invalid or missing image paths');
-  }
-
-  const analysisPrompt = `
+export const generateAnalysisPrompt = (description, itemId, sellerNotes) => `
 Analyze the provided images to fill out the specified JSON structure with detailed information.
 
 # Steps
@@ -115,100 +51,56 @@ Provide the output strictly in the following JSON format with each field filled 
   "detailedBreakdown": "string"
 }
 
-# Notes
-
-- Ensure all numbers are provided without quotes and any unavailable or undetermined fields are set to \`null\`.
-- Utilize any supplementary details such as description, item ID, and seller notes, even if they are not directly visible in the images.
-- If relevant, the provided number of images should be considered during the analysis process for context.
-
 Additional Information:
 Description: ${description || 'N/A'}
 Item ID: ${itemId || 'N/A'}
 Seller Notes: ${sellerNotes || 'N/A'}
-
-Note: ${images.length} images were provided for analysis.
 `;
 
-  console.log('Image paths before processing:', images);
-  const processedImages = await processImages(images);
-  console.log('Number of processed images:', processedImages.length);
+export const generateCombineAndSummarizeAnalysisPrompt = () => `
+Combine and summarize the provided analysis results into a single, comprehensive JSON structure.
 
-  const validProcessedImages = processedImages.filter(
-    (img) => img && img.base64
-  );
-  console.log('Number of valid processed images:', validProcessedImages.length);
+# Steps
 
-  if (validProcessedImages.length === 0) {
-    throw new Error('No valid images were processed');
-  }
+1. Review all provided analysis results carefully.
+2. For each attribute in the JSON structure, synthesize the information from all analyses to determine the most accurate and comprehensive value.
+3. If there are conflicting values for an attribute, use your best judgment to select the most appropriate one or provide a range if applicable.
+4. If an attribute is consistently undetermined across all analyses, assign it a value of \`null\`.
+5. Compile all additional notes and use them to create a detailed breakdown of the item.
 
-  const messages = [
-    createUserMessage(analysisPrompt),
-    ...validProcessedImages.map((img) => {
-      console.log(`Creating message for image: ${img.original_path}`);
-      return {
-        role: 'user',
-        content: [
-          { type: 'text', text: 'Analyze this image:' },
-          { type: 'image_url', image_url: { url: img.base64 } },
-        ],
-      };
-    }),
-  ];
+# Output Format
 
-  console.log('Number of messages created:', messages.length);
+Provide the output strictly in the following JSON format, ensuring each field is filled out with the most comprehensive information:
 
-  try {
-    const analysisResponse = await interactWithMoolaMaticAssistant(messages);
-    return analysisResponse; // Return the raw response without parsing
-  } catch (error) {
-    console.error('Error sending analysis request:', error);
-    throw error;
-  }
+{
+  "type": "string",
+  "brand": "string",
+  "condition": "string",
+  "rarity": "string",
+  "authenticityConfirmed": "Yes/No",
+  "packagingAccessories": "string",
+  "purchasePrice": 0,
+  "cleaningRepairCosts": 0,
+  "estimatedShippingCosts": 0,
+  "platformFees": 0,
+  "expectedProfit": 0,
+  "marketDemand": "string",
+  "historicalPriceTrends": "string",
+  "marketSaturation": "string",
+  "salesVelocity": "string",
+  "purchaseRecommendation": "Yes/No",
+  "detailedBreakdown": "string"
 }
 
-/**
- * Sends an array of JSON analysis objects to the backend endpoint /api/combine-image-analyses.
- * @param {Array<Object>} analysisJSONs - Array of analysis JSON objects.
- * @returns {Promise<Object>} The combined and summarized JSON response from the backend.
- * @throws Will throw an error if the request fails or the response status is unexpected.
- */
-const sendToBackend = async (analysisJSONs) => {
-  try {
-    const backendUrl =
-      process.env.BACKEND_URL ||
-      'http://localhost:3001/api/combine-image-analyses';
+# Important Notes
 
-    const response = await axios.post(backendUrl, analysisJSONs, {
-      headers: {
-        'Content-Type': 'application/json',
-        // Include authentication headers if required
-        // 'Authorization': `Bearer ${process.env.BACKEND_API_KEY}`,
-      },
-      timeout: 5000, // 5 seconds timeout
-    });
+1. The "detailedBreakdown" field should be a comprehensive summary that incorporates all additional notes from the individual analyses. This should include any observations, insights, or details that didn't fit into the other structured fields.
 
-    if (response.status === 200) {
-      console.log('Combined analysis received:', response.data);
-      return response.data;
-    } else {
-      console.error(`Unexpected response status: ${response.status}`);
-      throw new Error(`Unexpected response status: ${response.status}`);
-    }
-  } catch (error) {
-    if (error.isAxiosError) {
-      console.error(
-        'Axios error while sending analyses to backend:',
-        error.message
-      );
-    } else {
-      console.error(
-        'Unexpected error while sending analyses to backend:',
-        error.message
-      );
-    }
-    throw error;
-  }
-};
+2. If there are discrepancies between analyses, mention these in the "detailedBreakdown" and explain how you arrived at the final values in the JSON structure.
 
-export { sendAnalysisRequest, sendToBackend };
+3. Ensure that all relevant information from the individual analyses is captured in the final output, either in the structured fields or in the "detailedBreakdown".
+
+4. If any analysis provided unique insights not covered by the standard fields, include this information in the "detailedBreakdown".
+
+5. The final output should represent a complete and nuanced understanding of the item, synthesizing all available information from the multiple analyses.
+`;

@@ -5,13 +5,18 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import mongoose from 'mongoose';
-// import { DraftItem } from '../models/DraftItem.js'; // Import the DraftItem model
 import {
-  interactWithMoolaMaticAssistant,
-  createUserMessage,
   createAssistantMessage,
+  analyzeImagesWithAssistant,
+  summarizeAnalyses,
 } from './chatAssistant.js';
-import { sendAnalysisRequest } from './analysisAssistant.js';
+import {
+  generateAnalysisPrompt,
+  generateCombineAndSummarizeAnalysisPrompt,
+} from './analysisAssistant.js';
+import { processImages } from '../utils/imageProcessor.js';
+import { combineAnalyses } from './chatCombineAnalysis.js';
+import { Item } from '../models/Item.js'; // Import the Item model
 
 // Resolve __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -29,32 +34,19 @@ const {
   MOOLA_MATIC_ASSISTANT_ID,
 } = process.env;
 
-if (!OPENAI_API_KEY) {
-  console.error('Error: OPENAI_API_KEY is not defined in the .env file.');
-  process.exit(1);
-}
-
-if (!BACKEND_PORT) {
-  console.error('Error: BACKEND_PORT is not defined in the .env file.');
-  process.exit(1);
-}
-
-if (!SESSION_SECRET) {
-  console.error('Error: SESSION_SECRET is not defined in the .env file.');
-  process.exit(1);
-}
-
-if (!MONGODB_URI) {
-  console.error('Error: MONGODB_URI is not defined in the .env file.');
-  process.exit(1);
-}
-
-if (!MOOLA_MATIC_ASSISTANT_ID) {
-  console.error(
-    'Error: MOOLA_MATIC_ASSISTANT_ID is not defined in the .env file.'
-  );
-  process.exit(1);
-}
+// Check for required environment variables
+[
+  { key: 'OPENAI_API_KEY', value: OPENAI_API_KEY },
+  { key: 'BACKEND_PORT', value: BACKEND_PORT },
+  { key: 'SESSION_SECRET', value: SESSION_SECRET },
+  { key: 'MONGODB_URI', value: MONGODB_URI },
+  { key: 'MOOLA_MATIC_ASSISTANT_ID', value: MOOLA_MATIC_ASSISTANT_ID },
+].forEach(({ key, value }) => {
+  if (!value) {
+    console.error(`Error: ${key} is not defined in the .env file.`);
+    process.exit(1);
+  }
+});
 
 // Connect to MongoDB
 mongoose
@@ -71,54 +63,110 @@ mongoose
 // Initialize Express Router
 const router = express.Router();
 
-// Parse JSON bodies
-router.use(express.json({ limit: '20mb' })); // Increased limit for large images
+// Parse JSON bodies with increased limit for large images
+router.use(express.json({ limit: '20mb' }));
 
 /**
- * Route to handle multiple image-based chat interactions using uploaded image files
+ * Route to handle multiple image-based chat interactions
  * POST /api/analyze-images
- * Expects multipart/form-data with 'images' (array of files), 'description', and 'itemId' fields
  */
 router.post('/analyze-images', async (req, res) => {
   try {
-    console.log(
-      'Data received for image analysis:',
-      JSON.stringify(req.body, null, 2)
+    const { images, description, itemId, sellerNotes } = req.body;
+
+    // Validate image input
+    if (!images || !Array.isArray(images) || images.length === 0) {
+      return res.status(400).json({ error: 'No valid images provided' });
+    }
+
+    // Extract valid image URLs
+    const imageUrls = images.filter(
+      (img) =>
+        typeof img === 'string' &&
+        (img.startsWith('http') || img.startsWith('https'))
     );
-    const analysisResponse = await sendAnalysisRequest(req.body);
-    res.json(analysisResponse);
+    console.log('Extracted image URLs:', imageUrls);
+
+    if (imageUrls.length === 0) {
+      return res.status(400).json({ error: 'No valid image URLs found' });
+    }
+
+    // Process images, analyze, combine, and summarize
+    const processedImages = await processImages(imageUrls);
+    const analysisPrompt = generateAnalysisPrompt(
+      description,
+      itemId,
+      sellerNotes
+    );
+    const analysisResults = await analyzeImagesWithAssistant(
+      processedImages,
+      analysisPrompt
+    );
+    const combinedAnalyses = combineAnalyses([analysisResults]);
+    const combineAndSummarizeAnalysisPrompt =
+      generateCombineAndSummarizeAnalysisPrompt();
+    const finalAnalysis = await summarizeAnalyses(
+      combinedAnalyses,
+      combineAndSummarizeAnalysisPrompt
+    );
+
+    res.json(JSON.parse(finalAnalysis));
   } catch (error) {
-    console.error('Error processing image analysis:', error);
+    console.error('Error in /analyze-images:', error);
     res
       .status(500)
-      .json({ error: 'Error processing image analysis: ' + error.message });
+      .json({ error: 'Failed to analyze images', details: error.message });
   }
 });
 
-// Add this new route for text-only chat
+/**
+ * Route to handle text-only chat
+ * POST /chat
+ */
 router.post('/chat', async (req, res) => {
   console.log('Received chat request:', req.body);
-  const { message, contextData } = req.body;
+  const { message, itemId } = req.body;
 
+  // Validate input
   if (!message) {
     console.log('Error: Message is required');
     return res.status(400).json({ error: 'Message is required' });
   }
+  if (!itemId) {
+    console.log('Error: Item ID is required');
+    return res.status(400).json({ error: 'Item ID is required' });
+  }
 
   try {
     console.log('Processing message:', message);
-    const userMessage = createUserMessage(message);
-    const response = await interactWithMoolaMaticAssistant(
-      [userMessage],
-      contextData
-    );
-    console.log('Assistant response:', response);
 
-    const assistantMessage = createAssistantMessage(response);
+    // Retrieve the item from the database
+    const item = await Item.findById(itemId);
+    if (!item) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+
+    // Combine previous context with the new message
+    const fullContext = [
+      ...(item.chatContext || []),
+      { role: 'user', content: message },
+    ];
+
+    // Get assistant's response
+    const assistantResponse = await createAssistantMessage(fullContext);
+    console.log('Assistant response:', assistantResponse);
+
+    // Update the item's chat context in the database
+    item.chatContext = [
+      ...fullContext,
+      { role: 'assistant', content: assistantResponse },
+    ];
+    await item.save();
 
     res.json({
-      message: assistantMessage,
-      contextData: contextData, // Return updated context data
+      message: assistantResponse,
+      context: item.chatContext,
+      itemId: item._id,
     });
   } catch (error) {
     console.error('Error in chat handler:', error);
@@ -128,6 +176,5 @@ router.post('/chat', async (req, res) => {
   }
 });
 
-// Export the router
 export { router as chatHandler };
 export default router;

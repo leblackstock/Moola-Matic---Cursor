@@ -1,107 +1,98 @@
 // backend/chat/chatCombineAnalysis.js
 
-import express from 'express';
-import OpenAI from 'openai';
-import dotenv from 'dotenv';
-
-dotenv.config();
-
-const router = express.Router();
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-/**
- * Parses a JSON string and handles any parsing errors.
- * @param {string} jsonString - The JSON string to parse.
- * @returns {Object} - The parsed JSON object or an error object.
- */
-const parseJsonResponse = (jsonString) => {
+export const combineAnalyses = (analysisResults) => {
   try {
-    return JSON.parse(jsonString);
+    const combinedAnalyses = analysisResults.map((result) => {
+      const { parsedJson, remainingText } = parseJsonResponse(result);
+
+      if (!parsedJson) {
+        return {
+          error: 'Failed to parse JSON response',
+          rawResponse: result,
+          additionalNotes: remainingText,
+        };
+      }
+
+      if (Array.isArray(parsedJson)) {
+        // Handle case where multiple JSON objects were extracted
+        return parsedJson.map((json) => ({
+          ...json,
+          additionalNotes: remainingText,
+        }));
+      }
+
+      if (!isValidAnalysis(parsedJson)) {
+        return {
+          error: 'Invalid analysis structure',
+          rawResponse: result,
+          additionalNotes: remainingText,
+        };
+      }
+
+      return {
+        ...parsedJson,
+        additionalNotes: remainingText,
+      };
+    });
+
+    return combinedAnalyses.flat();
   } catch (error) {
-    console.error('Error parsing JSON response:', error);
-    return {
-      error: 'Failed to parse JSON response',
-      rawResponse: jsonString,
-    };
+    console.error('Error in combineAnalyses:', error);
+    throw error;
   }
 };
 
 /**
- * POST /combine-image-analyses
- * Accepts an array of JSON objects representing image analyses,
- * sends them to OpenAI for summarization, and returns the summarized JSON.
+ * Attempts to parse JSON from a string, extracting valid JSON objects if possible.
+ * @param {string} inputString - The input string that may contain JSON.
+ * @returns {Object} - An object containing parsed JSON (if any) and remaining text.
  */
-router.post('/combine-image-analyses', async (req, res) => {
+const parseJsonResponse = (inputString) => {
+  const result = {
+    parsedJson: null,
+    remainingText: inputString,
+  };
+
   try {
-    const analyses = req.body;
-
-    if (!Array.isArray(analyses)) {
-      return res
-        .status(400)
-        .json({ error: 'Input should be an array of JSON objects.' });
-    }
-
-    // Validate each analysis object
-    for (const [index, analysis] of analyses.entries()) {
-      if (
-        typeof analysis.overall_description !== 'string' ||
-        !Array.isArray(analysis.common_objects) ||
-        !Array.isArray(analysis.dominant_colors) ||
-        typeof analysis.overall_scene !== 'string'
-      ) {
-        return res.status(400).json({
-          error: `Invalid format in analysis object at index ${index}.`,
-        });
-      }
-    }
-
-    // Prepare the prompt for OpenAI
-    const prompt = `
-You are an AI assistant that summarizes multiple image analyses into a single, cohesive JSON object following this structure:
-
-{
-  "overall_description": "A combined description summarizing all the images collectively.",
-  "common_objects": ["list", "of", "objects", "frequently", "appearing", "across", "images"],
-  "dominant_colors": ["list", "of", "dominant", "colors", "appearing", "frequently", "across", "images"],
-  "overall_scene": "A brief description summarizing the common theme or setting across all the images."
-}
-
-Here are the individual image analyses:
-
-${JSON.stringify(analyses, null, 2)}
-
-Please summarize the above analyses into a single JSON object following the specified structure.
-`;
-
-    // Call OpenAI's API to get the summarized JSON
-    const aiResponse = await openai.chat.completions.create({
-      model: 'gpt-4',
-      messages: [
-        { role: 'system', content: 'You are a helpful assistant.' },
-        { role: 'user', content: prompt },
-      ],
-      max_tokens: 500,
-      temperature: 0.5,
-    });
-
-    const summarizedContent = aiResponse.choices[0].message.content.trim();
-
-    // Parse the JSON response
-    const summarizedJson = parseJsonResponse(summarizedContent);
-
-    // Respond with the summarized JSON
-    res.json(summarizedJson);
+    // Try to parse the entire string as JSON
+    result.parsedJson = JSON.parse(inputString);
+    result.remainingText = '';
   } catch (error) {
-    console.error('Error in /combine-image-analyses:', error);
-    res.status(500).json({
-      error: 'An error occurred while processing your request.',
-      details: error.message,
-    });
-  }
-});
+    // If parsing fails, try to extract JSON objects
+    const jsonRegex = /{[^{}]*}|[[^\[\]]*]/g;
+    const matches = inputString.match(jsonRegex);
 
-export default router;
+    if (matches) {
+      result.parsedJson = matches
+        .map((match) => {
+          try {
+            return JSON.parse(match);
+          } catch (e) {
+            return null;
+          }
+        })
+        .filter((item) => item !== null);
+
+      // Remove extracted JSON from the remaining text
+      result.remainingText = inputString.replace(jsonRegex, '').trim();
+    }
+  }
+
+  return result;
+};
+
+/**
+ * Validates the structure of an analysis object.
+ * @param {Object} analysis - The analysis object to validate.
+ * @returns {boolean} - True if valid, false otherwise.
+ */
+const isValidAnalysis = (analysis) => {
+  return (
+    typeof analysis.overall_description === 'string' &&
+    Array.isArray(analysis.common_objects) &&
+    Array.isArray(analysis.dominant_colors) &&
+    typeof analysis.overall_scene === 'string'
+  );
+};
+
 export { parseJsonResponse };
