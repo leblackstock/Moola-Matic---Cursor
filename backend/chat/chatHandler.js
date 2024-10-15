@@ -7,7 +7,8 @@ import { fileURLToPath } from 'url';
 import mongoose from 'mongoose';
 import {
   createAssistantMessage,
-  analyzeImagesWithAssistant,
+  // analyzeImagesWithAssistant, // Comment out or remove if not used
+  analyzeImagesWithVision,
   summarizeAnalyses,
 } from './chatAssistant.js';
 import {
@@ -92,84 +93,39 @@ router.post('/analyze-images', async (req, res) => {
       return res.status(400).json({ error: 'No valid image URLs provided' });
     }
 
-    // Log the first few image URLs (for debugging)
-    console.log('First few image URLs:', imageUrls.slice(0, 3));
-
-    // Limit the number of images to process
-    const maxImagesToAnalyze = 2; // Adjust this number as needed
-    const limitedImageUrls = imageUrls.slice(0, maxImagesToAnalyze);
-
-    // Process images
-    console.log('Processing images...');
-    const processedImages = await processImages(limitedImageUrls);
-    console.log('Images processed:', processedImages.length);
-
-    // Generate analysis prompt
-    console.log('Generating analysis prompt...');
     const analysisPrompt = generateAnalysisPrompt(
       description,
       itemId,
       sellerNotes,
       context
     );
-    console.log('Analysis prompt generated');
-
-    // Analyze images with assistant
-    console.log('Analyzing images with assistant...');
-    const analysisResults = await analyzeImagesWithAssistant(
-      processedImages,
-      analysisPrompt
-    );
-    console.log('Image analysis completed');
-
-    // Combine analyses
-    console.log('Combining analyses...');
-    const combinedAnalyses = combineAnalyses([analysisResults]);
-    console.log('Analyses combined');
-
-    // Generate combine and summarize prompt
-    console.log('Generating combine and summarize prompt...');
     const combineAndSummarizeAnalysisPrompt =
-      generateCombineAndSummarizeAnalysisPrompt(context);
-    console.log('Combine and summarize prompt generated');
+      generateCombineAndSummarizeAnalysisPrompt();
 
-    // Summarize analyses
-    console.log('Summarizing analyses...');
-    const finalAnalysis = await summarizeAnalyses(
-      combinedAnalyses,
+    const analyses = [];
+    for (const imageUrl of imageUrls) {
+      const base64Image = await processImages([imageUrl]);
+      if (base64Image.length > 0) {
+        const analysis = await analyzeImagesWithVision(
+          base64Image[0],
+          analysisPrompt
+        );
+        analyses.push(analysis);
+      } else {
+        console.error(`Failed to process image: ${imageUrl}`);
+      }
+    }
+
+    const combinedAnalysis = analyses.join('\n\n');
+    const summary = await summarizeAnalyses(
+      combinedAnalysis,
       combineAndSummarizeAnalysisPrompt
     );
-    console.log('Analyses summarized');
 
-    // Parse and send response
-    console.log('Parsing final analysis...');
-    const parsedAnalysis = JSON.parse(finalAnalysis);
-    console.log('Sending response');
-    res.json(parsedAnalysis);
+    res.json({ analyses, summary });
   } catch (error) {
     console.error('Error in /analyze-images:', error);
-    if (error.name === 'ValidationError') {
-      console.log('Validation error:', error.message);
-      res
-        .status(400)
-        .json({ error: 'Invalid input data', details: error.message });
-    } else if (error.name === 'ProcessingError') {
-      console.log('Processing error:', error.message);
-      res
-        .status(500)
-        .json({ error: 'Error processing images', details: error.message });
-    } else if (error.status === 413) {
-      console.log('Capacity limit exceeded:', error.message);
-      res.status(413).json({
-        error: 'Capacity limit exceeded',
-        message: 'Please try again with fewer or smaller images.',
-      });
-    } else {
-      console.log('Unexpected error:', error.message);
-      res
-        .status(500)
-        .json({ error: 'Failed to analyze images', details: error.message });
-    }
+    res.status(500).json({ error: 'An unexpected error occurred' });
   }
 });
 
