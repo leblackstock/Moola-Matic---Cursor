@@ -459,7 +459,8 @@ function NewItemPage({ setItemId }) {
   const handleAnalyzeImagesWrapper = async () => {
     setIsAnalyzing(true);
     try {
-      await handleAnalyzeImages({
+      console.log('Starting image analysis...');
+      const result = await handleAnalyzeImages({
         uploadedImages,
         item,
         contextData,
@@ -468,8 +469,32 @@ function NewItemPage({ setItemId }) {
         setNotificationMessage,
         setShowNotification,
       });
+
+      console.log('Analysis result:', result);
+
+      if (
+        result &&
+        (result.itemDetails ||
+          result.financials ||
+          result.marketAnalysis ||
+          result.finalRecommendation)
+      ) {
+        setItem((prevItem) => ({
+          ...prevItem,
+          ...result, // Spread the entire result object into the item
+        }));
+
+        console.log('Updated item:', item);
+      } else {
+        console.error('Invalid analysis result:', result);
+      }
+
+      setNotificationMessage('Image analysis completed successfully!');
+      setShowNotification(true);
     } catch (error) {
       console.error('Error in handleAnalyzeImagesWrapper:', error);
+      setNotificationMessage('Error analyzing images. Please try again.');
+      setShowNotification(true);
     } finally {
       setIsAnalyzing(false);
     }
@@ -938,6 +963,62 @@ function NewItemPage({ setItemId }) {
                 rows="5"
               />
             </StyledFormGroup>
+
+            {item.itemDetails && (
+              <>
+                {/* Item Details */}
+                <StyledFormGroup>
+                  <StyledLabel htmlFor="itemDetailsAnalysis">
+                    Item Details Analysis
+                  </StyledLabel>
+                  <StyledTextarea
+                    id="itemDetailsAnalysis"
+                    value={JSON.stringify(item.itemDetails, null, 2)}
+                    readOnly
+                    rows="5"
+                  />
+                </StyledFormGroup>
+
+                {/* Financials */}
+                <StyledFormGroup>
+                  <StyledLabel htmlFor="financialsAnalysis">
+                    Financials Analysis
+                  </StyledLabel>
+                  <StyledTextarea
+                    id="financialsAnalysis"
+                    value={JSON.stringify(item.financials, null, 2)}
+                    readOnly
+                    rows="5"
+                  />
+                </StyledFormGroup>
+
+                {/* Market Analysis */}
+                <StyledFormGroup>
+                  <StyledLabel htmlFor="marketAnalysis">
+                    Market Analysis
+                  </StyledLabel>
+                  <StyledTextarea
+                    id="marketAnalysis"
+                    value={JSON.stringify(item.marketAnalysis, null, 2)}
+                    readOnly
+                    rows="5"
+                  />
+                </StyledFormGroup>
+
+                {/* Final Recommendation */}
+                <StyledFormGroup>
+                  <StyledLabel htmlFor="finalRecommendation">
+                    Final Recommendation
+                  </StyledLabel>
+                  <StyledTextarea
+                    id="finalRecommendation"
+                    value={JSON.stringify(item.finalRecommendation, null, 2)}
+                    readOnly
+                    rows="5"
+                  />
+                </StyledFormGroup>
+              </>
+            )}
 
             <StyledButton type="submit">Save Item</StyledButton>
           </StyledForm>

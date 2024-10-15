@@ -128,6 +128,12 @@ uploads/drafts/*
 uploads/purchased/*
 !uploads/purchased/.gitkeep
 
-# Include backend/uploads/drafts
-!moola-matic_react/backend/uploads/drafts
-!moola-matic_react/backend/uploads/drafts/*
+# Ignore everything in backend/uploads/drafts
+/backend/uploads/drafts/*
+# But keep the .gitkeep file
+!/backend/uploads/drafts/.gitkeep
+
+# Ignore contents of all subdirectories in backend/uploads
+/backend/uploads/**/
+# But keep .gitkeep files
+!/backend/uploads/**/.gitkeep

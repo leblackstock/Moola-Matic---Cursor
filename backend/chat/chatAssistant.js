@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import axios from 'axios';
 import fs from 'fs';
 import OpenAI from 'openai';
+import { combineAnalyses } from './chatCombineAnalysis.js';
 
 dotenv.config();
 
@@ -120,11 +121,22 @@ const analyzeImagesWithVision = async (analysisPrompt, base64Image) => {
       temperature: 0.7,
     });
 
+    const analysis = response.choices[0].message.content;
+
+    // Log the full analysis
+    console.log('Full image analysis:', analysis);
+
+    // Combine the analysis using combineAnalyses
+    const combinedAnalysis = combineAnalyses([analysis]);
+
     console.log(
-      'Image analysis completed. Response length:',
-      response.choices[0].message.content.length
+      'Combined analysis:',
+      JSON.stringify(combinedAnalysis, null, 2)
     );
-    return response.choices[0].message.content;
+
+    console.log('Image analysis completed. Response length:', analysis.length);
+
+    return { analysis, combinedAnalysis };
   } catch (error) {
     const truncatedMessage = truncateMessage(error.message);
     console.error('Error analyzing image:', truncatedMessage);
@@ -156,11 +168,18 @@ const summarizeAnalyses = async (combinedAnalyses, summarizePrompt) => {
       presence_penalty: 0,
       response_format: { type: 'text' },
     });
-    console.log(
-      'Analyses summarized. Summary length:',
-      response.choices[0].message.content.length
-    );
-    return response.choices[0].message.content;
+
+    const summary = response.choices[0].message.content;
+    console.log('Analyses summarized. Summary length:', summary.length);
+
+    return {
+      summary,
+      metadata: {
+        model: 'gpt-4-turbo',
+        summaryLength: summary.length,
+        timestamp: new Date().toISOString(),
+      },
+    };
   } catch (error) {
     console.error('Error summarizing analyses:', error.message);
     throw error;

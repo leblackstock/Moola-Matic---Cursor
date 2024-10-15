@@ -50,8 +50,14 @@ const combineAnalyses = (analysisResults) => {
 const parseJsonResponse = (inputString) => {
   const result = {
     parsedJson: null,
-    remainingText: inputString,
+    remainingText: '',
   };
+
+  if (typeof inputString !== 'string') {
+    console.error('parseJsonResponse: Input is not a string', inputString);
+    result.remainingText = JSON.stringify(inputString);
+    return result;
+  }
 
   try {
     // Try to parse the entire string as JSON
@@ -75,6 +81,9 @@ const parseJsonResponse = (inputString) => {
 
       // Remove extracted JSON from the remaining text
       result.remainingText = inputString.replace(jsonRegex, '').trim();
+    } else {
+      // If no JSON objects found, store the entire input as remainingText
+      result.remainingText = inputString;
     }
   }
 

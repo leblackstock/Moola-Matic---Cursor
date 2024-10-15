@@ -126,12 +126,12 @@ router.post('/analyze-images', async (req, res) => {
     }
 
     const combinedAnalysis = combineAnalyses(analyses);
-    const summary = await summarizeAnalyses(
+    const { summary, metadata } = await summarizeAnalyses(
       combinedAnalysis,
       combineAndSummarizeAnalysisPrompt
     );
 
-    res.json({ analyses, summary });
+    res.json({ analyses, summary, metadata });
   } catch (error) {
     console.error('Error in /analyze-images:', error);
     res
