@@ -17,6 +17,10 @@ import {
 import { processImages } from '../utils/imageProcessor.js';
 import { combineAnalyses } from './chatCombineAnalysis.js';
 import { DraftItem } from '../models/draftItem.js';
+import {
+  calculateMessageTokens,
+  calculateImageTokens,
+} from '../utils/tokenCalculator.js';
 
 // ... rest of the file
 
@@ -95,37 +99,107 @@ router.post('/analyze-images', async (req, res) => {
     // Log the first few image URLs (for debugging)
     console.log('First few image URLs:', imageUrls.slice(0, 3));
 
-    // Limit the number of images to process
-    const maxImagesToAnalyze = 2; // Adjust this number as needed
-    const limitedImageUrls = imageUrls.slice(0, maxImagesToAnalyze);
-
-    // Process images
+    // Process all images
     console.log('Processing images...');
-    const processedImages = await processImages(limitedImageUrls);
-    console.log('Images processed:', processedImages.length);
+    let processedImages;
+    try {
+      processedImages = await processImages(imageUrls);
+      console.log('Images processed:', processedImages.length);
 
-    // Generate analysis prompt
-    console.log('Generating analysis prompt...');
-    const analysisPrompt = generateAnalysisPrompt(
-      description,
-      itemId,
-      sellerNotes,
-      context
-    );
-    console.log('Analysis prompt generated');
+      // Calculate and log image tokens
+      const imageTokens = calculateImageTokens(
+        processedImages.map((img) => img.base64Image)
+      );
+      console.log('Total image tokens:', imageTokens);
+    } catch (processingError) {
+      console.error('Error processing images:', processingError);
+      return res.status(500).json({
+        error: 'Failed to process images',
+        details: processingError.message,
+      });
+    }
 
-    // Analyze images with assistant
-    console.log('Analyzing images with assistant...');
-    const analysisResults = await analyzeImagesWithAssistant(
-      processedImages,
-      analysisPrompt
-    );
-    console.log('Image analysis completed');
+    // Check if any images were successfully processed
+    if (processedImages.length === 0) {
+      console.log('Error: No images were successfully processed');
+      return res
+        .status(400)
+        .json({ error: 'No images were successfully processed' });
+    }
 
-    // Combine analyses
-    console.log('Combining analyses...');
-    const combinedAnalyses = combineAnalyses([analysisResults]);
-    console.log('Analyses combined');
+    const maxTokensPerBatch = 100000;
+    let allAnalysisResults = [];
+    let remainingImages = [...processedImages];
+
+    console.log('Total images to process:', remainingImages.length);
+    console.log('Max tokens per batch:', maxTokensPerBatch);
+
+    while (remainingImages.length > 0) {
+      let batchImages = [];
+      let batchTokens = 0;
+
+      console.log('\nStarting new batch:');
+      while (remainingImages.length > 0 && batchTokens < maxTokensPerBatch) {
+        const nextImage = remainingImages[0];
+        const imageTokens = calculateImageTokens([nextImage.base64Image]);
+        console.log(`  Image tokens: ${imageTokens}`);
+
+        if (batchTokens + imageTokens <= maxTokensPerBatch) {
+          batchImages.push(nextImage);
+          batchTokens += imageTokens;
+          remainingImages.shift();
+          console.log(`  Added to batch. Current batch tokens: ${batchTokens}`);
+        } else {
+          console.log(`  Exceeds batch token limit. Moving to next batch.`);
+          break;
+        }
+      }
+
+      console.log(
+        `Analyzing batch of ${batchImages.length} images, total tokens: ${batchTokens}`
+      );
+
+      // Generate analysis prompt
+      console.log('Generating analysis prompt...');
+      const analysisPrompt = generateAnalysisPrompt(
+        description,
+        itemId,
+        sellerNotes,
+        context
+      );
+      console.log('Analysis prompt generated');
+
+      // Calculate and log prompt tokens
+      const promptTokens = calculateMessageTokens([
+        { content: analysisPrompt },
+      ]);
+      console.log('Analysis prompt tokens:', promptTokens);
+
+      // Analyze images with assistant
+      console.log('Analyzing images with assistant...');
+      const batchAnalysisResults = await analyzeImagesWithAssistant(
+        batchImages.map((img) => img.base64Image),
+        analysisPrompt
+      );
+      console.log('Batch image analysis completed');
+
+      // Calculate and log response tokens
+      const responseTokens = calculateMessageTokens([
+        { content: JSON.stringify(batchAnalysisResults) },
+      ]);
+      console.log('Batch analysis response tokens:', responseTokens);
+
+      allAnalysisResults.push(batchAnalysisResults);
+
+      console.log(
+        `Batch analysis complete. Remaining images: ${remainingImages.length}`
+      );
+    }
+
+    // Combine all batch analyses
+    console.log('Combining all analyses...');
+    const combinedAnalyses = combineAnalyses(allAnalysisResults);
+    console.log('All analyses combined');
 
     // Generate combine and summarize prompt
     console.log('Generating combine and summarize prompt...');
@@ -140,6 +214,12 @@ router.post('/analyze-images', async (req, res) => {
       combineAndSummarizeAnalysisPrompt
     );
     console.log('Analyses summarized');
+
+    // Calculate and log final analysis tokens
+    const finalAnalysisTokens = calculateMessageTokens([
+      { content: finalAnalysis },
+    ]);
+    console.log('Final analysis tokens:', finalAnalysisTokens);
 
     // Parse and send response
     console.log('Parsing final analysis...');
@@ -194,6 +274,10 @@ router.post('/chat', async (req, res) => {
   try {
     console.log('Processing message:', message);
 
+    // Calculate and log input message tokens
+    const inputTokens = calculateMessageTokens([{ content: message }]);
+    console.log('Input message tokens:', inputTokens);
+
     // Retrieve the draft item from the database
     const draftItem = await DraftItem.findOne({ itemId: itemId });
     if (!draftItem) {
@@ -206,12 +290,19 @@ router.post('/chat', async (req, res) => {
       { role: 'user', content: message },
     ];
 
-    // Add this log to see the full context being sent to the assistant
-    console.log('Full context being sent to assistant:', fullContext);
+    // Calculate and log full context tokens
+    const contextTokens = calculateMessageTokens(fullContext);
+    console.log('Full context tokens:', contextTokens);
 
     // Get assistant's response
     const assistantResponse = await createAssistantMessage(fullContext);
     console.log('Assistant response:', assistantResponse);
+
+    // Calculate and log assistant response tokens
+    const responseTokens = calculateMessageTokens([
+      { content: assistantResponse },
+    ]);
+    console.log('Assistant response tokens:', responseTokens);
 
     // Update the draft item's chat context in the database
     draftItem.chatContext = [

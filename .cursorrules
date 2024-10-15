@@ -1,97 +1,76 @@
 {
-    "TypeScript": {
-      "usage": "Use TypeScript for all components; prefer interfaces over types. Enable strict typing in `tsconfig.json`. Avoid using `any`; strive for precise types. Use utility types such as `Partial`, `Pick`, etc., for common transformations. Avoid type assertions (`as`) unless absolutely necessary.",
-      "syntax": "Use the `function` keyword for pure functions. Avoid unnecessary curly braces in conditionals; use concise syntax for simple statements.",
-      "structure": "Organize files by feature, grouping related components, hooks, and styles."
-    },
-  
-    "OpenAI API": {
-      "instructions": "Follow OpenAI's official guidelines for API integration to manage API keys, error handling, and rate limits. Use version 4.61.0 and `@web` for the latest features. Only modify the selected AI models if specifically requested."
-    },
-  
-    "Multer": {
-      "fileRouting": "Set up routes to manage file uploads and ensure files are saved to an appropriate location with error handling."
-    },
-  
-    "Helmet": {
-      "security": "Use Helmet for securing Express apps by setting various HTTP headers. Follow usage guidelines for CSP (Content Security Policy). Ensure that all middleware configurations are updated to prevent conflicts when adding security policies."
-    },
-  
-    "CORS": {
-      "configuration": "Configure CORS to allow requests from specific origins as needed for your application. Differentiate between configurations for development and production environments."
-    },
-  
-    "express-session": {
-      "sessionManagement": "Implement secure session management with express-session, ensuring session cookies are properly configured. Use a store like `connect-mongo` or `redis` for production environments for persistent session management."
-    },
-  
-    "dotenv": {
-      "environmentConfig": "Use dotenv to manage environment variables securely. Ensure all sensitive information is not hardcoded. Add `.env` to `.gitignore` to avoid exposing sensitive information in version control.",
-      "file": ".env"
-    },
-  
-    "axios": {
-      "httpRequests": "Use Axios for making HTTP requests. Manage requests and responses with proper error handling."
-    },
-  
-    "React Router": {
-      "navigation": "Implement navigation using React Router for defining routes, including nested and dynamic routing, as needed for your application. Use `React.lazy()` for code splitting to improve performance."
-    },
-  
-    "Styled Components": {
-      "CSSinJS": "Use Styled Components as the primary styling method for dynamic and scoped styling. Leverage its theme support and component-based styles. All styles should be saved in `moola-matic_react/src/components/compStyles.js`."
-    },
-  
-    "App.css": {
-      "styling": "Use `moola-matic_react/src/App.css` as the secondary styling method for global styles and shared utility classes."
-    },
-  
-    "Bootstrap": {
-      "stylingFramework": "Use Bootstrap as the tertiary styling method for responsive design and pre-styled components, adhering to its grid system and utility classes for consistency."
-    },
-  
-    "FontAwesome": {
-      "icons": "Use FontAwesome for icons, ensuring that icons are loaded efficiently and styled appropriately."
-    },
-  
-    "Webpack": {
-      "bundling": "Use Webpack to bundle JavaScript modules, specifying entry points and outputs as well as loaders for handling different types of files. Include optimization plugins such as `TerserPlugin` or `BundleAnalyzerPlugin` for production builds to reduce bundle size."
-    },
-  
-    "Babel": {
-      "transpilation": "Configure Babel to transpile modern JavaScript to older syntax for compatibility. Ensure presets for React and TypeScript are included."
-    },
-  
-    "ESLint": {
-      "linting": "Configure ESLint for code quality, with rules that enforce TypeScript and React best practices."
-    },
-  
-    "Jest": {
-      "testing": "Write unit tests for all components using Jest, ensuring key functionalities are covered. Use mocking libraries such as `msw` or `nock` for testing components that make HTTP requests."
-    },
-  
-    "Error Handling": {
-      "guidelines": "Implement centralized error handling to ensure all errors are captured and managed properly. Log errors effectively and provide user-friendly messages where appropriate."
-    },
-  
-    "Logging": {
-      "bestPractices": "Use structured logging with a library like `winston` to effectively capture and format log messages. Configure Winston with different transports for logging to both files and the console. Use appropriate log levels (`error`, `warn`, `info`, `debug`) to control the level of detail recorded.",
-      "exampleConfiguration": {
-        "setup": "Import Winston and create a logger instance with transports for logging to files and the console.",
-        "codeExample": "const winston = require('winston');\n\nconst logger = winston.createLogger({\n  level: 'info',\n  format: winston.format.combine(\n    winston.format.timestamp(),\n    winston.format.json()\n  ),\n  transports: [\n    new winston.transports.Console(),\n    new winston.transports.File({ filename: 'logs/app.log' })\n  ]\n});\n\nlogger.info('Application has started');\nlogger.error('An error occurred');"
-      }
-    },
-  
-    "Code Consistency": {
-      "namingConventions": "Maintain consistent naming conventions across the project. Use `camelCase` for variables and functions, and `PascalCase` for classes and components. Use tools like `prettier` for automatic formatting to enforce code style."
-    },
-  
-    "Code Reviews": {
-      "bestPractices": "During code reviews, ensure adherence to project guidelines, code quality, and best practices. Provide constructive feedback to improve the quality and maintainability of the codebase."
-    },
-  
-    "General Guidelines": {
-      "itemID": "Do not set a default itemID or create an itemID preemptively, as it is used to track items. The itemID should only be created after 'New Item' is clicked in App.js.",
-      "codeEditing": "Do not remove any code, comments, or logging not directly related to the code being edited unless explicitly instructed."
+  "TypeScript": {
+    "usage": "Use TypeScript for all components; prefer interfaces over types. Enable strict typing in `tsconfig.json`. Avoid using `any`; strive for precise types. Use utility types such as `Partial`, `Pick`, etc., for common transformations. Avoid type assertions (`as`) unless absolutely necessary.",
+    "syntax": "Use the `function` keyword for pure functions. Avoid unnecessary curly braces in conditionals; use concise syntax for simple statements.",
+    "structure": "Organize files by feature, grouping related components, hooks, and styles."
+  },
+  "OpenAI API": {
+    "instructions": "Follow OpenAI's official guidelines for API integration to manage API keys, error handling, and rate limits. Use version 4.61.0 and `@web` for the latest features. Only modify the selected AI models if specifically requested."
+  },
+  "Multer": {
+    "fileRouting": "Set up routes to manage file uploads and ensure files are saved to an appropriate location with error handling."
+  },
+  "Helmet": {
+    "security": "Use Helmet for securing Express apps by setting various HTTP headers. Follow usage guidelines for CSP (Content Security Policy). Ensure that all middleware configurations are updated to prevent conflicts when adding security policies."
+  },
+  "CORS": {
+    "configuration": "Configure CORS to allow requests from specific origins as needed for your application. Differentiate between configurations for development and production environments."
+  },
+  "express-session": {
+    "sessionManagement": "Implement secure session management with express-session, ensuring session cookies are properly configured. Use a store like `connect-mongo` or `redis` for production environments for persistent session management."
+  },
+  "dotenv": {
+    "environmentConfig": "Use dotenv to manage environment variables securely. Ensure all sensitive information is not hardcoded. Add `.env` to `.gitignore` to avoid exposing sensitive information in version control.",
+    "file": ".env"
+  },
+  "axios": {
+    "httpRequests": "Use Axios for making HTTP requests. Manage requests and responses with proper error handling."
+  },
+  "React Router": {
+    "navigation": "Implement navigation using React Router for defining routes, including nested and dynamic routing, as needed for your application. Use `React.lazy()` for code splitting to improve performance."
+  },
+  "Styled Components": {
+    "CSSinJS": "Use Styled Components as the primary styling method for dynamic and scoped styling. Leverage its theme support and component-based styles. All styles should be saved in `moola-matic_react/src/components/compStyles.js`."
+  },
+  "App.css": {
+    "styling": "Use `moola-matic_react/src/App.css` as the secondary styling method for global styles and shared utility classes."
+  },
+  "Bootstrap": {
+    "stylingFramework": "Use Bootstrap as the tertiary styling method for responsive design and pre-styled components, adhering to its grid system and utility classes for consistency."
+  },
+  "FontAwesome": {
+    "icons": "Use FontAwesome for icons, ensuring that icons are loaded efficiently and styled appropriately."
+  },
+  "Webpack": {
+    "bundling": "Use Webpack to bundle JavaScript modules, specifying entry points and outputs as well as loaders for handling different types of files. Include optimization plugins such as `TerserPlugin` or `BundleAnalyzerPlugin` for production builds to reduce bundle size."
+  },
+  "Babel": {
+    "transpilation": "Configure Babel to transpile modern JavaScript to older syntax for compatibility. Ensure presets for React and TypeScript are included."
+  },
+  "ESLint": {
+    "linting": "Configure ESLint for code quality, with rules that enforce TypeScript and React best practices."
+  },
+  "Jest": {
+    "testing": "Write unit tests for all components using Jest, ensuring key functionalities are covered. Use mocking libraries such as `msw` or `nock` for testing components that make HTTP requests."
+  },
+  "Error Handling": {
+    "guidelines": "Implement centralized error handling to ensure all errors are captured and managed properly. Log errors effectively and provide user-friendly messages where appropriate."
+  },
+  "Logging": {
+    "bestPractices": "Use structured logging with a library like `winston` to effectively capture and format log messages. Configure Winston with different transports for logging to both files and the console. Use appropriate log levels (`error`, `warn`, `info`, `debug`) to control the level of detail recorded.",
+    "exampleConfiguration": {
+      "setup": "Import Winston and create a logger instance with transports for logging to files and the console.",
+      "codeExample": "const winston = require('winston');\n\nconst logger = winston.createLogger({\n  level: 'info',\n  format: winston.format.combine(\n    winston.format.timestamp(),\n    winston.format.json()\n  ),\n  transports: [\n    new winston.transports.Console(),\n    new winston.transports.File({ filename: 'logs/app.log' })\n  ]\n});\n\nlogger.info('Application has started');\nlogger.error('An error occurred');"
     }
+  },
+  "Code Consistency": {
+    "namingConventions": "Maintain consistent naming conventions across the project. Use `camelCase` for variables and functions, and `PascalCase` for classes and components. Use tools like `prettier` for automatic formatting to enforce code style."
+  },
+  "Code Reviews": {
+    "bestPractices": "During code reviews, ensure adherence to project guidelines, code quality, and best practices. Provide constructive feedback to improve the quality and maintainability of the codebase."
+  },
+  "General Guidelines": {
+    "itemID": "Do not set a default itemID or create an itemID preemptively, as it is used to track items. The itemID should only be created after 'New Item' is clicked in App.js.",
+    "codeEditing": "Do not remove any code, comments, or logging not directly related to the code being edited unless explicitly instructed."
   }
+}
