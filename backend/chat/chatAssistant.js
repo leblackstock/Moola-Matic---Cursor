@@ -161,36 +161,30 @@ const retrieveFileContent = async (fileId) => {
 
 /**
  * Analyzes file content using GPT-4o to identify the item.
- * @param {string} imagePath - The local path to the image file.
  * @param {string} analysisPrompt - The prompt/question for analysis.
+ * @param {string} fileId - The ID of the file to analyze.
  * @returns {Promise<string>} - The analysis result.
  */
-const analyzeImagesWithVision = async (imagePath, analysisPrompt) => {
+const analyzeImagesWithVision = async (analysisPrompt, fileId) => {
   try {
-    console.log('Analyzing file content with GPT-4o');
-    console.log('Action: Received image path for analysis', { imagePath });
-
-    // Check if the file exists
-    if (!fs.existsSync(imagePath)) {
-      console.log('Action: Checked file existence', { imagePath });
-      console.error(`File not found: ${imagePath}`);
-      throw new Error(`File not found: ${imagePath}`);
-    }
-
-    // Get file stats
-    const stats = fs.statSync(imagePath);
-    console.log('Action: Retrieved file stats', { imagePath, stats });
-
-    // Upload the image file
-    const fileId = await uploadLocalImage(imagePath);
-    console.log('Action: Uploaded local image', { imagePath, fileId });
+    console.log('Action: Preparing to analyze image', {
+      fileId: fileId.substring(0, 10) + '...',
+    });
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
         {
           role: 'user',
-          content: `${analysisPrompt}\nImage file ID: ${fileId}`,
+          content: [
+            { type: 'text', text: analysisPrompt },
+            {
+              type: 'image_url',
+              image_url: {
+                url: `https://api.openai.com/v1/files/${fileId}/content`,
+              },
+            },
+          ],
         },
       ],
       max_tokens: 4000,
@@ -200,7 +194,9 @@ const analyzeImagesWithVision = async (imagePath, analysisPrompt) => {
       presence_penalty: 0,
       response_format: { type: 'text' },
     });
-    console.log('Action: Sent analysis request to OpenAI', { fileId });
+    console.log('Action: Sent analysis request to OpenAI', {
+      fileId: fileId.substring(0, 10) + '...',
+    });
 
     const analysis = response.choices[0].message.content;
     console.log('File content analysis completed');
@@ -209,7 +205,7 @@ const analyzeImagesWithVision = async (imagePath, analysisPrompt) => {
   } catch (error) {
     console.error('Error in analyzeImagesWithVision:', error.message);
     console.log('Action: Encountered error during image analysis', {
-      imagePath,
+      fileId: fileId.substring(0, 10) + '...',
     });
     if (error.response) {
       console.error('OpenAI API Error:', error.response.data);
