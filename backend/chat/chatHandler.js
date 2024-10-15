@@ -97,132 +97,24 @@ router.post('/analyze-images', async (req, res) => {
       return res.status(400).json({ error: 'No valid image URLs provided' });
     }
 
-<<<<<<< HEAD
     const analysisPrompt = generateAnalysisPrompt(
       description,
       itemId,
       sellerNotes,
       context
     );
-=======
-    // Log the first few image URLs (for debugging)
-    console.log('First few image URLs:', imageUrls.slice(0, 3));
-
-    // Process all images
-    console.log('Processing images...');
-    let processedImages;
-    try {
-      processedImages = await processImages(imageUrls);
-      console.log('Images processed:', processedImages.length);
-
-      // Calculate and log image tokens
-      const imageTokens = calculateImageTokens(
-        processedImages.map((img) => img.base64Image)
-      );
-      console.log('Total image tokens:', imageTokens);
-    } catch (processingError) {
-      console.error('Error processing images:', processingError);
-      return res.status(500).json({
-        error: 'Failed to process images',
-        details: processingError.message,
-      });
-    }
-
-    // Check if any images were successfully processed
-    if (processedImages.length === 0) {
-      console.log('Error: No images were successfully processed');
-      return res
-        .status(400)
-        .json({ error: 'No images were successfully processed' });
-    }
-
-    const maxTokensPerBatch = 100000;
-    let allAnalysisResults = [];
-    let remainingImages = [...processedImages];
-
-    console.log('Total images to process:', remainingImages.length);
-    console.log('Max tokens per batch:', maxTokensPerBatch);
-
-    while (remainingImages.length > 0) {
-      let batchImages = [];
-      let batchTokens = 0;
-
-      console.log('\nStarting new batch:');
-      while (remainingImages.length > 0 && batchTokens < maxTokensPerBatch) {
-        const nextImage = remainingImages[0];
-        const imageTokens = calculateImageTokens([nextImage.base64Image]);
-        console.log(`  Image tokens: ${imageTokens}`);
-
-        if (batchTokens + imageTokens <= maxTokensPerBatch) {
-          batchImages.push(nextImage);
-          batchTokens += imageTokens;
-          remainingImages.shift();
-          console.log(`  Added to batch. Current batch tokens: ${batchTokens}`);
-        } else {
-          console.log(`  Exceeds batch token limit. Moving to next batch.`);
-          break;
-        }
-      }
-
-      console.log(
-        `Analyzing batch of ${batchImages.length} images, total tokens: ${batchTokens}`
-      );
-
-      // Generate analysis prompt
-      console.log('Generating analysis prompt...');
-      const analysisPrompt = generateAnalysisPrompt(
-        description,
-        itemId,
-        sellerNotes,
-        context
-      );
-      console.log('Analysis prompt generated');
-
-      // Calculate and log prompt tokens
-      const promptTokens = calculateMessageTokens([
-        { content: analysisPrompt },
-      ]);
-      console.log('Analysis prompt tokens:', promptTokens);
-
-      // Analyze images with assistant
-      console.log('Analyzing images with assistant...');
-      const batchAnalysisResults = await analyzeImagesWithAssistant(
-        batchImages.map((img) => img.base64Image),
-        analysisPrompt
-      );
-      console.log('Batch image analysis completed');
-
-      // Calculate and log response tokens
-      const responseTokens = calculateMessageTokens([
-        { content: JSON.stringify(batchAnalysisResults) },
-      ]);
-      console.log('Batch analysis response tokens:', responseTokens);
-
-      allAnalysisResults.push(batchAnalysisResults);
-
-      console.log(
-        `Batch analysis complete. Remaining images: ${remainingImages.length}`
-      );
-    }
-
-    // Combine all batch analyses
-    console.log('Combining all analyses...');
-    const combinedAnalyses = combineAnalyses(allAnalysisResults);
-    console.log('All analyses combined');
-
-    // Generate combine and summarize prompt
-    console.log('Generating combine and summarize prompt...');
->>>>>>> 64027e7216e212dfee3722ff636c989fa6dc9ab9
     const combineAndSummarizeAnalysisPrompt =
       generateCombineAndSummarizeAnalysisPrompt();
 
     const analyses = [];
     for (const imageUrl of imageUrls) {
-      const base64Image = await processImages([imageUrl]);
-      if (base64Image.length > 0) {
+      const processedImages = await processImages([imageUrl]);
+      if (processedImages.length > 0) {
+        const { base64Image, filename } = processedImages[0];
         const analysis = await analyzeImagesWithVision(
-          base64Image[0],
-          analysisPrompt
+          base64Image,
+          analysisPrompt,
+          filename // Pass the filename here
         );
         analyses.push(analysis);
       } else {
@@ -230,27 +122,13 @@ router.post('/analyze-images', async (req, res) => {
       }
     }
 
-    const combinedAnalysis = analyses.join('\n\n');
+    const combinedAnalysis = combineAnalyses(analyses);
     const summary = await summarizeAnalyses(
       combinedAnalysis,
       combineAndSummarizeAnalysisPrompt
     );
 
-<<<<<<< HEAD
     res.json({ analyses, summary });
-=======
-    // Calculate and log final analysis tokens
-    const finalAnalysisTokens = calculateMessageTokens([
-      { content: finalAnalysis },
-    ]);
-    console.log('Final analysis tokens:', finalAnalysisTokens);
-
-    // Parse and send response
-    console.log('Parsing final analysis...');
-    const parsedAnalysis = JSON.parse(finalAnalysis);
-    console.log('Sending response');
-    res.json(parsedAnalysis);
->>>>>>> 64027e7216e212dfee3722ff636c989fa6dc9ab9
   } catch (error) {
     console.error('Error in /analyze-images:', error);
     res.status(500).json({ error: 'An unexpected error occurred' });

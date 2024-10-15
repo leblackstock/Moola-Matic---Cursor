@@ -1,6 +1,6 @@
 // backend/chat/chatCombineAnalysis.js
 
-export const combineAnalyses = (analysisResults) => {
+const combineAnalyses = (analysisResults) => {
   try {
     const combinedAnalyses = analysisResults.map((result) => {
       const { parsedJson, remainingText } = parseJsonResponse(result);
@@ -95,4 +95,4 @@ const isValidAnalysis = (analysis) => {
   );
 };
 
-export { parseJsonResponse };
+export { combineAnalyses, parseJsonResponse, isValidAnalysis };

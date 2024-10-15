@@ -27,9 +27,13 @@ const convertUrlToBase64 = async (url) => {
     // Remove the existing data URI if present
     const cleanBase64 = base64.replace(/^data:image\/[a-z]+;base64,/, '');
 
+    // Extract the filename from the URL
+    const filename = new URL(url).pathname.split('/').pop();
+
     return {
       base64Image: `data:${mimeType};base64,${cleanBase64}`,
       sizeMB: imageSizeMB,
+      filename: filename,
     };
   } catch (error) {
     console.error('Error in convertUrlToBase64:', error);
@@ -48,20 +52,16 @@ const processImages = async (imageUrls) => {
         console.log(
           `Attempting to convert URL to base64 for image ${index + 1}`
         );
-        const { base64Image, sizeMB } = await convertUrlToBase64(url);
+        const { base64Image, sizeMB, filename } = await convertUrlToBase64(url);
         console.log(`Successfully converted image ${index + 1} to base64`);
         console.log(`Image ${index + 1} size:`, sizeMB.toFixed(2), 'MB');
 
         console.log(`Validating base64 for image ${index + 1}`);
         if (validateBase64(base64Image)) {
           console.log(`Image ${index + 1} passed base64 validation`);
-          return { base64Image, sizeMB };
+          return { base64Image, sizeMB, filename };
         } else {
           console.log(`Image ${index + 1} failed base64 validation`);
-          console.log(
-            'Base64 string start:',
-            base64Image.substring(0, 50) + '...'
-          );
         }
       } catch (error) {
         console.error(`Error processing image ${index + 1} (${url}):`, error);

@@ -1,224 +1,208 @@
 // backend/chat/chatAssistant.js
 
 import dotenv from 'dotenv';
-import OpenAI from 'openai';
-import winston from 'winston';
 import axios from 'axios';
-import FormData from 'form-data';
-import fs from 'fs';
-import { v4 as uuidv4 } from 'uuid';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+//import fs from 'fs';
+//import path from 'path';
+//import { fileURLToPath } from 'url';
+//import { dirname } from 'path';
+import { Buffer } from 'buffer';
+import OpenAI from 'openai';
 
 dotenv.config();
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-// Create a logger instance
-const logger = winston.createLogger({
-  level: 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.json()
-  ),
-  transports: [
-    new winston.transports.Console(),
-    new winston.transports.File({ filename: 'logs/chat_assistant.log' }),
-  ],
+// Initialize OpenAI API Client
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+// Determine the current directory path
+//const __filename = fileURLToPath(import.meta.url);
+//const __dirname = dirname(__filename);
 
-const uploadBase64Image = async (base64Image) => {
+/**
+ * Uploads a base64-encoded image to OpenAI and returns the file ID.
+ * @param {string} base64Image - The base64-encoded image string.
+ * @param {string} originalFileName - The original filename of the image.
+ * @returns {Promise<string>} - The ID of the uploaded file.
+ */
+const uploadBase64Image = async (base64Image, originalFileName) => {
   try {
-    // Ensure base64Image is a string
-    if (typeof base64Image !== 'string') {
-      throw new Error('base64Image must be a string');
+    console.log('Preparing base64 image data for upload');
+
+    if (!originalFileName) {
+      throw new Error('Original filename is required');
     }
 
-    // Log the base64 image data being sent (first 100 characters)
-    logger.info('Preparing base64 image data for upload', {
-      base64ImagePreview: base64Image.substring(0, 100) + '...',
-      base64ImageLength: base64Image.length,
+    // Convert the base64 string to a buffer
+    const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(base64Data, 'base64');
+
+    // Upload file using the OpenAI SDK
+    const response = await openai.files.create({
+      file: buffer,
+      purpose: 'vision',
+      filename: originalFileName,
     });
 
-    // Create a temporary file
-    const tempDir = path.join(__dirname, '..', 'temp');
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true });
-    }
-    const tempFilePath = path.join(tempDir, `${uuidv4()}.png`);
-
-    // Write base64 data to the temporary file
-    fs.writeFileSync(
-      tempFilePath,
-      Buffer.from(base64Image.split(',')[1], 'base64')
+    const fileId = response.id;
+    console.log(
+      'File uploaded successfully. File ID:',
+      fileId.substring(0, 10) + '...'
     );
 
-    // Create a FormData object and append the file
-    const form = new FormData();
-    form.append('file', fs.createReadStream(tempFilePath));
-    form.append('purpose', 'vision');
-
-    const apiUrl = 'https://api.openai.com/v1/files';
-
-    const response = await axios.post(apiUrl, form, {
-      headers: {
-        ...form.getHeaders(),
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      },
-    });
-
-    // Clean up the temporary file
-    fs.unlinkSync(tempFilePath);
-
-    logger.info('Uploaded file to OpenAI', { fileId: response.data.id });
-
-    return response.data.id;
+    return fileId;
   } catch (error) {
-    logger.error('Error in uploadBase64Image', {
-      error: error.message,
-      stack: error.stack,
-    });
+    console.error('Error in uploadBase64Image:', error.message);
     throw error;
   }
 };
 
-const analyzeImagesWithVision = async (base64Image, analysisPrompt) => {
+/**
+ * Summarizes combined analyses using GPT-4-turbo.
+ * @param {string} combinedAnalyses - The combined analyses to summarize.
+ * @param {string} summarizePrompt - The prompt for summarization.
+ * @returns {Promise<string>} - The summarized analysis.
+ */
+const summarizeAnalyses = async (combinedAnalyses, summarizePrompt) => {
   try {
-    logger.info('Preparing image data for analysis');
+    console.log('Preparing to summarize analyses');
+
+    const userContent = `${summarizePrompt}\n\nAnalyses to summarize:\n\n${combinedAnalyses}`;
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4-turbo',
       messages: [
         {
           role: 'user',
-          content: [
-            { type: 'text', text: analysisPrompt },
-            {
-              type: 'image_url',
-              image_url: {
-                url: `data:image/jpeg;base64,${base64Image.split(',')[1]}`,
-              },
-            },
-          ],
+          content: userContent,
         },
       ],
-      max_tokens: 4096,
+      temperature: 0.5,
+      max_tokens: 1024,
+      top_p: 1,
+      frequency_penalty: 0,
+      presence_penalty: 0,
+      response_format: { type: 'text' },
     });
 
-    logger.info('Received response from OpenAI API', {
-      responseStatus: 'success',
-      responseData: response.choices[0].message.content,
-    });
+    const summary = response.choices[0].message.content;
+    console.log('Received summary from OpenAI API', { summary });
 
-    return response.choices[0].message.content;
+    return summary;
   } catch (error) {
-    logger.error('Error in analyzeImagesWithVision', {
-      error: error.message,
-      stack: error.stack,
-    });
-    if (error.response) {
-      logger.error('API Error:', error.response.data);
-    }
-    throw error;
-  }
-};
-
-const createUserMessage = async (threadId, analysisPrompt, fileIds = []) => {
-  try {
-    return await openai.beta.threads.messages.create(threadId, {
-      role: 'user',
-      content: analysisPrompt,
-      file_ids: fileIds,
-    });
-  } catch (error) {
-    console.error('Error in createUserMessage:', error);
-    throw error;
-  }
-};
-
-const summarizeAnalyses = async (
-  combinedAnalyses,
-  combineAndSummarizeAnalysisPrompt
-) => {
-  try {
-    const thread = await openai.beta.threads.create();
-
-    await openai.beta.threads.messages.create(thread.id, {
-      role: 'user',
-      content: `${combineAndSummarizeAnalysisPrompt}\n\nAnalyses to combine and summarize:\n\n${JSON.stringify(combinedAnalyses, null, 2)}`,
-    });
-
-    const run = await openai.beta.threads.runs.create(thread.id, {
-      assistant_id: process.env.MOOLA_MATIC_ASSISTANT_ID,
-    });
-
-    let runStatus = await openai.beta.threads.runs.retrieve(thread.id, run.id);
-    while (runStatus.status !== 'completed') {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      runStatus = await openai.beta.threads.runs.retrieve(thread.id, run.id);
-    }
-
-    const messages = await openai.beta.threads.messages.list(thread.id);
-    return messages.data[0].content[0].text.value;
-  } catch (error) {
-    console.error('Error in summarizeAnalyses:', error);
+    console.error('Error in summarizeAnalyses:', error.message);
     throw error;
   }
 };
 
 /**
- * Creates an assistant message for text-only interactions.
+ * Creates an assistant message based on the user's input.
  * @param {string} userMessage - The user's message.
  * @returns {Promise<string>} - The assistant's response.
  */
 const createAssistantMessage = async (userMessage) => {
   try {
-    // Log the user message being sent
-    logger.info('Sending user message to OpenAI', { userMessage });
+    console.log('Sending user message to OpenAI:', { userMessage });
 
-    const thread = await openai.beta.threads.create();
-
-    // Add the user's message to the thread
-    await openai.beta.threads.messages.create(thread.id, {
-      role: 'user',
-      content: userMessage,
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4-turbo',
+      messages: [
+        {
+          role: 'user',
+          content: userMessage,
+        },
+      ],
+      temperature: 0.7,
+      max_tokens: 2048,
+      top_p: 1,
+      frequency_penalty: 0,
+      presence_penalty: 0,
+      response_format: { type: 'text' },
     });
 
-    // Run the assistant
-    const run = await openai.beta.threads.runs.create(thread.id, {
-      assistant_id: process.env.MOOLA_MATIC_ASSISTANT_ID,
-    });
-
-    // Wait for the run to complete
-    let runStatus = await openai.beta.threads.runs.retrieve(thread.id, run.id);
-    while (runStatus.status !== 'completed') {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      runStatus = await openai.beta.threads.runs.retrieve(thread.id, run.id);
-    }
-
-    // Retrieve the assistant's response
-    const messages = await openai.beta.threads.messages.list(thread.id);
-    const assistantResponse = messages.data[0].content[0].text.value;
-
-    // Log the assistant's response
-    logger.info('Received assistant response', { assistantResponse });
+    const assistantResponse = response.choices[0].message.content;
+    console.log('Received assistant response:', { assistantResponse });
 
     return assistantResponse;
   } catch (error) {
-    logger.error('Error in createAssistantMessage', { error: error.message });
+    console.error('Error in createAssistantMessage:', error.message);
     throw error;
   }
 };
 
-// Update the exports at the bottom of the file
+/**
+ * Retrieves the content of a file from OpenAI using its file ID.
+ * @param {string} fileId - The ID of the file to retrieve.
+ * @returns {Promise<string>} - The content of the file.
+ */
+const retrieveFileContent = async (fileId) => {
+  try {
+    console.log(
+      'Retrieving file content for file ID:',
+      fileId.substring(0, 10) + '...'
+    );
+    const apiUrl = `https://api.openai.com/v1/files/${fileId}/content`;
+
+    const response = await axios.get(apiUrl, {
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      },
+    });
+
+    console.log('File content retrieved successfully');
+    return response.data;
+  } catch (error) {
+    console.error('Error retrieving file content:', error.message);
+    throw error;
+  }
+};
+
+/**
+ * Analyzes file content using GPT-4-turbo to identify the item.
+ * @param {string} fileContent - The content of the file to analyze.
+ * @returns {Promise<string>} - The analysis result.
+ * @param {string} analysisPrompt - The prompt/question for analysis.
+ */
+const analyzeImagesWithVision = async (
+  base64Image,
+  analysisPrompt,
+  filename
+) => {
+  try {
+    console.log('Analyzing file content with GPT-4-turbo');
+    const uploadedFile = await uploadBase64Image(base64Image, filename);
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4-turbo',
+      messages: [
+        {
+          role: 'user',
+          content: `Please identify the item in the following content: ${uploadedFile}, ${analysisPrompt}`,
+        },
+      ],
+      temperature: 0.7,
+      max_tokens: 1024,
+      top_p: 1,
+      frequency_penalty: 0,
+      presence_penalty: 0,
+      response_format: { type: 'text' },
+    });
+
+    const analysis = response.choices[0].message.content;
+    console.log('File content analysis completed');
+    return analysis;
+  } catch (error) {
+    console.error('Error in analyzeFileContent:', error.message);
+    throw error;
+  }
+};
+
+// Export functions
 export {
+  uploadBase64Image,
   analyzeImagesWithVision,
-  createUserMessage,
   summarizeAnalyses,
   createAssistantMessage,
-  uploadBase64Image,
+  retrieveFileContent,
 };
