@@ -2,11 +2,11 @@
 
 import dotenv from 'dotenv';
 import axios from 'axios';
-//import fs from 'fs';
+import fs from 'fs';
 //import path from 'path';
 //import { fileURLToPath } from 'url';
 //import { dirname } from 'path';
-import { Buffer } from 'buffer';
+//import { Buffer } from 'buffer';
 import OpenAI from 'openai';
 
 dotenv.config();
@@ -26,40 +26,41 @@ const openai = new OpenAI({
  * @param {string} originalFileName - The original filename of the image.
  * @returns {Promise<string>} - The ID of the uploaded file.
  */
-const uploadBase64Image = async (base64Image, originalFileName) => {
-  try {
-    console.log('Preparing base64 image data for upload');
+// const uploadBase64Image = async (base64Image, originalFileName) => {
+//   try {
+//     console.log('Preparing base64 image data for upload');
 
-    if (!originalFileName) {
-      throw new Error('Original filename is required');
-    }
+//     if (!originalFileName) {
+//       throw new Error('Original filename is required');
+//     }
 
-    // Convert the base64 string to a buffer
-    const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
-    const buffer = Buffer.from(base64Data, 'base64');
+//     // Convert the base64 string to a buffer
+//     const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
+//     const buffer = Buffer.from(base64Data, 'base64');
+//     console.log('Buffer Size:', buffer.length);
 
-    // Upload file using the OpenAI SDK
-    const response = await openai.files.create({
-      file: buffer,
-      purpose: 'vision',
-      filename: originalFileName,
-    });
+//     // Upload file using the OpenAI SDK
+//     const response = await openai.files.create({
+//       file: buffer,
+//       purpose: 'vision',
+//       filename: originalFileName,
+//     });
 
-    const fileId = response.id;
-    console.log(
-      'File uploaded successfully. File ID:',
-      fileId.substring(0, 10) + '...'
-    );
+//     const fileId = response.id;
+//     console.log(
+//       'File uploaded successfully. File ID:',
+//       fileId.substring(0, 10) + '...'
+//     );
 
-    return fileId;
-  } catch (error) {
-    console.error('Error in uploadBase64Image:', error.message);
-    throw error;
-  }
-};
+//     return fileId;
+//   } catch (error) {
+//     console.error('Error in uploadBase64Image:', error.message);
+//     throw error;
+//   }
+// };
 
 /**
- * Summarizes combined analyses using GPT-4-turbo.
+ * Summarizes combined analyses using GPT-4o.
  * @param {string} combinedAnalyses - The combined analyses to summarize.
  * @param {string} summarizePrompt - The prompt for summarization.
  * @returns {Promise<string>} - The summarized analysis.
@@ -71,7 +72,7 @@ const summarizeAnalyses = async (combinedAnalyses, summarizePrompt) => {
     const userContent = `${summarizePrompt}\n\nAnalyses to summarize:\n\n${combinedAnalyses}`;
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4-turbo',
+      model: 'gpt-4o',
       messages: [
         {
           role: 'user',
@@ -106,7 +107,7 @@ const createAssistantMessage = async (userMessage) => {
     console.log('Sending user message to OpenAI:', { userMessage });
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4-turbo',
+      model: 'gpt-4o',
       messages: [
         {
           role: 'user',
@@ -159,48 +160,115 @@ const retrieveFileContent = async (fileId) => {
 };
 
 /**
- * Analyzes file content using GPT-4-turbo to identify the item.
- * @param {string} fileContent - The content of the file to analyze.
- * @returns {Promise<string>} - The analysis result.
+ * Analyzes file content using GPT-4o to identify the item.
+ * @param {string} imagePath - The local path to the image file.
  * @param {string} analysisPrompt - The prompt/question for analysis.
+ * @returns {Promise<string>} - The analysis result.
  */
-const analyzeImagesWithVision = async (
-  base64Image,
-  analysisPrompt,
-  filename
-) => {
+const analyzeImagesWithVision = async (imagePath, analysisPrompt) => {
   try {
-    console.log('Analyzing file content with GPT-4-turbo');
-    const uploadedFile = await uploadBase64Image(base64Image, filename);
+    console.log('Analyzing file content with GPT-4o');
+    console.log('Action: Received image path for analysis', { imagePath });
+
+    // Check if the file exists
+    if (!fs.existsSync(imagePath)) {
+      console.log('Action: Checked file existence', { imagePath });
+      console.error(`File not found: ${imagePath}`);
+      throw new Error(`File not found: ${imagePath}`);
+    }
+
+    // Get file stats
+    const stats = fs.statSync(imagePath);
+    console.log('Action: Retrieved file stats', { imagePath, stats });
+
+    // Upload the image file
+    const fileId = await uploadLocalImage(imagePath);
+    console.log('Action: Uploaded local image', { imagePath, fileId });
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4-turbo',
+      model: 'gpt-4o',
       messages: [
         {
           role: 'user',
-          content: `Please identify the item in the following content: ${uploadedFile}, ${analysisPrompt}`,
+          content: `${analysisPrompt}\nImage file ID: ${fileId}`,
         },
       ],
+      max_tokens: 4000,
       temperature: 0.7,
-      max_tokens: 1024,
       top_p: 1,
       frequency_penalty: 0,
       presence_penalty: 0,
       response_format: { type: 'text' },
     });
+    console.log('Action: Sent analysis request to OpenAI', { fileId });
 
     const analysis = response.choices[0].message.content;
     console.log('File content analysis completed');
+
     return analysis;
   } catch (error) {
-    console.error('Error in analyzeFileContent:', error.message);
+    console.error('Error in analyzeImagesWithVision:', error.message);
+    console.log('Action: Encountered error during image analysis', {
+      imagePath,
+    });
+    if (error.response) {
+      console.error('OpenAI API Error:', error.response.data);
+    }
+    throw error;
+  }
+};
+
+/**
+ * Uploads a local image file to OpenAI and returns the file ID.
+ * @param {string} imagePath - The local path to the image file.
+ * @param {string} originalFileName - The original filename of the image.
+ * @returns {Promise<string>} - The ID of the uploaded file.
+ */
+const uploadLocalImage = async (imagePath) => {
+  try {
+    console.log('Preparing local image data for upload');
+    console.log('Action: Received image path for upload', { imagePath });
+
+    if (!fs.existsSync(imagePath)) {
+      console.log('Action: Checked file existence', { imagePath });
+      throw new Error(`File not found: ${imagePath}`);
+    }
+
+    // Create a read stream for the image file
+    const fileStream = fs.createReadStream(imagePath);
+    console.log('Action: Created read stream for file', { imagePath });
+
+    // Upload the file using OpenAI SDK
+    const response = await openai.files.create({
+      file: fileStream,
+      purpose: 'vision',
+    });
+    console.log('Action: Uploaded file to OpenAI', { imagePath });
+
+    const fileId = response.id;
+    console.log('Action: Retrieved file ID from response', {
+      fileId: fileId.substring(0, 10) + '...',
+    });
+
+    console.log(
+      'File uploaded successfully. File ID:',
+      fileId.substring(0, 10) + '...'
+    );
+
+    return fileId;
+  } catch (error) {
+    console.error('Error in uploadLocalImage:', error.message);
+    console.log('Action: Encountered error during file upload', { imagePath });
+    if (error.response) {
+      console.error('OpenAI API Error:', error.response.data);
+    }
     throw error;
   }
 };
 
 // Export functions
 export {
-  uploadBase64Image,
+  uploadLocalImage,
   analyzeImagesWithVision,
   summarizeAnalyses,
   createAssistantMessage,

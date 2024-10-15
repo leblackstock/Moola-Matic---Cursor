@@ -22,6 +22,7 @@ import {
   calculateMessageTokens,
   calculateImageTokens,
 } from '../utils/tokenCalculator.js';
+import { uploadLocalImage } from './chatAssistant.js';
 
 // ... rest of the file
 
@@ -108,17 +109,30 @@ router.post('/analyze-images', async (req, res) => {
 
     const analyses = [];
     for (const imageUrl of imageUrls) {
-      const processedImages = await processImages([imageUrl]);
-      if (processedImages.length > 0) {
-        const { base64Image, filename } = processedImages[0];
-        const analysis = await analyzeImagesWithVision(
-          base64Image,
-          analysisPrompt,
-          filename // Pass the filename here
-        );
+      try {
+        // Remove the http://localhost:3001 part from the imageUrl
+        const cleanedImageUrl = imageUrl.replace(/^http:\/\/localhost:\d+/, '');
+        console.log(`Cleaned image URL: ${cleanedImageUrl}`);
+
+        // Convert URL to local path
+        const localPath = path.join(__dirname, '..', cleanedImageUrl);
+        console.log(`Converting URL to local path: ${localPath}`);
+
+        // Extract filename from path
+        const filename = path.basename(localPath);
+        console.log(`Extracted filename: ${filename}`);
+
+        console.log(`Uploading local image: ${localPath}`);
+
+        // Upload the local image
+        const fileId = await uploadLocalImage(localPath, filename);
+        console.log(`Uploaded file ID: ${fileId}`);
+
+        // Analyze the image using the file ID
+        const analysis = await analyzeImagesWithVision(fileId, analysisPrompt);
         analyses.push(analysis);
-      } else {
-        console.error(`Failed to process image: ${imageUrl}`);
+      } catch (error) {
+        console.error(`Failed to analyze image: ${imageUrl}`, error);
       }
     }
 
@@ -131,7 +145,9 @@ router.post('/analyze-images', async (req, res) => {
     res.json({ analyses, summary });
   } catch (error) {
     console.error('Error in /analyze-images:', error);
-    res.status(500).json({ error: 'An unexpected error occurred' });
+    res
+      .status(500)
+      .json({ error: 'An unexpected error occurred', details: error.message });
   }
 });
 
