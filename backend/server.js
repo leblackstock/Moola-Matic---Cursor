@@ -7,16 +7,12 @@ import helmet from 'helmet';
 import session from 'express-session';
 import { fileURLToPath } from 'url';
 import { chatHandler } from './chat/chatHandler.js';
-import combineAnalysis from './chat/chatCombineAnalysis.js'; // Import the new route
 import itemsRouter from './routes/items.js';
 import tempImageRouter from './api/apiTempImage.js';
 import purchaseImageRouter from './api/apiPurchaseImage.js';
 import connectDB from './config/database.js';
 import MongoStore from 'connect-mongo';
 import logger from '../src/helpers/logger.js';
-
-import { handleMoolaMaticChat, manageContext } from './chat/chatService.js';
-import { processImages } from './utils/imageProcessor.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -112,7 +108,6 @@ app.use('/api/items', itemsRouter);
 app.use('/api/temp-images', tempImageRouter);
 app.use('/api/purchase-images', purchaseImageRouter);
 app.use('/api', chatHandler);
-app.use('/api', combineAnalysis); // Mount the new combineAnalysis route
 
 // Logout Route
 app.post('/api/logout', (req, res) => {
@@ -206,28 +201,3 @@ const startServer = async () => {
 };
 
 startServer();
-
-app.post('/api/analyze-images', async (req, res) => {
-  try {
-    console.log('Received request body:', req.body);
-    const { images } = req.body;
-
-    if (!images || !Array.isArray(images) || images.length === 0) {
-      console.error('Invalid images data received:', images);
-      return res.status(400).json({ error: 'No valid images provided' });
-    }
-
-    console.log('Received image paths:', images);
-
-    const processedImages = await processImages(images);
-
-    console.log('Processed images:', processedImages);
-
-    res.json({ result: processedImages });
-  } catch (error) {
-    console.error('Error processing images:', error);
-    res
-      .status(500)
-      .json({ error: 'Failed to process images', details: error.message });
-  }
-});

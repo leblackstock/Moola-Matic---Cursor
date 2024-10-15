@@ -2,16 +2,13 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { debounce } from 'lodash'; // Change this line
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 import treasureSpecs from './Images/Treasure_Specs01.jpeg';
 import {
   handleChatWithAssistant,
-  analyzeImageWithGPT4Turbo,
   createUserMessage,
-  createAssistantMessage,
-  analyzeImagesWithAssistant,
+  handleAnalyzeImages, // Add this line
 } from './api/chat.js';
 import axios from 'axios';
 import { UploadedImagesGallery } from './components/compGallery.js';
@@ -19,23 +16,12 @@ import PropTypes from 'prop-types';
 import ChatComp from './components/compChat.js';
 
 import {
-  handleDraftSave,
-  handleAutoSave,
   handleLocalSave,
   loadLocalData,
-  clearLocalData,
-  updateContextData,
   createDefaultItem,
-  handleDraftSaveWithImages,
   updateItem as updateItemFunc,
   handleFileUpload,
   handleManualSave,
-  handleNewItem,
-  saveDraft,
-  deleteDraft,
-  fetchDrafts,
-  fetchItems,
-  saveToLocalStorage,
   useAutosave,
 } from './components/compSave.js';
 import {
@@ -71,41 +57,11 @@ import {
   WarningButton,
 } from './components/compStyles.js';
 
-import {
-  generateDraftFilename,
-  getNextSequentialNumber,
-  getImageUrl,
-} from './helpers/itemGen.js';
-
-import CombineAnalyses from './components/compCombineAnalyses.js';
-
 export const API_BASE_URL =
   process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001';
 
-// Helper functions
-const getBase64 = (file) => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => {
-      const base64String = reader.result.split(',')[1];
-      resolve(base64String);
-    };
-    reader.onerror = (error) => reject(error);
-  });
-};
-
 const loadItemData = (itemId) => {
   return loadLocalData(itemId);
-};
-
-const fileToBase64 = (file) => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => resolve(reader.result.split(',')[1]);
-    reader.onerror = (error) => reject(error);
-  });
 };
 
 function NewItemPage({ setItemId }) {
@@ -276,128 +232,87 @@ function NewItemPage({ setItemId }) {
   };
 
   // Handle sending messages
-  const sendMessage = async () => {
-    const generalInput = message.trim();
-    const imageSpecificInput = imageInput.trim();
+  // const sendMessage = async () => {
+  //   const generalInput = message.trim();
+  //   const imageSpecificInput = imageInput.trim();
 
-    if (!generalInput && !imageSpecificInput && !imageFile) return;
+  //   if (!generalInput && !imageSpecificInput && !imageFile) return;
 
-    setMessage('');
-    setImageInput('');
-    setIsLoading(true);
+  //   setMessage('');
+  //   setImageInput('');
+  //   setIsLoading(true);
 
-    try {
-      let response;
+  //   try {
+  //     let response;
 
-      if (imageFile) {
-        // Handle image-based messages
-        const messageToSend = imageAnalyzed
-          ? imageSpecificInput
-          : imageAnalysisPrompt;
-        const result = await analyzeImageWithGPT4Turbo(
-          imageFile,
-          messageToSend,
-          item.itemId
-        );
-        response = {
-          content: result.assistantResponse,
-          status: 'completed',
-          contextData: result.contextData,
-        };
+  //     if (imageFile) {
+  //       // Handle image-based messages
+  //       const messageToSend = imageAnalyzed
+  //         ? imageSpecificInput
+  //         : imageAnalysisPrompt;
+  //       const result = await analyzeImageWithGPT4Turbo(
+  //         imageFile,
+  //         messageToSend,
+  //         item.itemId
+  //       );
+  //       response = {
+  //         content: result.assistantResponse,
+  //         status: 'completed',
+  //         contextData: result.contextData,
+  //       };
 
-        if (!imageAnalyzed) {
-          setImageAnalyzed(true);
-        }
-      } else {
-        // Handle text-only messages
-        response = await handleChatWithAssistant(
-          [...messages, { role: 'user', content: generalInput }],
-          item.itemId
-        );
-      }
+  //       if (!imageAnalyzed) {
+  //         setImageAnalyzed(true);
+  //       }
+  //     } else {
+  //       // Handle text-only messages
+  //       response = await handleChatWithAssistant(
+  //         [...messages, { role: 'user', content: generalInput }],
+  //         item.itemId
+  //       );
+  //     }
 
-      console.log('Assistant response:', response);
+  //     console.log('Assistant response:', response);
 
-      // Update the UI with the new message and response
-      setMessages((prevMessages) => {
-        const newMessages = [
-          ...prevMessages,
-          {
-            role: 'user',
-            content: imageFile ? imageSpecificInput : generalInput,
-          },
-          {
-            role: 'assistant',
-            content: response.content,
-            source: 'moola-matic',
-            status: response.status,
-          },
-        ];
-        return newMessages;
-      });
+  //     // Update the UI with the new message and response
+  //     setMessages((prevMessages) => {
+  //       const newMessages = [
+  //         ...prevMessages,
+  //         {
+  //           role: 'user',
+  //           content: imageFile ? imageSpecificInput : generalInput,
+  //         },
+  //         {
+  //           role: 'assistant',
+  //           content: response.content,
+  //           source: 'moola-matic',
+  //           status: response.status,
+  //         },
+  //       ];
+  //       return newMessages;
+  //     });
 
-      // Update contextData
-      const updatedContextData = updateContextData(item.itemId, {
-        lastAssistantResponse: response.content,
-        lastUserMessage: imageFile ? imageSpecificInput : generalInput,
-        // ... any other context updates
-      });
-      setContextData(updatedContextData);
-    } catch (error) {
-      console.error('Error interacting with Moola-Matic assistant:', error);
-      setMessages((prevMessages) => [
-        ...prevMessages,
-        {
-          role: 'assistant',
-          content:
-            'I apologize, but I encountered an error while processing your request. Please try again or contact support if the issue persists.',
-        },
-      ]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Rename this function to avoid conflict with the imported function
-  const analyzeImageLocally = async (
-    file,
-    message,
-    isInitialAnalysis = true
-  ) => {
-    // Convert the file to base64
-    const base64Image = await fileToBase64(file);
-
-    const formData = new FormData();
-    formData.append('image', file);
-    formData.append('base64Image', base64Image); // Add base64 image
-    formData.append(
-      'message',
-      isInitialAnalysis ? imageAnalysisPrompt : message
-    );
-    formData.append('isInitialAnalysis', isInitialAnalysis);
-    formData.append('itemId', item.itemId);
-    formData.append('contextData', JSON.stringify(contextData));
-
-    try {
-      const response = await fetch(
-        `http://localhost:${backendPort}/api/analyze-images`,
-        {
-          method: 'POST',
-          body: formData,
-        }
-      );
-      const data = await response.json();
-      // Update your local contextData with the response
-      setContextData((prevContextData) => ({
-        ...prevContextData,
-        ...data.contextData,
-      }));
-      return data.advice;
-    } catch (error) {
-      console.error('Error analyzing image:', error);
-      throw error;
-    }
-  };
+  //     // Update contextData
+  //     const updatedContextData = updateContextData(item.itemId, {
+  //       lastAssistantResponse: response.content,
+  //       lastUserMessage: imageFile ? imageSpecificInput : generalInput,
+  //       // ... any other context updates
+  //     });
+  //     setContextData(updatedContextData);
+  //   } catch (error) {
+  //     console.error('Error interacting with Moola-Matic assistant:', error);
+  //     setMessages((prevMessages) => [
+  //       ...prevMessages,
+  //       {
+  //         role: 'assistant',
+  //         content:
+  //           'I apologize, but I encountered an error while processing your request. Please try again or contact support if the issue persists.',
+  //       },
+  //     ]);
+  //   } finally {
+  //     setIsLoading(false);
+  //   }
+  // };
 
   const handleFileChangeWrapper = (event) => {
     handleFileChange(
@@ -414,46 +329,46 @@ function NewItemPage({ setItemId }) {
   };
 
   // Send Image Message
-  const sendImageMessage = async () => {
-    if (!imageFile || !imageInput.trim()) return;
+  // const sendImageMessage = async () => {
+  //   if (!imageFile || !imageInput.trim()) return;
 
-    const newMessage = {
-      content: imageInput.trim(),
-      role: 'user',
-      image: imagePreview,
-    };
+  //   const newMessage = {
+  //     content: imageInput.trim(),
+  //     role: 'user',
+  //     image: imagePreview,
+  //   };
 
-    setMessages((prevMessages) => [...prevMessages, newMessage]);
-    setIsLoading(true);
+  //   setMessages((prevMessages) => [...prevMessages, newMessage]);
+  //   setIsLoading(true);
 
-    try {
-      const assistantResponse = await analyzeImageWithGPT4Turbo(
-        imageFile,
-        imageInput.trim(),
-        false
-      );
+  //   try {
+  //     const assistantResponse = await analyzeImageWithGPT4Turbo(
+  //       imageFile,
+  //       imageInput.trim(),
+  //       false
+  //     );
 
-      setMessages((prevMessages) => [
-        ...prevMessages,
-        { role: 'user', content: imageInput.trim(), image: imagePreview },
-        { role: 'assistant', content: assistantResponse },
-      ]);
-    } catch (error) {
-      console.error('Error in sendImageMessage:', error);
-      setMessages((prevMessages) => [
-        ...prevMessages,
-        {
-          role: 'assistant',
-          content: 'Sorry, an error occurred. Please try again.',
-        },
-      ]);
-    } finally {
-      setIsLoading(false);
-      setImageFile(null);
-      setImagePreview('');
-      setImageInput('');
-    }
-  };
+  //     setMessages((prevMessages) => [
+  //       ...prevMessages,
+  //       { role: 'user', content: imageInput.trim(), image: imagePreview },
+  //       { role: 'assistant', content: assistantResponse },
+  //     ]);
+  //   } catch (error) {
+  //     console.error('Error in sendImageMessage:', error);
+  //     setMessages((prevMessages) => [
+  //       ...prevMessages,
+  //       {
+  //         role: 'assistant',
+  //         content: 'Sorry, an error occurred. Please try again.',
+  //       },
+  //     ]);
+  //   } finally {
+  //     setIsLoading(false);
+  //     setImageFile(null);
+  //     setImagePreview('');
+  //     setImageInput('');
+  //   }
+  // };
 
   // Remove or comment out the existing handleImageSelect function
   /*
@@ -541,95 +456,20 @@ function NewItemPage({ setItemId }) {
   };
 
   // Update the handleAnalyzeImages function
-  const handleAnalyzeImages = async () => {
-    if (uploadedImages.length === 0) {
-      setNotificationMessage('Please upload at least one image to analyze.');
-      setShowNotification(true);
-      return;
-    }
-
+  const handleAnalyzeImagesWrapper = async () => {
     setIsAnalyzing(true);
     try {
-      const imageUrls = uploadedImages.map((image) => image.url);
-
-      // Step 1: Collect all JSON responses
-      const analysisResults = await analyzeImagesWithAssistant(
-        imageUrls,
-        item.description,
-        item.itemId,
-        item.sellerNotes,
-        JSON.stringify(contextData)
-      );
-
-      console.log('Raw analysis results:', analysisResults);
-
-      // Step 2: Use combineAnalyses to combine and summarize the results
-      const combinedAnalysis = await CombineAnalyses(analysisResults);
-
-      console.log('Combined analysis:', combinedAnalysis);
-
-      // Step 3: Map the combined analysis to your form fields
-      const mappedResult = {
-        itemDetails: {
-          type: combinedAnalysis.itemDetails?.type || 'Unknown',
-          brand: combinedAnalysis.itemDetails?.brand || 'Unknown',
-          condition: combinedAnalysis.itemDetails?.condition || 'Unknown',
-          rarity: combinedAnalysis.itemDetails?.rarity || 'Unknown',
-          authenticityConfirmed:
-            combinedAnalysis.itemDetails?.authenticityConfirmed || null,
-          packagingAccessories:
-            combinedAnalysis.itemDetails?.packagingAccessories || 'None',
-        },
-        financials: {
-          purchasePrice: combinedAnalysis.financials?.purchasePrice || 0,
-          cleaningRepairCosts:
-            combinedAnalysis.financials?.cleaningRepairCosts || 0,
-          estimatedShippingCosts:
-            combinedAnalysis.financials?.estimatedShippingCosts || 0,
-          platformFees: combinedAnalysis.financials?.platformFees || 0,
-          expectedProfit: combinedAnalysis.financials?.expectedProfit || 0,
-          estimatedValue: combinedAnalysis.financials?.estimatedValue || 0,
-        },
-        marketAnalysis: {
-          marketDemand:
-            combinedAnalysis.marketAnalysis?.marketDemand || 'Unknown',
-          historicalPriceTrends:
-            combinedAnalysis.marketAnalysis?.historicalPriceTrends || 'Unknown',
-          marketSaturation:
-            combinedAnalysis.marketAnalysis?.marketSaturation || 'Unknown',
-          salesVelocity:
-            combinedAnalysis.marketAnalysis?.salesVelocity || 'Unknown',
-        },
-        finalRecommendation: {
-          purchaseRecommendation:
-            combinedAnalysis.finalRecommendation?.purchaseRecommendation ||
-            'Unknown',
-          detailedBreakdown:
-            combinedAnalysis.finalRecommendation?.detailedBreakdown ||
-            'No additional notes provided',
-        },
-      };
-
-      // Update the item state with the mapped results
-      setItem((prevItem) => ({
-        ...prevItem,
-        ...mappedResult,
-      }));
-
-      // Update messages with the analysis advice
-      setMessages((prevMessages) => [
-        ...prevMessages,
-        {
-          role: 'assistant',
-          content: `Analysis complete. ${mappedResult.finalRecommendation.detailedBreakdown}`,
-        },
-      ]);
+      await handleAnalyzeImages({
+        uploadedImages,
+        item,
+        contextData,
+        setItem,
+        setMessages,
+        setNotificationMessage,
+        setShowNotification,
+      });
     } catch (error) {
-      console.error('Error in handleAnalyzeImages:', error);
-      setNotificationMessage(
-        'An error occurred while analyzing the images. Please try again.'
-      );
-      setShowNotification(true);
+      console.error('Error in handleAnalyzeImagesWrapper:', error);
     } finally {
       setIsAnalyzing(false);
     }
@@ -766,7 +606,7 @@ function NewItemPage({ setItemId }) {
               <i className="fas fa-image"></i> Add Images
             </GlowingButton>
             <GlowingButton
-              onClick={handleAnalyzeImages}
+              onClick={handleAnalyzeImagesWrapper}
               disabled={isLoading || isAnalyzing || uploadedImages.length === 0}
             >
               {isAnalyzing ? 'Analyzing...' : 'Analyze Images'}

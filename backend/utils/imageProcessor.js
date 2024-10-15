@@ -1,15 +1,17 @@
 // backend/utils/imageProcessor.js
 
 import axios from 'axios';
-import {
-  validateBase64,
-  validateImageDimensions,
-  validateImageSize,
-} from './imageValidator.js';
+import { validateBase64, validateAndResizeImage } from './imageValidator.js';
 
-const MAX_WIDTH = 1920;
-const MAX_HEIGHT = 1080;
-const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+const convertUrlToBase64 = async (url) => {
+  const response = await axios.get(url, { responseType: 'arraybuffer' });
+  const buffer = Buffer.from(response.data, 'binary');
+
+  const resizedBuffer = await validateAndResizeImage(buffer);
+  const base64 = resizedBuffer.toString('base64');
+  const mimeType = response.headers['content-type'];
+  return `data:${mimeType};base64,${base64}`;
+};
 
 const processImages = async (imageUrls) => {
   const processedImages = await Promise.all(
@@ -25,18 +27,6 @@ const processImages = async (imageUrls) => {
       return null;
     })
   );
-
-  const convertUrlToBase64 = async (url) => {
-    const response = await axios.get(url, { responseType: 'arraybuffer' });
-    const buffer = Buffer.from(response.data, 'binary');
-
-    await validateImageDimensions(buffer, MAX_WIDTH, MAX_HEIGHT);
-    validateImageSize(buffer, MAX_SIZE_BYTES);
-
-    const base64 = buffer.toString('base64');
-    const mimeType = response.headers['content-type'];
-    return `data:${mimeType};base64,${base64}`;
-  };
 
   return processedImages.filter((img) => img !== null);
 };

@@ -1,6 +1,9 @@
 // backend/chat/chatAssistant.js
 
+import dotenv from 'dotenv';
 import OpenAI from 'openai';
+
+dotenv.config();
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -15,6 +18,7 @@ const analyzeImagesWithAssistant = async (processedImages, analysisPrompt) => {
           file: Buffer.from(base64.split(',')[1], 'base64'),
           purpose: 'vision',
         });
+        console.log(`Uploaded file ID: ${file.id}`);
         return file.id;
       })
     );
