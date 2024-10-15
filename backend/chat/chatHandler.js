@@ -23,6 +23,7 @@ import {
   calculateImageTokens,
 } from '../utils/tokenCalculator.js';
 import { uploadLocalImage } from './chatAssistant.js';
+import { uploadBase64Image } from './chatAssistant.js';
 
 // ... rest of the file
 
@@ -107,32 +108,23 @@ router.post('/analyze-images', async (req, res) => {
     const combineAndSummarizeAnalysisPrompt =
       generateCombineAndSummarizeAnalysisPrompt();
 
+    // Process images to get base64 representations
+    const processedImages = await processImages(imageUrls);
+
     const analyses = [];
-    for (const imageUrl of imageUrls) {
+    for (const { base64Image, filename } of processedImages) {
       try {
-        // Remove the http://localhost:3001 part from the imageUrl
-        const cleanedImageUrl = imageUrl.replace(/^http:\/\/localhost:\d+/, '');
-        console.log(`Cleaned image URL: ${cleanedImageUrl}`);
+        console.log(`Uploading base64 image: ${filename}`);
 
-        // Convert URL to local path
-        const localPath = path.join(__dirname, '..', cleanedImageUrl);
-        console.log(`Converting URL to local path: ${localPath}`);
-
-        // Extract filename from path
-        const filename = path.basename(localPath);
-        console.log(`Extracted filename: ${filename}`);
-
-        console.log(`Uploading local image: ${localPath}`);
-
-        // Upload the local image
-        const fileId = await uploadLocalImage(localPath, filename);
+        // Upload the base64 image
+        const fileId = await uploadBase64Image(base64Image, filename);
         console.log(`Uploaded file ID: ${fileId}`);
 
         // Analyze the image using the file ID
         const analysis = await analyzeImagesWithVision(fileId, analysisPrompt);
         analyses.push(analysis);
       } catch (error) {
-        console.error(`Failed to analyze image: ${imageUrl}`, error);
+        console.error(`Failed to analyze image: ${filename}`, error);
       }
     }
 
