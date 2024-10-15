@@ -22,7 +22,7 @@ import {
   calculateMessageTokens,
   calculateImageTokens,
 } from '../utils/tokenCalculator.js';
-import { uploadLocalImage } from './chatAssistant.js';
+//import { uploadLocalImage } from './chatAssistant.js';
 import { uploadBase64Image } from './chatAssistant.js';
 
 // ... rest of the file
@@ -114,14 +114,11 @@ router.post('/analyze-images', async (req, res) => {
     const analyses = [];
     for (const { base64Image, filename } of processedImages) {
       try {
-        console.log(`Uploading base64 image: ${filename}`);
-
-        // Upload the base64 image
-        const fileId = await uploadBase64Image(base64Image, filename);
-        console.log(`Uploaded file ID: ${fileId}`);
-
-        // Analyze the image using the file ID
-        const analysis = await analyzeImagesWithVision(fileId, analysisPrompt);
+        console.log(`Analyzing image: ${filename}`);
+        const analysis = await analyzeImagesWithVision(
+          analysisPrompt,
+          base64Image
+        );
         analyses.push(analysis);
       } catch (error) {
         console.error(`Failed to analyze image: ${filename}`, error);
