@@ -119,7 +119,7 @@ function ViewItemsPage({ currentItemId }) {
       console.log('Draft deleted successfully');
       setDrafts(
         drafts.filter((d) => {
-          const dId = d.itemId || (d._id && d._id.toString());
+          const dId = d.itemId || d._id;
           return dId !== id;
         })
       );

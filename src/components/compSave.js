@@ -493,35 +493,36 @@ export const handleManualSave = async (
       )
     : [];
 
-  const updatedItem = {
+  const draftData = {
     ...item,
     images: combinedImages,
-    messages: validMessages, // Include validated messages in the updatedItem
   };
 
   try {
-    let savedItem;
-    if (item._id) {
-      // If the item has an _id, it already exists in the database, so update it
-      savedItem = await updateItem(
-        item._id,
-        updatedItem,
-        {},
-        validMessages,
-        handleLocalSave,
-        setHasUnsavedChanges
-      );
-    } else {
-      // If the item doesn't have an _id, it's new, so create it
-      savedItem = await createItem(updatedItem);
-    }
+    const response = await axios.post(
+      `${API_URL}/api/items/autosave-draft`,
+      {
+        draftData,
+        contextData: item.contextData || {}, // Include contextData
+        messages: validMessages, // Include validated messages
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
 
-    setItem(savedItem);
-    setUploadedImages(savedItem.images || []);
-    setHasUnsavedChanges(false);
-    setLastAutoSave(new Date());
-    console.log('Saved item with messages:', savedItem.messages);
-    return savedItem;
+    if (response.data && response.data.item) {
+      setItem(response.data.item);
+      setUploadedImages(response.data.item.images || []);
+      setHasUnsavedChanges(false);
+      setLastAutoSave(new Date());
+      console.log('Manual save completed successfully');
+      return response.data.item;
+    } else {
+      throw new Error('Invalid response format from server');
+    }
   } catch (error) {
     console.error('Error during manual save:', error);
     throw error;

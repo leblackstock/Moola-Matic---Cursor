@@ -1,7 +1,8 @@
 // backend/helpers/itemHelpers.js
 
 import AsyncLock from 'async-lock';
-import { DraftItem } from '../models/DraftItem.js';
+import { DraftItem } from '../models/draftItem.js';
+import { v4 as uuidv4 } from 'uuid';
 
 const lock = new AsyncLock();
 
@@ -23,8 +24,16 @@ export const getNextSequentialNumber = async (itemId) => {
         return 0;
       });
 
-      const maxSequentialNumber = Math.max(...sequentialNumbers);
-      return maxSequentialNumber + 1;
+      // Create a Set to store unique numbers
+      const uniqueNumbers = new Set(sequentialNumbers);
+
+      // Find the first available number
+      let nextNumber = 1;
+      while (uniqueNumbers.has(nextNumber)) {
+        nextNumber++;
+      }
+
+      return nextNumber;
     } catch (error) {
       console.error('Error in getNextSequentialNumber:', error);
       throw error;
@@ -47,6 +56,5 @@ export const generateDraftFilename = (
 
 // Generate Item ID (UUID)
 export const generateItemId = () => {
-  const { v4: uuidv4 } = require('uuid');
   return uuidv4();
 };

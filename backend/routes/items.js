@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { DraftItem } from '../models/DraftItem.js';
+import { DraftItem } from '../models/draftItem.js';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -76,15 +76,30 @@ router.post(
           .json({ error: 'Failed to create upload directory' });
       }
 
-      // Determine filename
-      const sequentialNumber = await getNextSequentialNumber(itemId);
-      const newFilename = generateDraftFilename(
+      // Determine filename with uniqueness check
+      let sequentialNumber = await getNextSequentialNumber(itemId);
+      let newFilename = generateDraftFilename(
         itemId,
         sequentialNumber,
         req.file.originalname
       );
+      let filePath = path.join(uploadDir, newFilename);
 
-      const filePath = path.join(uploadDir, newFilename);
+      // Check if file already exists and increment if necessary
+      while (
+        await fs
+          .access(filePath)
+          .then(() => true)
+          .catch(() => false)
+      ) {
+        sequentialNumber++;
+        newFilename = generateDraftFilename(
+          itemId,
+          sequentialNumber,
+          req.file.originalname
+        );
+        filePath = path.join(uploadDir, newFilename);
+      }
 
       // Write the file to disk
       await fs.writeFile(filePath, req.file.buffer);
@@ -448,7 +463,12 @@ router.post('/autosave-draft', async (req, res) => {
 
     let draft = await DraftItem.findOneAndUpdate(
       { itemId: draftData.itemId },
-      { ...draftData, lastUpdated: new Date() },
+      {
+        ...draftData,
+        contextData, // Save contextData
+        messages, // Save messages
+        lastUpdated: new Date(),
+      },
       {
         new: true,
         upsert: true,
@@ -457,7 +477,7 @@ router.post('/autosave-draft', async (req, res) => {
       }
     );
 
-    console.log('Draft autosaved');
+    console.log('Draft autosaved with contextData and messages');
     res.status(200).json({ item: draft });
   } catch (error) {
     console.error('Error autosaving draft:', error);

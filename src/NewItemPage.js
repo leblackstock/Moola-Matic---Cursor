@@ -14,6 +14,7 @@ import axios from 'axios';
 import { UploadedImagesGallery } from './components/compGallery.js';
 import PropTypes from 'prop-types';
 import ChatComp from './components/compChat.js';
+import FormFields from './components/compFormFields.js';
 
 import {
   handleLocalSave,
@@ -209,11 +210,11 @@ function NewItemPage({ setItemId }) {
   // ----------------------------
   useEffect(() => {
     return () => {
-      if (item && item.itemId) {
-        handleLocalSave(item, contextData, messages);
+      if (item && ItemId) {
+        handleLocalSave(item, contextData, messages, ItemId);
       }
     };
-  }, [item, contextData, messages]);
+  }, [item, contextData, messages, ItemId]);
 
   // ----------------------------
   // useEffect Hook: Set Selected Image if Needed
@@ -317,7 +318,7 @@ function NewItemPage({ setItemId }) {
   const handleFileChangeWrapper = (event) => {
     handleFileChange(
       event,
-      item,
+      ItemId, // Use ItemId here instead of item.itemId
       setItem,
       (newImages) => {
         console.log('Setting uploaded images:', newImages);
@@ -458,6 +459,7 @@ function NewItemPage({ setItemId }) {
   // Update the handleAnalyzeImages function
   const handleAnalyzeImagesWrapper = async () => {
     setIsAnalyzing(true);
+    setIsLoading(true); // Add this line to set loading state
     try {
       console.log('Starting image analysis...');
       const result = await handleAnalyzeImages({
@@ -481,7 +483,22 @@ function NewItemPage({ setItemId }) {
       ) {
         setItem((prevItem) => ({
           ...prevItem,
-          ...result, // Spread the entire result object into the item
+          itemDetails: {
+            ...prevItem.itemDetails,
+            ...result.itemDetails,
+          },
+          financials: {
+            ...prevItem.financials,
+            ...result.financials,
+          },
+          marketAnalysis: {
+            ...prevItem.marketAnalysis,
+            ...result.marketAnalysis,
+          },
+          finalRecommendation: {
+            ...prevItem.finalRecommendation,
+            ...result.finalRecommendation,
+          },
         }));
 
         console.log('Updated item:', item);
@@ -497,6 +514,7 @@ function NewItemPage({ setItemId }) {
       setShowNotification(true);
     } finally {
       setIsAnalyzing(false);
+      setIsLoading(false); // Add this line to reset loading state
     }
   };
 
@@ -507,7 +525,7 @@ function NewItemPage({ setItemId }) {
         const { newImage } = await handleFileUpload(
           file,
           backendPort,
-          item,
+          ItemId, // Use ItemId here instead of item
           setUploadedImages
         );
 
@@ -611,14 +629,14 @@ function NewItemPage({ setItemId }) {
             updateItem={updateItem}
             messages={messages}
             setMessages={setMessages}
-            ItemId={item?.itemId} // Use optional chaining
-            onFileChange={handleFileChangeWrapper} // Add this prop
+            ItemId={ItemId} // Use ItemId directly here
+            onFileChange={handleFileChangeWrapper}
             isLoading={isLoading}
             onStartLoading={handleStartLoading}
             onEndLoading={handleEndLoading}
             imageUploaded={imageUploaded}
             setImageUploaded={setImageUploaded}
-            imagePreview={imagePreview} // Pass the imagePreview to ChatComp
+            imagePreview={imagePreview}
             selectedImage={selectedImage}
             setSelectedImage={setSelectedImage}
           />
@@ -634,16 +652,22 @@ function NewItemPage({ setItemId }) {
               onClick={handleAnalyzeImagesWrapper}
               disabled={isLoading || isAnalyzing || uploadedImages.length === 0}
             >
-              {isAnalyzing ? 'Analyzing...' : 'Analyze Images'}
+              {isAnalyzing ? (
+                <>
+                  <i className="fas fa-spinner fa-spin"></i> Analyzing...
+                </>
+              ) : (
+                'Analyze Images'
+              )}
             </GlowingButton>
           </ButtonContainer>
 
           <UploadedImagesGallery
-            images={uploadedImages || []} // Ensure it's always an array
+            images={uploadedImages || []}
             onSelect={handleImageSelect}
             selectedImage={selectedImage}
             onDelete={handleDeleteImageWrapper}
-            itemId={ItemId}
+            itemId={ItemId} // Use ItemId here
           />
 
           {/* Image Selection Modal */}
@@ -662,7 +686,7 @@ function NewItemPage({ setItemId }) {
             </ModalOverlay>
           )}
 
-          {/* Hidden File Inputs */}
+          {/* Hidden file input */}
           <input
             type="file"
             ref={fileInputRef}
@@ -674,355 +698,7 @@ function NewItemPage({ setItemId }) {
             }}
           />
 
-          <input
-            type="file"
-            id="images"
-            multiple
-            accept="image/*"
-            onChange={(e) => {
-              handleFileChange(setUploadedImages, ItemId)(e);
-            }}
-          />
-
-          <StyledForm onSubmit={handleSubmit}>
-            {/* Basic item information */}
-            <StyledFormGroup>
-              <StyledLabel htmlFor="name">Item Name</StyledLabel>
-              <StyledInput
-                type="text"
-                id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-              />
-            </StyledFormGroup>
-
-            <StyledFormGroup>
-              <StyledLabel htmlFor="description">Description</StyledLabel>
-              <StyledTextarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows="3"
-              />
-            </StyledFormGroup>
-
-            <StyledFormGroup>
-              <StyledLabel htmlFor="category">Category</StyledLabel>
-              <StyledInput
-                type="text"
-                id="category"
-                value={item.category || ''}
-                onChange={(e) => updateItem('category', e.target.value)}
-              />
-            </StyledFormGroup>
-
-            {/* Item details */}
-            <StyledFormGroup>
-              <StyledLabel htmlFor="itemType">Item Type</StyledLabel>
-              <StyledInput
-                type="text"
-                id="itemType"
-                value={item.itemDetails?.type || ''}
-                onChange={(e) => updateItem('itemDetails.type', e.target.value)}
-                required
-              />
-            </StyledFormGroup>
-
-            <StyledFormGroup>
-              <StyledLabel htmlFor="brand">Brand</StyledLabel>
-              <StyledInput
-                type="text"
-                id="brand"
-                value={item.itemDetails?.brand || ''}
-                onChange={(e) =>
-                  updateItem('itemDetails.brand', e.target.value)
-                }
-              />
-            </StyledFormGroup>
-
-            <StyledFormGroup>
-              <StyledLabel htmlFor="condition">Condition</StyledLabel>
-              <StyledSelect
-                id="condition"
-                value={item.itemDetails?.condition || ''}
-                onChange={(e) =>
-                  updateItem('itemDetails.condition', e.target.value)
-                }
-              >
-                <option value="">Select condition</option>
-                <option value="new">New</option>
-                <option value="like-new">Like New</option>
-                <option value="good">Good</option>
-                <option value="fair">Fair</option>
-                <option value="poor">Poor</option>
-              </StyledSelect>
-            </StyledFormGroup>
-
-            <StyledFormGroup>
-              <StyledLabel htmlFor="rarity">Rarity</StyledLabel>
-              <StyledInput
-                type="text"
-                id="rarity"
-                value={item.itemDetails?.rarity || ''}
-                onChange={(e) =>
-                  updateItem('itemDetails.rarity', e.target.value)
-                }
-              />
-            </StyledFormGroup>
-
-            <StyledFormGroup>
-              <StyledLabel htmlFor="authenticityConfirmed">
-                Authenticity Confirmed
-              </StyledLabel>
-              <StyledInput
-                type="checkbox"
-                id="authenticityConfirmed"
-                checked={item.itemDetails?.authenticityConfirmed || false}
-                onChange={(e) =>
-                  updateItem(
-                    'itemDetails.authenticityConfirmed',
-                    e.target.checked
-                  )
-                }
-              />
-            </StyledFormGroup>
-
-            <StyledFormGroup>
-              <StyledLabel htmlFor="packagingAccessories">
-                Packaging/Accessories
-              </StyledLabel>
-              <StyledInput
-                type="text"
-                id="packagingAccessories"
-                value={item.itemDetails?.packagingAccessories || ''}
-                onChange={(e) =>
-                  updateItem('itemDetails.packagingAccessories', e.target.value)
-                }
-              />
-            </StyledFormGroup>
-
-            {/* Dates */}
-            <StyledFormGroup>
-              <StyledLabel htmlFor="purchaseDate">Purchase Date</StyledLabel>
-              <StyledInput
-                type="date"
-                id="purchaseDate"
-                value={item.purchaseDate ? item.purchaseDate.split('T')[0] : ''}
-                onChange={(e) => updateItem('purchaseDate', e.target.value)}
-              />
-            </StyledFormGroup>
-
-            <StyledFormGroup>
-              <StyledLabel htmlFor="listingDate">Listing Date</StyledLabel>
-              <StyledInput
-                type="date"
-                id="listingDate"
-                value={item.listingDate ? item.listingDate.split('T')[0] : ''}
-                onChange={(e) => updateItem('listingDate', e.target.value)}
-              />
-            </StyledFormGroup>
-
-            {/* Financial information */}
-            <StyledFormGroup>
-              <StyledLabel htmlFor="purchasePrice">Purchase Price</StyledLabel>
-              <StyledInput
-                type="number"
-                id="purchasePrice"
-                value={item.financials?.purchasePrice || ''}
-                onChange={(e) =>
-                  updateItem(
-                    'financials.purchasePrice',
-                    parseFloat(e.target.value)
-                  )
-                }
-              />
-            </StyledFormGroup>
-
-            <StyledFormGroup>
-              <StyledLabel htmlFor="cleaningRepairCosts">
-                Cleaning/Repair Costs
-              </StyledLabel>
-              <StyledInput
-                type="number"
-                id="cleaningRepairCosts"
-                value={item.financials?.cleaningRepairCosts || ''}
-                onChange={(e) =>
-                  updateItem(
-                    'financials.cleaningRepairCosts',
-                    parseFloat(e.target.value)
-                  )
-                }
-              />
-            </StyledFormGroup>
-
-            <StyledFormGroup>
-              <StyledLabel htmlFor="estimatedShippingCosts">
-                Estimated Shipping Costs
-              </StyledLabel>
-              <StyledInput
-                type="number"
-                id="estimatedShippingCosts"
-                value={item.financials?.estimatedShippingCosts || ''}
-                onChange={(e) =>
-                  updateItem(
-                    'financials.estimatedShippingCosts',
-                    parseFloat(e.target.value)
-                  )
-                }
-              />
-            </StyledFormGroup>
-
-            <StyledFormGroup>
-              <StyledLabel htmlFor="platformFees">Platform Fees</StyledLabel>
-              <StyledInput
-                type="number"
-                id="platformFees"
-                value={item.financials?.platformFees || ''}
-                onChange={(e) =>
-                  updateItem(
-                    'financials.platformFees',
-                    parseFloat(e.target.value)
-                  )
-                }
-              />
-            </StyledFormGroup>
-
-            <StyledFormGroup>
-              <StyledLabel htmlFor="expectedProfit">
-                Expected Profit
-              </StyledLabel>
-              <StyledInput
-                type="number"
-                id="expectedProfit"
-                value={item.financials?.expectedProfit || ''}
-                onChange={(e) =>
-                  updateItem(
-                    'financials.expectedProfit',
-                    parseFloat(e.target.value)
-                  )
-                }
-              />
-            </StyledFormGroup>
-
-            <StyledFormGroup>
-              <StyledLabel htmlFor="estimatedValue">
-                Estimated Value
-              </StyledLabel>
-              <StyledInput
-                type="number"
-                id="estimatedValue"
-                value={item.financials?.estimatedValue || ''}
-                onChange={(e) =>
-                  updateItem(
-                    'financials.estimatedValue',
-                    parseFloat(e.target.value)
-                  )
-                }
-              />
-            </StyledFormGroup>
-
-            {/* Additional information */}
-            <StyledFormGroup>
-              <StyledLabel htmlFor="sellerNotes">Seller Notes</StyledLabel>
-              <StyledTextarea
-                id="sellerNotes"
-                value={item.sellerNotes || ''}
-                onChange={(e) => updateItem('sellerNotes', e.target.value)}
-                rows="3"
-              />
-            </StyledFormGroup>
-
-            <StyledFormGroup>
-              <StyledLabel htmlFor="purchaseRecommendation">
-                Purchase Recommendation
-              </StyledLabel>
-              <StyledSelect
-                id="purchaseRecommendation"
-                value={
-                  item.finalRecommendation?.purchaseRecommendation ?? 'Unknown'
-                }
-                onChange={(e) =>
-                  handlePurchaseRecommendationChange(e.target.value)
-                }
-              >
-                <option value="true">Yes</option>
-                <option value="false">No</option>
-                <option value="Unknown">Unknown</option>
-              </StyledSelect>
-            </StyledFormGroup>
-
-            <StyledFormGroup>
-              <StyledLabel htmlFor="detailedBreakdown">
-                Detailed Breakdown
-              </StyledLabel>
-              <StyledTextarea
-                id="detailedBreakdown"
-                value={item.finalRecommendation?.detailedBreakdown || ''}
-                readOnly
-                rows="5"
-              />
-            </StyledFormGroup>
-
-            {item.itemDetails && (
-              <>
-                {/* Item Details */}
-                <StyledFormGroup>
-                  <StyledLabel htmlFor="itemDetailsAnalysis">
-                    Item Details Analysis
-                  </StyledLabel>
-                  <StyledTextarea
-                    id="itemDetailsAnalysis"
-                    value={JSON.stringify(item.itemDetails, null, 2)}
-                    readOnly
-                    rows="5"
-                  />
-                </StyledFormGroup>
-
-                {/* Financials */}
-                <StyledFormGroup>
-                  <StyledLabel htmlFor="financialsAnalysis">
-                    Financials Analysis
-                  </StyledLabel>
-                  <StyledTextarea
-                    id="financialsAnalysis"
-                    value={JSON.stringify(item.financials, null, 2)}
-                    readOnly
-                    rows="5"
-                  />
-                </StyledFormGroup>
-
-                {/* Market Analysis */}
-                <StyledFormGroup>
-                  <StyledLabel htmlFor="marketAnalysis">
-                    Market Analysis
-                  </StyledLabel>
-                  <StyledTextarea
-                    id="marketAnalysis"
-                    value={JSON.stringify(item.marketAnalysis, null, 2)}
-                    readOnly
-                    rows="5"
-                  />
-                </StyledFormGroup>
-
-                {/* Final Recommendation */}
-                <StyledFormGroup>
-                  <StyledLabel htmlFor="finalRecommendation">
-                    Final Recommendation
-                  </StyledLabel>
-                  <StyledTextarea
-                    id="finalRecommendation"
-                    value={JSON.stringify(item.finalRecommendation, null, 2)}
-                    readOnly
-                    rows="5"
-                  />
-                </StyledFormGroup>
-              </>
-            )}
-
-            <StyledButton type="submit">Save Item</StyledButton>
-          </StyledForm>
-
+          {/* New Save Draft button */}
           <StyledButton onClick={handleSaveDraft}>Save Draft</StyledButton>
 
           {lastAutoSave && (
@@ -1030,6 +706,17 @@ function NewItemPage({ setItemId }) {
           )}
 
           {hasUnsavedChanges && <span>Unsaved changes</span>}
+
+          {/* FormFields component */}
+          <FormFields
+            item={item}
+            updateItem={updateItem}
+            handleSubmit={handleSubmit}
+            handleSaveDraft={handleSaveDraft}
+            handlePurchaseRecommendationChange={
+              handlePurchaseRecommendationChange
+            }
+          />
         </div>
       </MainContentArea>
     </PageContainer>
