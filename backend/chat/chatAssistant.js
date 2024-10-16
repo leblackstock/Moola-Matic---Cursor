@@ -46,17 +46,12 @@ const uploadBase64Image = async (base64Image, originalFileName) => {
     throw new Error('Invalid base64Image input');
   }
 
-  // Remove the data URI prefix if present
   const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
 
   try {
     const buffer = Buffer.from(base64Data, 'base64');
-    console.log(
-      `Processed image: ${originalFileName}, Size: ${buffer.length} bytes`
-    );
     return buffer;
   } catch (error) {
-    console.error('Error processing base64 image:', error);
     throw error;
   }
 };
@@ -75,10 +70,8 @@ const retrieveFileContent = async (fileId) => {
       },
       responseType: 'arraybuffer',
     });
-    console.log('OpenAI Response:', JSON.stringify(response.headers, null, 2));
     return Buffer.from(response.data, 'binary').toString('base64');
   } catch (error) {
-    console.error('Error retrieving file content:', error.message);
     throw error;
   }
 };
@@ -95,11 +88,9 @@ const analyzeImagesWithVision = async (analysisPrompt, base64Image) => {
       throw new Error('Invalid base64Image input');
     }
 
-    // Remove the data URI prefix if present
     const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
 
     const buffer = Buffer.from(base64Data, 'base64');
-    console.log(`Processing image, size: ${buffer.length} bytes`);
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4-turbo',
@@ -123,23 +114,14 @@ const analyzeImagesWithVision = async (analysisPrompt, base64Image) => {
 
     const analysis = response.choices[0].message.content;
 
-    // Log the full analysis
-    console.log('Full image analysis:', analysis);
+    // Log the analysis result for this image
+    console.log('Image analysis result:', analysis);
 
     // Combine the analysis using combineAnalyses
     const combinedAnalysis = combineAnalyses([analysis]);
 
-    console.log(
-      'Combined analysis:',
-      JSON.stringify(combinedAnalysis, null, 2)
-    );
-
-    console.log('Image analysis completed. Response length:', analysis.length);
-
     return { analysis, combinedAnalysis };
   } catch (error) {
-    const truncatedMessage = truncateMessage(error.message);
-    console.error('Error analyzing image:', truncatedMessage);
     throw error;
   }
 };
@@ -170,7 +152,9 @@ const summarizeAnalyses = async (combinedAnalyses, summarizePrompt) => {
     });
 
     const summary = response.choices[0].message.content;
-    console.log('Analyses summarized. Summary length:', summary.length);
+
+    // Log the summary of the analyses
+    console.log('Analysis summary:', summary);
 
     return {
       summary,
@@ -181,7 +165,6 @@ const summarizeAnalyses = async (combinedAnalyses, summarizePrompt) => {
       },
     };
   } catch (error) {
-    console.error('Error summarizing analyses:', error.message);
     throw error;
   }
 };
@@ -208,13 +191,8 @@ const createAssistantMessage = async (userMessage) => {
       presence_penalty: 0,
       response_format: { type: 'text' },
     });
-    console.log(
-      'Assistant message created. Response length:',
-      response.choices[0].message.content.length
-    );
     return response.choices[0].message.content;
   } catch (error) {
-    console.error('Error creating assistant message:', error.message);
     throw error;
   }
 };
@@ -229,17 +207,4 @@ export {
   analyzeImagesWithVision,
   summarizeAnalyses,
   createAssistantMessage,
-};
-
-/**
- * Truncates a message to a specified length.
- * @param {string} message - The message to truncate.
- * @param {number} maxLength - The maximum length of the truncated message.
- * @returns {string} - The truncated message.
- */
-const truncateMessage = (message, maxLength = 500) => {
-  if (message.length <= maxLength) {
-    return message;
-  }
-  return message.slice(0, maxLength) + '... (truncated)';
 };

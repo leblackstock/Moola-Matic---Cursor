@@ -2,40 +2,35 @@
 
 const combineAnalyses = (analysisResults) => {
   try {
-    const combinedAnalyses = analysisResults.map((result) => {
+    const combinedAnalysis = analysisResults.reduce((combined, result) => {
       const { parsedJson, remainingText } = parseJsonResponse(result);
 
       if (!parsedJson) {
-        return {
-          error: 'Failed to parse JSON response',
-          rawResponse: result,
-          additionalNotes: remainingText,
-        };
+        console.error('Failed to parse JSON response', result);
+        return combined;
       }
 
-      if (Array.isArray(parsedJson)) {
-        // Handle case where multiple JSON objects were extracted
-        return parsedJson.map((json) => ({
-          ...json,
-          additionalNotes: remainingText,
-        }));
+      // Merge the parsed JSON with the combined result
+      Object.keys(parsedJson).forEach((key) => {
+        if (
+          combined[key] === undefined ||
+          combined[key] === null ||
+          combined[key] === ''
+        ) {
+          combined[key] = parsedJson[key];
+        }
+      });
+
+      // Append any remaining text to the detailedBreakdown
+      if (remainingText) {
+        combined.detailedBreakdown =
+          (combined.detailedBreakdown || '') + '\n' + remainingText;
       }
 
-      if (!isValidAnalysis(parsedJson)) {
-        return {
-          error: 'Invalid analysis structure',
-          rawResponse: result,
-          additionalNotes: remainingText,
-        };
-      }
+      return combined;
+    }, {});
 
-      return {
-        ...parsedJson,
-        additionalNotes: remainingText,
-      };
-    });
-
-    return combinedAnalyses.flat();
+    return isValidAnalysis(combinedAnalysis) ? combinedAnalysis : null;
   } catch (error) {
     console.error('Error in combineAnalyses:', error);
     throw error;
@@ -60,11 +55,9 @@ const parseJsonResponse = (inputString) => {
   }
 
   try {
-    // Try to parse the entire string as JSON
     result.parsedJson = JSON.parse(inputString);
     result.remainingText = '';
   } catch (error) {
-    // If parsing fails, try to extract JSON objects
     const jsonRegex = /{[^{}]*}|[[^\[\]]*]/g;
     const matches = inputString.match(jsonRegex);
 
@@ -77,12 +70,10 @@ const parseJsonResponse = (inputString) => {
             return null;
           }
         })
-        .filter((item) => item !== null);
+        .filter((item) => item !== null)[0]; // Take the first valid JSON object
 
-      // Remove extracted JSON from the remaining text
       result.remainingText = inputString.replace(jsonRegex, '').trim();
     } else {
-      // If no JSON objects found, store the entire input as remainingText
       result.remainingText = inputString;
     }
   }
@@ -96,12 +87,22 @@ const parseJsonResponse = (inputString) => {
  * @returns {boolean} - True if valid, false otherwise.
  */
 const isValidAnalysis = (analysis) => {
-  return (
-    typeof analysis.overall_description === 'string' &&
-    Array.isArray(analysis.common_objects) &&
-    Array.isArray(analysis.dominant_colors) &&
-    typeof analysis.overall_scene === 'string'
-  );
+  const requiredFields = [
+    'name',
+    'brand',
+    'type',
+    'description',
+    'category',
+    'conditionRating',
+    'financialsPurchasePrice',
+    'marketAnalysisMarketDemand',
+    'purchaseRecommendation',
+  ];
+
+  return requiredFields.every((field) => {
+    const value = analysis[field];
+    return value !== undefined && value !== null && value !== '';
+  });
 };
 
 export { combineAnalyses, parseJsonResponse, isValidAnalysis };

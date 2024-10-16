@@ -1,28 +1,116 @@
 import mongoose from 'mongoose';
 
-const draftItemSchema = new mongoose.Schema(
+const DraftItemSchema = new mongoose.Schema(
   {
     // Basic item information
-    itemId: {
-      type: String,
-      required: true,
-      unique: true,
-    },
+    itemId: { type: String, required: true, unique: true },
     name: String,
+    brand: String,
+    make: String,
+    model: String,
+    serialNumber: String,
+    type: String,
     description: String,
     category: String,
+    subcategory: String,
+    style: String,
+    vintage: Boolean,
+    antique: Boolean,
+    rarity: String,
+    packagingAccessoriesIncluded: String,
+    materialComposition: String,
 
-    // Item details
-    itemDetails: {
-      type: { type: String, required: false },
-      brand: String,
-      condition: String,
-      rarity: String,
-      authenticityConfirmed: { type: Boolean, default: null },
-      packagingAccessories: String,
-    },
+    // Clothing measurements
+    clothingMeasurementsSizeLabel: String,
+    clothingMeasurementsChestBust: String,
+    clothingMeasurementsWaist: String,
+    clothingMeasurementsHips: String,
+    clothingMeasurementsShoulderWidth: String,
+    clothingMeasurementsSleeveLength: String,
+    clothingMeasurementsInseam: String,
+    clothingMeasurementsTotalLength: String,
 
-    // Images
+    // Footwear measurements
+    footwearMeasurementsSize: String,
+    footwearMeasurementsWidth: String,
+    footwearMeasurementsInsoleLength: String,
+    footwearMeasurementsHeelHeight: String,
+    footwearMeasurementsPlatformHeight: String,
+    footwearMeasurementsBootShaftHeight: String,
+    footwearMeasurementsCalfCircumference: String,
+
+    // Jewelry measurements
+    jewelryMeasurementsRingSize: String,
+    jewelryMeasurementsNecklaceBraceletLength: String,
+    jewelryMeasurementsPendantDimensions: String,
+    jewelryMeasurementsJewelryDimensions: String,
+
+    // Furniture and large item measurements
+    furnitureLargeItemMeasurementsHeight: String,
+    furnitureLargeItemMeasurementsWidth: String,
+    furnitureLargeItemMeasurementsDepth: String,
+    furnitureLargeItemMeasurementsLength: String,
+    furnitureLargeItemMeasurementsSeatHeight: String,
+    furnitureLargeItemMeasurementsTabletopDimensions: String,
+
+    // General measurements
+    generalMeasurementsWeight: String,
+    generalMeasurementsDiameter: String,
+    generalMeasurementsVolumeCapacity: String,
+    generalMeasurementsOtherSpecificMeasurements: String,
+
+    // Condition
+    conditionRating: String,
+    conditionSignsOfWear: String,
+    conditionDetailedNotes: String,
+    conditionRepairNeeds: String,
+    conditionCleaningRequirements: String,
+    conditionEstimatedRepairCosts: Number,
+    conditionEstimatedCleaningCosts: Number,
+    conditionTimeSpentOnRepairsCleaning: String,
+
+    // Financials
+    financialsPurchasePrice: Number,
+    financialsTotalRepairAndCleaningCosts: Number,
+    financialsEstimatedShippingCosts: Number,
+    financialsPlatformFees: Number,
+    financialsExpectedProfit: Number,
+    financialsProfitMargin: Number,
+    financialsEstimatedMarketValue: Number,
+    financialsAcquisitionCost: Number,
+
+    // Market analysis
+    marketAnalysisMarketDemand: String,
+    marketAnalysisHistoricalPriceTrends: String,
+    marketAnalysisMarketSaturation: String,
+    marketAnalysisSalesVelocity: String,
+    marketAnalysisSuggestedListingPrice: Number,
+    marketAnalysisMinimumAcceptablePrice: Number,
+
+    itemCareInstructions: String,
+    keywordsForSeo: String,
+    lotOrBundleInformation: String,
+    customizableFields: String,
+    recommendedSalePlatforms: String,
+
+    // Compliance
+    compliancePlatformPolicies: String,
+    complianceAuthenticityMarkers: String,
+    complianceCounterfeitRisk: String,
+    complianceStatus: String,
+    complianceRestrictedItemCheck: String,
+
+    // Inventory details
+    inventoryDetailsInventoryId: String,
+    inventoryDetailsStorageLocation: String,
+    inventoryDetailsAcquisitionDate: Date,
+    inventoryDetailsTargetMarket: String,
+    inventoryDetailsTrendingItems: String,
+    inventoryDetailsCustomerPreferences: String,
+    inventoryDetailsAcquisitionLocation: String,
+    inventoryDetailsSupplierInformation: String,
+
+    // Images (remains an array)
     images: [
       {
         id: String,
@@ -36,38 +124,11 @@ const draftItemSchema = new mongoose.Schema(
     purchaseDate: Date,
     listingDate: Date,
 
-    // Financial information
-    financials: {
-      purchasePrice: Number,
-      cleaningRepairCosts: Number,
-      estimatedShippingCosts: Number,
-      platformFees: Number,
-      expectedProfit: Number,
-      estimatedValue: Number,
-    },
-
-    // Market analysis
-    marketAnalysis: {
-      marketDemand: String,
-      historicalPriceTrends: String,
-      marketSaturation: String,
-      salesVelocity: String,
-    },
-
-    // Recommendation
-    finalRecommendation: {
-      purchaseRecommendation: {
-        type: mongoose.Schema.Types.Mixed,
-        default: null,
-      },
-      detailedBreakdown: String,
-    },
-
-    // Additional information
     sellerNotes: String,
     contextData: Object,
-
-    // Draft status
+    purchaseRecommendation: String,
+    detailedBreakdown: String,
+    sampleForSaleListing: String,
     isDraft: { type: Boolean, default: true },
 
     // AI-generated content
@@ -78,4 +139,4 @@ const draftItemSchema = new mongoose.Schema(
 
 // Check if the model already exists before defining it
 export const DraftItem =
-  mongoose.models.DraftItem || mongoose.model('DraftItem', draftItemSchema);
+  mongoose.models.DraftItem || mongoose.model('DraftItem', DraftItemSchema);

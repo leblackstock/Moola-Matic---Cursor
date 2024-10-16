@@ -1,6 +1,6 @@
 // frontend/src/components/compFormFields.js
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import {
   StyledForm,
@@ -20,183 +20,276 @@ function FormFields({
   handleSaveDraft,
   handlePurchaseRecommendationChange,
 }) {
-  // Check if any form fields have been populated
   const isAnyFieldPopulated = useMemo(() => {
-    return (
-      item.name ||
-      item.description ||
-      item.category ||
-      item.itemDetails?.type ||
-      // Add checks for other fields here
-      false
+    return Object.values(item).some(
+      (value) => value !== null && value !== undefined && value !== ''
     );
   }, [item]);
 
-  const renderAllFields = () => (
-    <>
-      {/* Input fields */}
-      <StyledFormGroup>
-        <StyledLabel htmlFor="name">Item Name</StyledLabel>
-        <StyledInput
-          type="text"
-          id="name"
-          value={item.name || ''}
-          onChange={(e) => updateItem('name', e.target.value)}
-          required
-        />
-      </StyledFormGroup>
+  useEffect(() => {
+    if (item.analysisResult) {
+      // ... (keep existing analysis result handling)
+    }
+  }, [item.analysisResult, updateItem]);
 
-      <StyledFormGroup>
-        <StyledLabel htmlFor="description">Description</StyledLabel>
+  const renderField = (key, label, type = 'text') => (
+    <StyledFormGroup key={key}>
+      <StyledLabel htmlFor={key}>{label}</StyledLabel>
+      {type === 'textarea' ? (
         <StyledTextarea
-          id="description"
-          value={item.description || ''}
-          onChange={(e) => updateItem('description', e.target.value)}
+          id={key}
+          value={item[key] || ''}
+          onChange={(e) => updateItem(key, e.target.value)}
           rows="3"
         />
-      </StyledFormGroup>
-
-      <StyledFormGroup>
-        <StyledLabel htmlFor="category">Category</StyledLabel>
+      ) : type === 'number' ? (
         <StyledInput
-          type="text"
-          id="category"
-          value={item.category || ''}
-          onChange={(e) => updateItem('category', e.target.value)}
+          type="number"
+          id={key}
+          value={item[key] || ''}
+          onChange={(e) => updateItem(key, parseFloat(e.target.value))}
         />
-      </StyledFormGroup>
-
-      <StyledFormGroup>
-        <StyledLabel htmlFor="itemType">Item Type</StyledLabel>
+      ) : type === 'date' ? (
         <StyledInput
-          type="text"
-          id="itemType"
-          value={item.itemDetails?.type || ''}
-          onChange={(e) => updateItem('itemDetails.type', e.target.value)}
-          required
-        />
-      </StyledFormGroup>
-
-      {/* ... (continue with all other input fields) ... */}
-
-      {/* Analysis Fields */}
-      <StyledTitle>Analysis Results</StyledTitle>
-
-      {/* Item Details */}
-      <StyledFormGroup>
-        <StyledLabel htmlFor="itemType">Item Type</StyledLabel>
-        <StyledInput
-          type="text"
-          id="itemType"
-          value={item.itemDetails?.type || ''}
-          onChange={(e) => updateItem('itemDetails.type', e.target.value)}
-        />
-      </StyledFormGroup>
-      <StyledFormGroup>
-        <StyledLabel htmlFor="itemBrand">Brand</StyledLabel>
-        <StyledInput
-          type="text"
-          id="itemBrand"
-          value={item.itemDetails?.brand || ''}
-          onChange={(e) => updateItem('itemDetails.brand', e.target.value)}
-        />
-      </StyledFormGroup>
-      <StyledFormGroup>
-        <StyledLabel htmlFor="itemCondition">Condition</StyledLabel>
-        <StyledInput
-          type="text"
-          id="itemCondition"
-          value={item.itemDetails?.condition || ''}
-          onChange={(e) => updateItem('itemDetails.condition', e.target.value)}
-        />
-      </StyledFormGroup>
-      <StyledFormGroup>
-        <StyledLabel htmlFor="itemRarity">Rarity</StyledLabel>
-        <StyledInput
-          type="text"
-          id="itemRarity"
-          value={item.itemDetails?.rarity || ''}
-          onChange={(e) => updateItem('itemDetails.rarity', e.target.value)}
-        />
-      </StyledFormGroup>
-      <StyledFormGroup>
-        <StyledLabel htmlFor="itemAuthenticityConfirmed">
-          Authenticity Confirmed
-        </StyledLabel>
-        <StyledSelect
-          id="itemAuthenticityConfirmed"
-          value={item.itemDetails?.authenticityConfirmed ? 'true' : 'false'}
-          onChange={(e) =>
-            updateItem(
-              'itemDetails.authenticityConfirmed',
-              e.target.value === 'true'
-            )
+          type="date"
+          id={key}
+          value={
+            item[key] ? new Date(item[key]).toISOString().split('T')[0] : ''
           }
+          onChange={(e) => updateItem(key, e.target.value)}
+        />
+      ) : type === 'boolean' ? (
+        <StyledSelect
+          id={key}
+          value={item[key] === true ? 'true' : 'false'}
+          onChange={(e) => updateItem(key, e.target.value === 'true')}
         >
           <option value="true">Yes</option>
           <option value="false">No</option>
         </StyledSelect>
-      </StyledFormGroup>
-
-      {/* Financials */}
-      <StyledFormGroup>
-        <StyledLabel htmlFor="purchasePrice">Purchase Price</StyledLabel>
+      ) : (
         <StyledInput
-          type="number"
-          id="purchasePrice"
-          value={item.financials?.purchasePrice || ''}
-          onChange={(e) =>
-            updateItem('financials.purchasePrice', parseFloat(e.target.value))
-          }
+          type={type}
+          id={key}
+          value={item[key] || ''}
+          onChange={(e) => updateItem(key, e.target.value)}
         />
-      </StyledFormGroup>
-      {/* Add similar fields for cleaningRepairCosts, estimatedShippingCosts, platformFees, expectedProfit, and estimatedValue */}
+      )}
+    </StyledFormGroup>
+  );
 
-      {/* Market Analysis */}
-      <StyledFormGroup>
-        <StyledLabel htmlFor="marketDemand">Market Demand</StyledLabel>
-        <StyledInput
-          type="text"
-          id="marketDemand"
-          value={item.marketAnalysis?.marketDemand || ''}
-          onChange={(e) =>
-            updateItem('marketAnalysis.marketDemand', e.target.value)
-          }
-        />
-      </StyledFormGroup>
-      {/* Add similar fields for historicalPriceTrends, marketSaturation, and salesVelocity */}
+  const renderAllFields = () => (
+    <>
+      <StyledTitle>Basic Item Information</StyledTitle>
+      {renderField('itemId', 'Item ID')}
+      {renderField('name', 'Item Name')}
+      {renderField('brand', 'Brand')}
+      {renderField('make', 'Make')}
+      {renderField('model', 'Model')}
+      {renderField('serialNumber', 'Serial Number')}
+      {renderField('type', 'Type')}
+      {renderField('description', 'Description', 'textarea')}
+      {renderField('category', 'Category')}
+      {renderField('subcategory', 'Subcategory')}
+      {renderField('style', 'Style')}
+      {renderField('vintage', 'Vintage', 'boolean')}
+      {renderField('antique', 'Antique', 'boolean')}
+      {renderField('rarity', 'Rarity')}
+      {renderField(
+        'packagingAccessoriesIncluded',
+        'Packaging/Accessories Included'
+      )}
+      {renderField('materialComposition', 'Material Composition')}
 
-      {/* Final Recommendation */}
+      <StyledTitle>Clothing Measurements</StyledTitle>
+      {renderField('clothingMeasurementsSizeLabel', 'Size Label')}
+      {renderField('clothingMeasurementsChestBust', 'Chest/Bust')}
+      {renderField('clothingMeasurementsWaist', 'Waist')}
+      {renderField('clothingMeasurementsHips', 'Hips')}
+      {renderField('clothingMeasurementsShoulderWidth', 'Shoulder Width')}
+      {renderField('clothingMeasurementsSleeveLength', 'Sleeve Length')}
+      {renderField('clothingMeasurementsInseam', 'Inseam')}
+      {renderField('clothingMeasurementsTotalLength', 'Total Length')}
+
+      <StyledTitle>Footwear Measurements</StyledTitle>
+      {renderField('footwearMeasurementsSize', 'Size')}
+      {renderField('footwearMeasurementsWidth', 'Width')}
+      {renderField('footwearMeasurementsInsoleLength', 'Insole Length')}
+      {renderField('footwearMeasurementsHeelHeight', 'Heel Height')}
+      {renderField('footwearMeasurementsPlatformHeight', 'Platform Height')}
+      {renderField('footwearMeasurementsBootShaftHeight', 'Boot Shaft Height')}
+      {renderField(
+        'footwearMeasurementsCalfCircumference',
+        'Calf Circumference'
+      )}
+
+      <StyledTitle>Jewelry Measurements</StyledTitle>
+      {renderField('jewelryMeasurementsRingSize', 'Ring Size')}
+      {renderField(
+        'jewelryMeasurementsNecklaceBraceletLength',
+        'Necklace/Bracelet Length'
+      )}
+      {renderField(
+        'jewelryMeasurementsPendantDimensions',
+        'Pendant Dimensions'
+      )}
+      {renderField(
+        'jewelryMeasurementsJewelryDimensions',
+        'Jewelry Dimensions'
+      )}
+
+      <StyledTitle>Furniture and Large Item Measurements</StyledTitle>
+      {renderField('furnitureLargeItemMeasurementsHeight', 'Height')}
+      {renderField('furnitureLargeItemMeasurementsWidth', 'Width')}
+      {renderField('furnitureLargeItemMeasurementsDepth', 'Depth')}
+      {renderField('furnitureLargeItemMeasurementsLength', 'Length')}
+      {renderField('furnitureLargeItemMeasurementsSeatHeight', 'Seat Height')}
+      {renderField(
+        'furnitureLargeItemMeasurementsTabletopDimensions',
+        'Tabletop Dimensions'
+      )}
+
+      <StyledTitle>General Measurements</StyledTitle>
+      {renderField('generalMeasurementsWeight', 'Weight')}
+      {renderField('generalMeasurementsDiameter', 'Diameter')}
+      {renderField('generalMeasurementsVolumeCapacity', 'Volume/Capacity')}
+      {renderField(
+        'generalMeasurementsOtherSpecificMeasurements',
+        'Other Specific Measurements'
+      )}
+
+      <StyledTitle>Condition</StyledTitle>
+      {renderField('conditionRating', 'Condition Rating')}
+      {renderField('conditionSignsOfWear', 'Signs of Wear')}
+      {renderField('conditionDetailedNotes', 'Detailed Notes', 'textarea')}
+      {renderField('conditionRepairNeeds', 'Repair Needs')}
+      {renderField('conditionCleaningRequirements', 'Cleaning Requirements')}
+      {renderField(
+        'conditionEstimatedRepairCosts',
+        'Estimated Repair Costs',
+        'number'
+      )}
+      {renderField(
+        'conditionEstimatedCleaningCosts',
+        'Estimated Cleaning Costs',
+        'number'
+      )}
+      {renderField(
+        'conditionTimeSpentOnRepairsCleaning',
+        'Time Spent on Repairs/Cleaning'
+      )}
+
+      <StyledTitle>Financials</StyledTitle>
+      {renderField('financialsPurchasePrice', 'Purchase Price', 'number')}
+      {renderField(
+        'financialsTotalRepairAndCleaningCosts',
+        'Total Repair and Cleaning Costs',
+        'number'
+      )}
+      {renderField(
+        'financialsEstimatedShippingCosts',
+        'Estimated Shipping Costs',
+        'number'
+      )}
+      {renderField('financialsPlatformFees', 'Platform Fees', 'number')}
+      {renderField('financialsExpectedProfit', 'Expected Profit', 'number')}
+      {renderField('financialsProfitMargin', 'Profit Margin', 'number')}
+      {renderField(
+        'financialsEstimatedMarketValue',
+        'Estimated Market Value',
+        'number'
+      )}
+      {renderField('financialsAcquisitionCost', 'Acquisition Cost', 'number')}
+
+      <StyledTitle>Market Analysis</StyledTitle>
+      {renderField('marketAnalysisMarketDemand', 'Market Demand')}
+      {renderField(
+        'marketAnalysisHistoricalPriceTrends',
+        'Historical Price Trends'
+      )}
+      {renderField('marketAnalysisMarketSaturation', 'Market Saturation')}
+      {renderField('marketAnalysisSalesVelocity', 'Sales Velocity')}
+      {renderField(
+        'marketAnalysisSuggestedListingPrice',
+        'Suggested Listing Price',
+        'number'
+      )}
+      {renderField(
+        'marketAnalysisMinimumAcceptablePrice',
+        'Minimum Acceptable Price',
+        'number'
+      )}
+
+      <StyledTitle>Additional Information</StyledTitle>
+      {renderField(
+        'itemCareInstructions',
+        'Item Care Instructions',
+        'textarea'
+      )}
+      {renderField('keywordsForSeo', 'Keywords for SEO', 'textarea')}
+      {renderField('lotOrBundleInformation', 'Lot or Bundle Information')}
+      {renderField('customizableFields', 'Customizable Fields')}
+      {renderField('recommendedSalePlatforms', 'Recommended Sale Platforms')}
+
+      <StyledTitle>Compliance</StyledTitle>
+      {renderField('compliancePlatformPolicies', 'Platform Policies')}
+      {renderField('complianceAuthenticityMarkers', 'Authenticity Markers')}
+      {renderField('complianceCounterfeitRisk', 'Counterfeit Risk')}
+      {renderField('complianceStatus', 'Compliance Status')}
+      {renderField('complianceRestrictedItemCheck', 'Restricted Item Check')}
+
+      <StyledTitle>Inventory Details</StyledTitle>
+      {renderField('inventoryDetailsInventoryId', 'Inventory ID')}
+      {renderField('inventoryDetailsStorageLocation', 'Storage Location')}
+      {renderField(
+        'inventoryDetailsAcquisitionDate',
+        'Acquisition Date',
+        'date'
+      )}
+      {renderField('inventoryDetailsTargetMarket', 'Target Market')}
+      {renderField('inventoryDetailsTrendingItems', 'Trending Items')}
+      {renderField(
+        'inventoryDetailsCustomerPreferences',
+        'Customer Preferences'
+      )}
+      {renderField(
+        'inventoryDetailsAcquisitionLocation',
+        'Acquisition Location'
+      )}
+      {renderField(
+        'inventoryDetailsSupplierInformation',
+        'Supplier Information'
+      )}
+
+      <StyledTitle>Dates</StyledTitle>
+      {renderField('purchaseDate', 'Purchase Date', 'date')}
+      {renderField('listingDate', 'Listing Date', 'date')}
+
+      <StyledTitle>Additional Notes</StyledTitle>
+      {renderField('sellerNotes', 'Seller Notes', 'textarea')}
+      {renderField('contextData', 'Context Data', 'textarea')}
+
+      <StyledTitle>Final Recommendation</StyledTitle>
       <StyledFormGroup>
         <StyledLabel htmlFor="purchaseRecommendation">
           Purchase Recommendation
         </StyledLabel>
         <StyledSelect
           id="purchaseRecommendation"
-          value={
-            item.finalRecommendation?.purchaseRecommendation?.toString() ||
-            'Unknown'
-          }
+          value={item.purchaseRecommendation || 'Unknown'}
           onChange={(e) => handlePurchaseRecommendationChange(e.target.value)}
         >
-          <option value="true">Yes</option>
-          <option value="false">No</option>
+          <option value="Yes">Yes</option>
+          <option value="No">No</option>
           <option value="Unknown">Unknown</option>
         </StyledSelect>
       </StyledFormGroup>
-      <StyledFormGroup>
-        <StyledLabel htmlFor="detailedBreakdown">
-          Detailed Breakdown
-        </StyledLabel>
-        <StyledTextarea
-          id="detailedBreakdown"
-          value={item.finalRecommendation?.detailedBreakdown || ''}
-          onChange={(e) =>
-            updateItem('finalRecommendation.detailedBreakdown', e.target.value)
-          }
-          rows="4"
-        />
-      </StyledFormGroup>
+      {renderField('detailedBreakdown', 'Detailed Breakdown', 'textarea')}
+      {renderField(
+        'sampleForSaleListing',
+        'Sample For Sale Listing',
+        'textarea'
+      )}
     </>
   );
 
@@ -206,7 +299,7 @@ function FormFields({
         {isAnyFieldPopulated ? (
           <>
             {renderAllFields()}
-            <StyledButton type="submit">Save Item</StyledButton>
+            <StyledButton type="submit">Purchase Item</StyledButton>
           </>
         ) : (
           <StyledFormGroup>

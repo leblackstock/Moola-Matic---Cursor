@@ -3,6 +3,7 @@
 import axios from 'axios';
 import { useEffect, useCallback } from 'react';
 import debounce from 'lodash.debounce';
+import { DraftItem } from '../../backend/models/draftItem.js';
 
 // Add this function near the top of the file, after the imports
 export const generateDraftFilename = (
@@ -18,8 +19,9 @@ export const generateDraftFilename = (
 };
 
 // Define API_URL
-const BACKEND_PORT = process.env.REACT_APP_BACKEND_PORT || 3001;
-const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
+const API_URL =
+  process.env.REACT_APP_BACKEND_URL ||
+  `http://localhost:${process.env.REACT_APP_BACKEND_PORT || 3001}`;
 
 // Function to create a default item
 export const createDefaultItem = (ItemId) => {
@@ -27,40 +29,101 @@ export const createDefaultItem = (ItemId) => {
     throw new Error('ItemId is required when creating a new item');
   }
   return {
-    ItemId: ItemId,
+    itemId: ItemId,
     name: '',
+    brand: '',
+    make: '',
+    model: '',
+    serialNumber: '',
+    type: '',
     description: '',
     category: '',
-    itemDetails: {
-      type: '',
-      brand: '',
-      condition: '',
-      rarity: '',
-      authenticityConfirmed: false,
-      packagingAccessories: '',
-    },
+    subcategory: '',
+    style: '',
+    vintage: false,
+    antique: false,
+    rarity: '',
+    packagingAccessoriesIncluded: '',
+    materialComposition: '',
+    clothingMeasurementsSizeLabel: '',
+    clothingMeasurementsChestBust: '',
+    clothingMeasurementsWaist: '',
+    clothingMeasurementsHips: '',
+    clothingMeasurementsShoulderWidth: '',
+    clothingMeasurementsSleeveLength: '',
+    clothingMeasurementsInseam: '',
+    clothingMeasurementsTotalLength: '',
+    footwearMeasurementsSize: '',
+    footwearMeasurementsWidth: '',
+    footwearMeasurementsInsoleLength: '',
+    footwearMeasurementsHeelHeight: '',
+    footwearMeasurementsPlatformHeight: '',
+    footwearMeasurementsBootShaftHeight: '',
+    footwearMeasurementsCalfCircumference: '',
+    jewelryMeasurementsRingSize: '',
+    jewelryMeasurementsNecklaceBraceletLength: '',
+    jewelryMeasurementsPendantDimensions: '',
+    jewelryMeasurementsJewelryDimensions: '',
+    furnitureLargeItemMeasurementsHeight: '',
+    furnitureLargeItemMeasurementsWidth: '',
+    furnitureLargeItemMeasurementsDepth: '',
+    furnitureLargeItemMeasurementsLength: '',
+    furnitureLargeItemMeasurementsSeatHeight: '',
+    furnitureLargeItemMeasurementsTabletopDimensions: '',
+    generalMeasurementsWeight: '',
+    generalMeasurementsDiameter: '',
+    generalMeasurementsVolumeCapacity: '',
+    generalMeasurementsOtherSpecificMeasurements: '',
+    conditionRating: '',
+    conditionSignsOfWear: '',
+    conditionDetailedNotes: '',
+    conditionRepairNeeds: '',
+    conditionCleaningRequirements: '',
+    conditionEstimatedRepairCosts: 0,
+    conditionEstimatedCleaningCosts: 0,
+    conditionTimeSpentOnRepairsCleaning: '',
+    financialsPurchasePrice: 0,
+    financialsTotalRepairAndCleaningCosts: 0,
+    financialsEstimatedShippingCosts: 0,
+    financialsPlatformFees: 0,
+    financialsExpectedProfit: 0,
+    financialsProfitMargin: 0,
+    financialsEstimatedMarketValue: 0,
+    financialsAcquisitionCost: 0,
+    marketAnalysisMarketDemand: '',
+    marketAnalysisHistoricalPriceTrends: '',
+    marketAnalysisMarketSaturation: '',
+    marketAnalysisSalesVelocity: '',
+    marketAnalysisSuggestedListingPrice: 0,
+    marketAnalysisMinimumAcceptablePrice: 0,
+    itemCareInstructions: '',
+    keywordsForSeo: '',
+    lotOrBundleInformation: '',
+    customizableFields: '',
+    recommendedSalePlatforms: '',
+    compliancePlatformPolicies: '',
+    complianceAuthenticityMarkers: '',
+    complianceCounterfeitRisk: '',
+    complianceStatus: '',
+    complianceRestrictedItemCheck: '',
+    inventoryDetailsInventoryId: '',
+    inventoryDetailsStorageLocation: '',
+    inventoryDetailsAcquisitionDate: null,
+    inventoryDetailsTargetMarket: '',
+    inventoryDetailsTrendingItems: '',
+    inventoryDetailsCustomerPreferences: '',
+    inventoryDetailsAcquisitionLocation: '',
+    inventoryDetailsSupplierInformation: '',
     images: [],
     purchaseDate: null,
     listingDate: null,
-    financials: {
-      purchasePrice: '',
-      cleaningRepairCosts: '',
-      estimatedShippingCosts: '',
-      platformFees: '',
-      expectedProfit: '',
-      estimatedValue: '',
-    },
-    marketAnalysis: {
-      marketDemand: '',
-      historicalPriceTrends: '',
-      marketSaturation: '',
-      salesVelocity: '',
-    },
-    finalRecommendation: {
-      purchaseRecommendation: false,
-      detailedBreakdown: '',
-    },
     sellerNotes: '',
+    contextData: {},
+    purchaseRecommendation: '',
+    detailedBreakdown: '',
+    sampleForSaleListing: '',
+    isDraft: true,
+    messages: [],
   };
 };
 
@@ -83,12 +146,7 @@ export const handleNewItem = (ItemId, setItemId, navigate) => {
 };
 
 // Function to handle draft save
-export const handleDraftSave = async (
-  item,
-  messages,
-  currentItemId,
-  backendPort
-) => {
+export const handleDraftSave = async (item, messages, currentItemId) => {
   if (!currentItemId) {
     console.error('Cannot save draft without a valid item ID');
     throw new Error('Invalid item ID');
@@ -115,7 +173,7 @@ export const handleDraftSave = async (
     };
 
     const response = await axios.post(
-      `http://localhost:${backendPort}/api/save-draft`,
+      `${API_URL}/api/items/save-draft`,
       dataToSend,
       {
         headers: {
@@ -140,7 +198,6 @@ export const handleAutoSave = async (
   item,
   uploadedImages,
   messages,
-  backendPort,
   setItem,
   setUploadedImages,
   setHasUnsavedChanges,
@@ -153,7 +210,6 @@ export const handleAutoSave = async (
       throw new Error('Item or itemId is missing');
     }
 
-    // Create a Set of image URLs to ensure uniqueness
     const uniqueImageUrls = new Set(item.images.map((img) => img.url));
 
     const draftData = {
@@ -169,17 +225,13 @@ export const handleAutoSave = async (
             isNew: image.isNew,
           })),
       ],
-      messages: Array.isArray(messages) ? messages : [],
     };
 
     console.log('Autosaving data:', JSON.stringify(draftData, null, 2));
 
-    const port = Number(backendPort) || 3001;
-    const url = `http://localhost:${port}/api/items/autosave-draft`;
-
     const response = await axios.post(
-      url,
-      { draftData },
+      `${API_URL}/api/items/autosave-draft`,
+      { draftData, contextData: item.contextData, messages },
       {
         headers: {
           'Content-Type': 'application/json',
@@ -193,24 +245,14 @@ export const handleAutoSave = async (
       setHasUnsavedChanges(false);
       if (typeof setLastAutoSave === 'function') {
         setLastAutoSave(new Date());
-      } else {
-        console.warn('setLastAutoSave is not a function');
       }
       onSuccess(response.data);
-      console.log('Autosave completed successfully'); // This log is now more prominent
+      console.log('Autosave completed successfully');
     } else {
       throw new Error('Invalid response format from server');
     }
   } catch (error) {
     console.error('Error during autosave:', error);
-    if (error.response) {
-      console.error('Server responded with:', error.response.data);
-      console.error('Status code:', error.response.status);
-    } else if (error.request) {
-      console.error('No response received:', error.request);
-    } else {
-      console.error('Error setting up request:', error.message);
-    }
     onError(error);
   }
 };
@@ -305,23 +347,17 @@ export const saveDraft = async (draftData, contextData, messages) => {
     }
 
     // Handle the purchaseRecommendation field
-    if (draftData.finalRecommendation) {
+    if (draftData.purchaseRecommendation !== undefined) {
       if (
-        draftData.finalRecommendation.purchaseRecommendation === 'Unknown' ||
-        draftData.finalRecommendation.purchaseRecommendation === ''
+        draftData.purchaseRecommendation === 'Unknown' ||
+        draftData.purchaseRecommendation === ''
       ) {
-        draftData.finalRecommendation.purchaseRecommendation = null;
-      } else if (
-        typeof draftData.finalRecommendation.purchaseRecommendation === 'string'
-      ) {
-        draftData.finalRecommendation.purchaseRecommendation =
-          draftData.finalRecommendation.purchaseRecommendation.toLowerCase() ===
-          'true';
+        draftData.purchaseRecommendation = null;
       }
     }
 
-    const response = await axios.post(`${API_URL}/api/items/autosave-draft`, {
-      draftData,
+    const response = await axios.post(`${API_URL}/api/items/save-draft`, {
+      ...draftData,
       contextData,
       messages,
     });
@@ -366,8 +402,6 @@ export const fetchDrafts = async () => {
       'Error fetching drafts:',
       error.response?.data || error.message
     );
-    // You might want to throw the error here instead of returning an empty array,
-    // depending on how you want to handle errors in the calling component
     return [];
   }
 };
@@ -547,6 +581,13 @@ export const updateItem = async (
       images: itemData.images.filter((img) => uniqueImageUrls.has(img.url)),
     };
 
+    // Remove any fields that are not in the DraftItemSchema
+    Object.keys(updatedItemData).forEach((key) => {
+      if (!DraftItem.schema.paths.hasOwnProperty(key)) {
+        delete updatedItemData[key];
+      }
+    });
+
     // Update local state
     if (typeof handleLocalSave === 'function') {
       handleLocalSave(updatedItemData, contextData, messages);
@@ -579,11 +620,15 @@ export const handleFileUpload = async (file, itemId) => {
     formData.append('image', file);
     formData.append('itemId', itemId);
 
-    const response = await axios.post(`/api/draft-image/upload`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    const response = await axios.post(
+      `${API_URL}/api/items/draft-images/upload`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
 
     console.log('Upload response:', response.data);
 
@@ -616,7 +661,6 @@ export const useAutosave = (
   item,
   uploadedImages,
   messages,
-  backendPort,
   setItem,
   setUploadedImages,
   setHasUnsavedChanges,
@@ -644,22 +688,22 @@ export const useAutosave = (
             messages: validMessages,
           };
 
-          // Handle the purchaseRecommendation field
-          if (itemToSave.finalRecommendation) {
-            if (
-              itemToSave.finalRecommendation.purchaseRecommendation ===
-                'Unknown' ||
-              itemToSave.finalRecommendation.purchaseRecommendation === ''
-            ) {
-              itemToSave.finalRecommendation.purchaseRecommendation = null;
-            } else if (
-              typeof itemToSave.finalRecommendation.purchaseRecommendation ===
-              'string'
-            ) {
-              itemToSave.finalRecommendation.purchaseRecommendation =
-                itemToSave.finalRecommendation.purchaseRecommendation.toLowerCase() ===
-                'true';
+          // Remove any fields that are not in the DraftItemSchema
+          Object.keys(itemToSave).forEach((key) => {
+            if (!DraftItem.schema.paths.hasOwnProperty(key)) {
+              delete itemToSave[key];
             }
+          });
+
+          // Handle the purchaseRecommendation field
+          if (typeof itemToSave.purchaseRecommendation === 'boolean') {
+            itemToSave.purchaseRecommendation =
+              itemToSave.purchaseRecommendation.toString();
+          } else if (
+            itemToSave.purchaseRecommendation === 'Unknown' ||
+            itemToSave.purchaseRecommendation === ''
+          ) {
+            itemToSave.purchaseRecommendation = null;
           }
 
           // Save the item
@@ -680,13 +724,7 @@ export const useAutosave = (
         }
       }
     },
-    [
-      backendPort,
-      setItem,
-      setUploadedImages,
-      setHasUnsavedChanges,
-      setLastAutoSave,
-    ]
+    [setItem, setUploadedImages, setHasUnsavedChanges, setLastAutoSave]
   );
 
   const debouncedAutoSave = useCallback(debounce(autoSave, 15000), [autoSave]);
@@ -724,13 +762,9 @@ export const createItem = async (itemData) => {
 
 export const fetchAllItems = async () => {
   try {
-    const response = await fetch('/api/items');
-    if (!response.ok) {
-      throw new Error('Network response was not ok');
-    }
-    const data = await response.json();
-    console.log('Raw data from fetchAllItems:', data);
-    return data;
+    const response = await axios.get(`${API_URL}/api/items`);
+    console.log('Raw data from fetchAllItems:', response.data);
+    return response.data;
   } catch (error) {
     console.error('Error fetching all items:', error);
     throw error;

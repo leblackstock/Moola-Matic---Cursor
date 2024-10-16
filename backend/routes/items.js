@@ -19,11 +19,7 @@ const router = express.Router();
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
-// ------------------------------
-// General Item Routes (Existing)
-// ------------------------------
-
-// Example: GET /api/items/:id
+// GET /api/items/:id
 router.get('/:id', async (req, res) => {
   try {
     const itemId = req.params.id;
@@ -40,13 +36,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// ... [Other existing item routes] ...
-
-// ------------------------------
-// Draft Image Routes (New)
-// ------------------------------
-
-// POST /api/items/draft-images/upload - Upload a new draft image
+// POST /api/items/draft-images/upload
 router.post(
   '/draft-images/upload',
   upload.single('image'),
@@ -67,14 +57,7 @@ router.post(
       const uploadDir = path.join(__dirname, '..', 'uploads', 'drafts', itemId);
 
       // Create the upload directory if it doesn't exist
-      try {
-        await fs.mkdir(uploadDir, { recursive: true });
-      } catch (mkdirError) {
-        console.error('Error creating upload directory:', mkdirError);
-        return res
-          .status(500)
-          .json({ error: 'Failed to create upload directory' });
-      }
+      await fs.mkdir(uploadDir, { recursive: true });
 
       // Determine filename with uniqueness check
       let sequentialNumber = await getNextSequentialNumber(itemId);
@@ -118,7 +101,6 @@ router.post(
               isNew: true,
             },
           },
-          lastUpdated: new Date(),
         },
         { new: true, upsert: true }
       );
@@ -131,30 +113,15 @@ router.post(
         updatedDraft: updatedDraft,
       });
     } catch (error) {
-      console.error('Detailed error in image upload:', error);
-      console.error('Stack trace:', error.stack);
-      res.status(500).json({
-        error: 'An error occurred while uploading the image',
-        details: error.message,
-        stack: error.stack,
-      });
+      console.error('Error uploading file:', error);
+      res
+        .status(500)
+        .json({ error: 'Failed to upload file', details: error.message });
     }
   }
 );
 
-// GET /api/items/draft-images/next-sequence/:itemId - Get next sequential number
-router.get('/draft-images/next-sequence/:itemId', async (req, res) => {
-  try {
-    const { itemId } = req.params;
-    const nextSequentialNumber = await getNextSequentialNumber(itemId);
-    res.json({ nextSequentialNumber });
-  } catch (error) {
-    console.error('Error getting next sequential number:', error);
-    res.status(500).json({ error: 'Failed to get next sequential number' });
-  }
-});
-
-// DELETE /api/items/draft-images/delete/:itemId/:filename - Delete an image
+// DELETE /api/items/draft-images/delete/:itemId/:filename
 router.delete('/draft-images/delete/:itemId/:filename', async (req, res) => {
   try {
     const { itemId, filename } = req.params;
@@ -170,32 +137,17 @@ router.delete('/draft-images/delete/:itemId/:filename', async (req, res) => {
     );
 
     // Check if the file exists
-    try {
-      await fs.access(imagePath);
-    } catch (error) {
-      console.log(`File not found: ${imagePath}`);
-      return res.status(404).json({ error: 'Image file not found' });
-    }
+    await fs.access(imagePath);
 
     // Delete the image file
     await fs.unlink(imagePath);
     console.log(`Successfully deleted image file: ${imagePath}`);
 
-    // Attempt to remove the itemId directory if it's empty
-    const itemDir = path.dirname(imagePath);
-    try {
-      await fs.rmdir(itemDir);
-      console.log(`Successfully removed empty directory: ${itemDir}`);
-    } catch (error) {
-      // Ignore error if directory is not empty or doesn't exist
-      console.log(`Could not remove directory ${itemDir}: ${error.message}`);
-    }
-
     // Remove the image reference from the DraftItem document
     const updatedDraft = await DraftItem.findOneAndUpdate(
       { itemId: itemId },
       { $pull: { images: { filename: filename } } },
-      { new: true, runValidators: false } // Skip validation
+      { new: true }
     );
 
     if (!updatedDraft) {
@@ -210,12 +162,11 @@ router.delete('/draft-images/delete/:itemId/:filename', async (req, res) => {
     res.status(500).json({
       error: 'An error occurred while deleting the image',
       details: error.message,
-      stack: error.stack, // Include stack trace for debugging
     });
   }
 });
 
-// GET /api/items/draft-images/:itemId/:filename - Serve a specific image
+// GET /api/items/draft-images/:itemId/:filename
 router.get('/draft-images/:itemId/:filename', async (req, res) => {
   try {
     const { itemId, filename } = req.params;
@@ -229,12 +180,7 @@ router.get('/draft-images/:itemId/:filename', async (req, res) => {
     );
 
     // Check if the file exists
-    try {
-      await fs.access(imagePath);
-    } catch (error) {
-      console.log(`File not found: ${imagePath}`);
-      return res.status(404).send('Image not found');
-    }
+    await fs.access(imagePath);
 
     // Determine the content type based on file extension
     const ext = path.extname(filename).toLowerCase();
@@ -283,7 +229,7 @@ router.get('/drafts', async (req, res) => {
   }
 });
 
-// DELETE /api/items/drafts/:id - Delete a specific draft
+// DELETE /api/items/drafts/:id
 router.delete('/drafts/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -367,7 +313,7 @@ router.delete('/drafts', async (req, res) => {
   }
 });
 
-// POST /api/items - Create a new item
+// POST /api/items
 router.post('/', async (req, res) => {
   try {
     const newItem = new DraftItem(req.body);
@@ -382,16 +328,17 @@ router.post('/', async (req, res) => {
   }
 });
 
-// PUT /api/items/:id - Update an existing item
+// PUT /api/items/:id
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const updateData = req.body;
 
-    const updatedItem = await DraftItem.findByIdAndUpdate(id, updateData, {
-      new: true,
-      runValidators: true,
-    });
+    const updatedItem = await DraftItem.findOneAndUpdate(
+      { itemId: id },
+      updateData,
+      { new: true, runValidators: true }
+    );
 
     if (!updatedItem) {
       return res.status(404).json({ error: 'Item not found' });
@@ -407,7 +354,7 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// POST /api/items/save-draft - Save a draft item
+// POST /api/items/save-draft
 router.post('/save-draft', async (req, res) => {
   try {
     const itemData = req.body;
@@ -416,9 +363,52 @@ router.post('/save-draft', async (req, res) => {
       return res.status(400).json({ error: 'itemId is required' });
     }
 
+    // Handle date fields
+    const dateFields = [
+      'purchaseDate',
+      'listingDate',
+      'inventoryDetailsAcquisitionDate',
+    ];
+    dateFields.forEach((field) => {
+      if (itemData[field]) {
+        itemData[field] = new Date(itemData[field]);
+      }
+    });
+
+    // Handle numeric fields
+    const numericFields = [
+      'conditionEstimatedRepairCosts',
+      'conditionEstimatedCleaningCosts',
+      'financialsPurchasePrice',
+      'financialsTotalRepairAndCleaningCosts',
+      'financialsEstimatedShippingCosts',
+      'financialsPlatformFees',
+      'financialsExpectedProfit',
+      'financialsProfitMargin',
+      'financialsEstimatedMarketValue',
+      'financialsAcquisitionCost',
+      'marketAnalysisSuggestedListingPrice',
+      'marketAnalysisMinimumAcceptablePrice',
+    ];
+    numericFields.forEach((field) => {
+      if (itemData[field] !== undefined && itemData[field] !== '') {
+        itemData[field] = Number(itemData[field]);
+      }
+    });
+
+    // Ensure images are properly formatted
+    if (itemData.images && Array.isArray(itemData.images)) {
+      itemData.images = itemData.images.map((image) => ({
+        id: image.id,
+        url: image.url,
+        filename: image.filename,
+        isNew: image.isNew,
+      }));
+    }
+
     let draft = await DraftItem.findOneAndUpdate(
       { itemId: itemData.itemId },
-      { ...itemData, lastUpdated: new Date() },
+      { ...itemData, lastUpdated: new Date(), isDraft: true },
       {
         new: true,
         upsert: true,
@@ -437,38 +427,80 @@ router.post('/save-draft', async (req, res) => {
   }
 });
 
-// POST /api/items/autosave-draft - Autosave a draft item
+// POST /api/items/autosave-draft
 router.post('/autosave-draft', async (req, res) => {
   try {
     const { draftData, contextData, messages } = req.body;
 
+    if (!draftData.itemId) {
+      return res.status(400).json({ error: 'itemId is required' });
+    }
+
     // Handle the purchaseRecommendation field
-    if (
-      draftData.finalRecommendation &&
-      draftData.finalRecommendation.purchaseRecommendation !== undefined
-    ) {
+    if (draftData.purchaseRecommendation !== undefined) {
       if (
-        draftData.finalRecommendation.purchaseRecommendation === 'Unknown' ||
-        draftData.finalRecommendation.purchaseRecommendation === ''
+        draftData.purchaseRecommendation === 'Unknown' ||
+        draftData.purchaseRecommendation === ''
       ) {
-        draftData.finalRecommendation.purchaseRecommendation = null;
-      } else if (
-        typeof draftData.finalRecommendation.purchaseRecommendation === 'string'
-      ) {
-        draftData.finalRecommendation.purchaseRecommendation =
-          draftData.finalRecommendation.purchaseRecommendation.toLowerCase() ===
-          'true';
+        draftData.purchaseRecommendation = null;
       }
     }
 
+    // Convert date strings to Date objects
+    const dateFields = [
+      'purchaseDate',
+      'listingDate',
+      'inventoryDetailsAcquisitionDate',
+    ];
+    dateFields.forEach((field) => {
+      if (draftData[field]) {
+        draftData[field] = new Date(draftData[field]);
+      }
+    });
+
+    // Convert numeric fields to Numbers
+    const numericFields = [
+      'conditionEstimatedRepairCosts',
+      'conditionEstimatedCleaningCosts',
+      'financialsPurchasePrice',
+      'financialsTotalRepairAndCleaningCosts',
+      'financialsEstimatedShippingCosts',
+      'financialsPlatformFees',
+      'financialsExpectedProfit',
+      'financialsProfitMargin',
+      'financialsEstimatedMarketValue',
+      'financialsAcquisitionCost',
+      'marketAnalysisSuggestedListingPrice',
+      'marketAnalysisMinimumAcceptablePrice',
+    ];
+    numericFields.forEach((field) => {
+      if (draftData[field] !== undefined && draftData[field] !== '') {
+        draftData[field] = Number(draftData[field]);
+      }
+    });
+
+    // Ensure images are properly formatted
+    if (draftData.images && Array.isArray(draftData.images)) {
+      draftData.images = draftData.images.map((image) => ({
+        id: image.id,
+        url: image.url,
+        filename: image.filename,
+        isNew: image.isNew,
+      }));
+    }
+
+    // Prepare the update object
+    const updateObject = {
+      ...draftData,
+      contextData,
+      messages,
+      lastUpdated: new Date(),
+      isDraft: true,
+    };
+
     let draft = await DraftItem.findOneAndUpdate(
       { itemId: draftData.itemId },
-      {
-        ...draftData,
-        contextData, // Save contextData
-        messages, // Save messages
-        lastUpdated: new Date(),
-      },
+      updateObject,
       {
         new: true,
         upsert: true,

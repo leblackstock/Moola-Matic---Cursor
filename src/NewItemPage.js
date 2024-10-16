@@ -69,27 +69,106 @@ function NewItemPage({ setItemId }) {
   const { ItemId } = useParams();
   const navigate = useNavigate();
 
-  if (ItemId === null) {
-    return (
-      <WarningBoxOverlay>
-        <WarningBox>
-          <StyledTitle>Oops! No Item Found</StyledTitle>
-          <StyledSubtitle>
-            It looks like we couldn't find an item to work with. Let's head back
-            and start fresh!
-          </StyledSubtitle>
-          <WarningBoxButtons>
-            <WarningButton onClick={() => navigate('/')}>
-              OK, Take Me Back
-            </WarningButton>
-          </WarningBoxButtons>
-        </WarningBox>
-      </WarningBoxOverlay>
-    );
-  }
+  // Update the item state to match the DraftItem schema
+  const [item, setItem] = useState({
+    itemId: ItemId,
+    name: '',
+    description: '',
+    brand: '',
+    make: '',
+    model: '',
+    serialNumber: '',
+    type: '',
+    category: '',
+    subcategory: '',
+    style: '',
+    vintage: false,
+    antique: false,
+    rarity: '',
+    packagingAccessoriesIncluded: '',
+    materialComposition: '',
+    clothingMeasurementsSizeLabel: '',
+    clothingMeasurementsChestBust: '',
+    clothingMeasurementsWaist: '',
+    clothingMeasurementsHips: '',
+    clothingMeasurementsShoulderWidth: '',
+    clothingMeasurementsSleeveLength: '',
+    clothingMeasurementsInseam: '',
+    clothingMeasurementsTotalLength: '',
+    footwearMeasurementsSize: '',
+    footwearMeasurementsWidth: '',
+    footwearMeasurementsInsoleLength: '',
+    footwearMeasurementsHeelHeight: '',
+    footwearMeasurementsPlatformHeight: '',
+    footwearMeasurementsBootShaftHeight: '',
+    footwearMeasurementsCalfCircumference: '',
+    jewelryMeasurementsRingSize: '',
+    jewelryMeasurementsNecklaceBraceletLength: '',
+    jewelryMeasurementsPendantDimensions: '',
+    jewelryMeasurementsJewelryDimensions: '',
+    furnitureLargeItemMeasurementsHeight: '',
+    furnitureLargeItemMeasurementsWidth: '',
+    furnitureLargeItemMeasurementsDepth: '',
+    furnitureLargeItemMeasurementsLength: '',
+    furnitureLargeItemMeasurementsSeatHeight: '',
+    furnitureLargeItemMeasurementsTabletopDimensions: '',
+    generalMeasurementsWeight: '',
+    generalMeasurementsDiameter: '',
+    generalMeasurementsVolumeCapacity: '',
+    generalMeasurementsOtherSpecificMeasurements: '',
+    conditionRating: '',
+    conditionSignsOfWear: '',
+    conditionDetailedNotes: '',
+    conditionRepairNeeds: '',
+    conditionCleaningRequirements: '',
+    conditionEstimatedRepairCosts: 0,
+    conditionEstimatedCleaningCosts: 0,
+    conditionTimeSpentOnRepairsCleaning: '',
+    financialsPurchasePrice: 0,
+    financialsTotalRepairAndCleaningCosts: 0,
+    financialsEstimatedShippingCosts: 0,
+    financialsPlatformFees: 0,
+    financialsExpectedProfit: 0,
+    financialsProfitMargin: 0,
+    financialsEstimatedMarketValue: 0,
+    financialsAcquisitionCost: 0,
+    marketAnalysisMarketDemand: '',
+    marketAnalysisHistoricalPriceTrends: '',
+    marketAnalysisMarketSaturation: '',
+    marketAnalysisSalesVelocity: '',
+    marketAnalysisSuggestedListingPrice: 0,
+    marketAnalysisMinimumAcceptablePrice: 0,
+    itemCareInstructions: '',
+    keywordsForSeo: '',
+    lotOrBundleInformation: '',
+    customizableFields: '',
+    recommendedSalePlatforms: '',
+    compliancePlatformPolicies: '',
+    complianceAuthenticityMarkers: '',
+    complianceCounterfeitRisk: '',
+    complianceStatus: '',
+    complianceRestrictedItemCheck: '',
+    inventoryDetailsInventoryId: '',
+    inventoryDetailsStorageLocation: '',
+    inventoryDetailsAcquisitionDate: null,
+    inventoryDetailsTargetMarket: '',
+    inventoryDetailsTrendingItems: '',
+    inventoryDetailsCustomerPreferences: '',
+    inventoryDetailsAcquisitionLocation: '',
+    inventoryDetailsSupplierInformation: '',
+    images: [],
+    purchaseDate: null,
+    listingDate: null,
+    sellerNotes: '',
+    contextData: {},
+    purchaseRecommendation: '',
+    detailedBreakdown: '',
+    sampleForSaleListing: '',
+    isDraft: true,
+    messages: [],
+  });
 
   // State declarations
-  const [item, setItem] = useState(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [contextData, setContextData] = useState({});
@@ -143,25 +222,17 @@ function NewItemPage({ setItemId }) {
 
       try {
         const localData = await loadLocalData(ItemId);
-        // console.log('Local data loaded:', localData);
 
         if (localData) {
           setItem(localData);
-          setName(localData.name || '');
-          setDescription(localData.description || '');
-          // Ensure we're setting the images array correctly
           setUploadedImages(
             Array.isArray(localData.images) ? localData.images : []
           );
-          // console.log('Setting uploaded images:', localData.images || []);
           setContextData(localData.contextData || {});
           setMessages(localData.messages || []);
         } else {
-          // console.log('No local data found, initializing with defaults');
           const defaultItem = createDefaultItem(ItemId);
           setItem(defaultItem);
-          setName(defaultItem.name || '');
-          setDescription(defaultItem.description || '');
           setUploadedImages([]);
           setContextData({});
           setMessages([]);
@@ -170,8 +241,6 @@ function NewItemPage({ setItemId }) {
         console.error('Error loading local data:', error);
         const defaultItem = createDefaultItem(ItemId);
         setItem(defaultItem);
-        setName(defaultItem.name || '');
-        setDescription(defaultItem.description || '');
         setUploadedImages([]);
         setContextData({});
         setMessages([]);
@@ -180,6 +249,11 @@ function NewItemPage({ setItemId }) {
 
     loadData();
   }, [ItemId, navigate]);
+
+  // Second useEffect - Log item changes
+  useEffect(() => {
+    console.log('Item state updated:', item);
+  }, [item]);
 
   // Optimize the loadDraft function
   const loadDraft = (draftData) => {
@@ -438,7 +512,7 @@ function NewItemPage({ setItemId }) {
     );
   };
 
-  // Update this function to handle nested updates
+  // Update the updateItem function to handle nested properties
   const updateItem = (field, value) => {
     setItem((prevItem) => {
       const newItem = { ...prevItem };
@@ -459,7 +533,7 @@ function NewItemPage({ setItemId }) {
   // Update the handleAnalyzeImages function
   const handleAnalyzeImagesWrapper = async () => {
     setIsAnalyzing(true);
-    setIsLoading(true); // Add this line to set loading state
+    setIsLoading(true);
     try {
       console.log('Starting image analysis...');
       const result = await handleAnalyzeImages({
@@ -474,47 +548,25 @@ function NewItemPage({ setItemId }) {
 
       console.log('Analysis result:', result);
 
-      if (
-        result &&
-        (result.itemDetails ||
-          result.financials ||
-          result.marketAnalysis ||
-          result.finalRecommendation)
-      ) {
+      if (result && typeof result === 'object') {
         setItem((prevItem) => ({
           ...prevItem,
-          itemDetails: {
-            ...prevItem.itemDetails,
-            ...result.itemDetails,
-          },
-          financials: {
-            ...prevItem.financials,
-            ...result.financials,
-          },
-          marketAnalysis: {
-            ...prevItem.marketAnalysis,
-            ...result.marketAnalysis,
-          },
-          finalRecommendation: {
-            ...prevItem.finalRecommendation,
-            ...result.finalRecommendation,
-          },
+          analysisResult: result,
         }));
-
-        console.log('Updated item:', item);
+        setNotificationMessage('Image analysis completed successfully!');
+        setShowNotification(true);
       } else {
         console.error('Invalid analysis result:', result);
+        setNotificationMessage('Error: Invalid analysis result');
+        setShowNotification(true);
       }
-
-      setNotificationMessage('Image analysis completed successfully!');
-      setShowNotification(true);
     } catch (error) {
       console.error('Error in handleAnalyzeImagesWrapper:', error);
       setNotificationMessage('Error analyzing images. Please try again.');
       setShowNotification(true);
     } finally {
       setIsAnalyzing(false);
-      setIsLoading(false); // Add this line to reset loading state
+      setIsLoading(false);
     }
   };
 
@@ -547,17 +599,9 @@ function NewItemPage({ setItemId }) {
   }, [uploadedImages]);
 
   const handleSaveDraft = async () => {
-    if (!item) {
-      console.error('No item to save');
-      setNotificationMessage('Error: Unable to save draft (no item data)');
-      setShowNotification(true);
-      setTimeout(() => setShowNotification(false), 3000);
-      return;
-    }
-
-    if (!ItemId) {
-      console.error('Missing ItemId');
-      setNotificationMessage('Error: Unable to save draft (missing ItemId)');
+    if (!item || !ItemId) {
+      console.error('No item to save or missing ItemId');
+      setNotificationMessage('Error: Unable to save draft');
       setShowNotification(true);
       setTimeout(() => setShowNotification(false), 3000);
       return;
@@ -565,7 +609,6 @@ function NewItemPage({ setItemId }) {
 
     try {
       console.log('Saving draft:', item);
-      console.log('Messages to save:', messages);
       const savedDraft = await handleManualSave(
         item,
         uploadedImages,
@@ -577,7 +620,6 @@ function NewItemPage({ setItemId }) {
         setLastAutoSave
       );
       console.log('Draft saved successfully:', savedDraft);
-      console.log('Saved messages:', savedDraft.messages);
 
       setNotificationMessage('Draft saved successfully!');
       setShowNotification(true);
@@ -629,7 +671,7 @@ function NewItemPage({ setItemId }) {
             updateItem={updateItem}
             messages={messages}
             setMessages={setMessages}
-            ItemId={ItemId} // Use ItemId directly here
+            ItemId={ItemId}
             onFileChange={handleFileChangeWrapper}
             isLoading={isLoading}
             onStartLoading={handleStartLoading}
@@ -667,7 +709,7 @@ function NewItemPage({ setItemId }) {
             onSelect={handleImageSelect}
             selectedImage={selectedImage}
             onDelete={handleDeleteImageWrapper}
-            itemId={ItemId} // Use ItemId here
+            itemId={ItemId}
           />
 
           {/* Image Selection Modal */}
@@ -707,7 +749,7 @@ function NewItemPage({ setItemId }) {
 
           {hasUnsavedChanges && <span>Unsaved changes</span>}
 
-          {/* FormFields component */}
+          {/* Update FormFields component to include all relevant fields from the DraftItem schema */}
           <FormFields
             item={item}
             updateItem={updateItem}
