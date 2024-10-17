@@ -19,6 +19,7 @@ function FormFields({
   handleSubmit,
   handleSaveDraft,
   handlePurchaseRecommendationChange,
+  itemId, // Add this line
 }) {
   const isAnyFieldPopulated = useMemo(() => {
     return Object.values(item).some(
@@ -293,9 +294,16 @@ function FormFields({
     </>
   );
 
+  // You can now use itemId within your component if needed
+  // For example, you might want to use it in the form submission:
+  const onSubmit = (e) => {
+    e.preventDefault();
+    handleSubmit(itemId);
+  };
+
   return (
     <>
-      <StyledForm onSubmit={handleSubmit}>
+      <StyledForm onSubmit={onSubmit}>
         {isAnyFieldPopulated ? (
           <>
             {renderAllFields()}
@@ -316,7 +324,9 @@ function FormFields({
       </StyledForm>
 
       {isAnyFieldPopulated && (
-        <StyledButton onClick={handleSaveDraft}>Save Draft</StyledButton>
+        <StyledButton onClick={() => handleSaveDraft(itemId)}>
+          Save Draft
+        </StyledButton>
       )}
     </>
   );
@@ -328,6 +338,7 @@ FormFields.propTypes = {
   handleSubmit: PropTypes.func.isRequired,
   handleSaveDraft: PropTypes.func.isRequired,
   handlePurchaseRecommendationChange: PropTypes.func.isRequired,
+  itemId: PropTypes.string.isRequired,
 };
 
 export default FormFields;

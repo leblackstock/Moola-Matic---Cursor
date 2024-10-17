@@ -502,11 +502,20 @@ router.post('/save-draft', async (req, res) => {
 // POST /api/items/autosave-draft
 router.post('/autosave-draft', async (req, res) => {
   try {
-    const { draftData, contextData, messages } = req.body;
+    const { draftData, contextData, messages, itemId } = req.body;
 
-    if (!draftData.itemId) {
-      return res.status(400).json({ error: 'itemId is required' });
+    if (!draftData || !itemId) {
+      logger.warn('Missing draftData or itemId in autosave request', {
+        hasDraftData: !!draftData,
+        hasItemId: !!itemId,
+        bodyKeys: Object.keys(req.body),
+      });
+      return res
+        .status(400)
+        .json({ error: 'draftData and itemId are required' });
     }
+
+    logger.info(`Autosaving draft for itemId: ${itemId}`);
 
     // Handle the purchaseRecommendation field
     if (draftData.purchaseRecommendation !== undefined) {
@@ -571,7 +580,7 @@ router.post('/autosave-draft', async (req, res) => {
     };
 
     let draft = await DraftItem.findOneAndUpdate(
-      { itemId: draftData.itemId },
+      { itemId: itemId },
       updateObject,
       {
         new: true,
@@ -581,13 +590,17 @@ router.post('/autosave-draft', async (req, res) => {
       }
     );
 
-    console.log('Draft autosaved with contextData and messages');
+    logger.info(`Draft autosaved successfully for itemId: ${itemId}`);
     res.status(200).json({ item: draft });
   } catch (error) {
-    console.error('Error autosaving draft:', error);
-    res
-      .status(500)
-      .json({ error: 'Failed to autosave draft', details: error.message });
+    logger.error('Error autosaving draft:', {
+      error: error.message,
+      stack: error.stack,
+    });
+    res.status(500).json({
+      error: 'Failed to autosave draft',
+      details: error.message,
+    });
   }
 });
 

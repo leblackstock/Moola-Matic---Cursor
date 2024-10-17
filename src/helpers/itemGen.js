@@ -131,119 +131,46 @@ export const getNextSequentialNumber = async (itemId) => {
   });
 };
 
-export const createDefaultItem = (itemId) => {
+export const createDefaultItem = async (itemId) => {
   if (!itemId) {
     throw new Error('ItemId is required when creating a new item');
   }
-  return {
-    itemId: itemId,
-    name: '',
-    brand: '',
-    make: '',
-    model: '',
-    serialNumber: '',
-    type: '',
-    description: '',
-    category: '',
-    subcategory: '',
-    style: '',
-    vintage: false,
-    antique: false,
-    rarity: '',
-    packagingAccessoriesIncluded: '',
-    materialComposition: '',
 
-    clothingMeasurementsSizeLabel: '',
-    clothingMeasurementsChestBust: '',
-    clothingMeasurementsWaist: '',
-    clothingMeasurementsHips: '',
-    clothingMeasurementsShoulderWidth: '',
-    clothingMeasurementsSleeveLength: '',
-    clothingMeasurementsInseam: '',
-    clothingMeasurementsTotalLength: '',
+  try {
+    // Fetch the schema fields from the backend
+    const response = await axios.get(
+      `${BACKEND_URL}/api/items/draft-item-schema`
+    );
+    const schemaFields = response.data.fields;
 
-    footwearMeasurementsSize: '',
-    footwearMeasurementsWidth: '',
-    footwearMeasurementsInsoleLength: '',
-    footwearMeasurementsHeelHeight: '',
-    footwearMeasurementsPlatformHeight: '',
-    footwearMeasurementsBootShaftHeight: '',
-    footwearMeasurementsCalfCircumference: '',
+    // Create a new item object based on the schema fields
+    const newItem = {
+      itemId: itemId,
+      isDraft: true,
+    };
 
-    jewelryMeasurementsRingSize: '',
-    jewelryMeasurementsNecklaceBraceletLength: '',
-    jewelryMeasurementsPendantDimensions: '',
-    jewelryMeasurementsJewelryDimensions: '',
+    // Initialize fields based on the schema
+    schemaFields.forEach((field) => {
+      if (field !== '_id' && field !== '__v') {
+        switch (field) {
+          case 'messages':
+            newItem[field] = [];
+            break;
+          case 'vintage':
+          case 'antique':
+            newItem[field] = false;
+            break;
+          default:
+            newItem[field] = '';
+        }
+      }
+    });
 
-    furnitureLargeItemMeasurementsHeight: '',
-    furnitureLargeItemMeasurementsWidth: '',
-    furnitureLargeItemMeasurementsDepth: '',
-    furnitureLargeItemMeasurementsLength: '',
-    furnitureLargeItemMeasurementsSeatHeight: '',
-    furnitureLargeItemMeasurementsTabletopDimensions: '',
-
-    generalMeasurementsWeight: '',
-    generalMeasurementsDiameter: '',
-    generalMeasurementsVolumeCapacity: '',
-    generalMeasurementsOtherSpecificMeasurements: '',
-
-    conditionRating: '',
-    conditionSignsOfWear: '',
-    conditionDetailedNotes: '',
-    conditionRepairNeeds: '',
-    conditionCleaningRequirements: '',
-    conditionEstimatedRepairCosts: 0,
-    conditionEstimatedCleaningCosts: 0,
-    conditionTimeSpentOnRepairsCleaning: '',
-
-    financialsPurchasePrice: 0,
-    financialsTotalRepairAndCleaningCosts: 0,
-    financialsEstimatedShippingCosts: 0,
-    financialsPlatformFees: 0,
-    financialsExpectedProfit: 0,
-    financialsProfitMargin: 0,
-    financialsEstimatedMarketValue: 0,
-    financialsAcquisitionCost: 0,
-
-    marketAnalysisMarketDemand: '',
-    marketAnalysisHistoricalPriceTrends: '',
-    marketAnalysisMarketSaturation: '',
-    marketAnalysisSalesVelocity: '',
-    marketAnalysisSuggestedListingPrice: 0,
-    marketAnalysisMinimumAcceptablePrice: 0,
-
-    itemCareInstructions: '',
-    keywordsForSeo: '',
-    lotOrBundleInformation: '',
-    customizableFields: '',
-    recommendedSalePlatforms: '',
-
-    compliancePlatformPolicies: '',
-    complianceAuthenticityMarkers: '',
-    complianceCounterfeitRisk: '',
-    complianceStatus: '',
-    complianceRestrictedItemCheck: '',
-
-    inventoryDetailsInventoryId: '',
-    inventoryDetailsStorageLocation: '',
-    inventoryDetailsAcquisitionDate: null,
-    inventoryDetailsTargetMarket: '',
-    inventoryDetailsTrendingItems: '',
-    inventoryDetailsCustomerPreferences: '',
-    inventoryDetailsAcquisitionLocation: '',
-    inventoryDetailsSupplierInformation: '',
-
-    images: [],
-    purchaseDate: null,
-    listingDate: null,
-    sellerNotes: '',
-    contextData: {},
-    purchaseRecommendation: '',
-    detailedBreakdown: '',
-    sampleForSaleListing: '',
-    isDraft: true,
-    messages: [],
-  };
+    return newItem;
+  } catch (error) {
+    console.error('Error fetching draft item schema:', error);
+    throw new Error('Failed to create default item');
+  }
 };
 
 const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';

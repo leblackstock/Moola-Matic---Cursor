@@ -52,21 +52,49 @@
     "guidelines": "Implement centralized error handling to ensure all errors are captured and managed properly. Log errors effectively and provide user-friendly messages where appropriate."
   },
   "Logging": {
-    "bestPractices": "Use structured logging with a library like `winston` to effectively capture and format log messages. Configure Winston with different transports for logging to both files and the console. Use appropriate log levels (`error`, `warn`, `info`, `debug`) to control the level of detail recorded.",
-    "exampleConfiguration": {
-      "setup": "Import Winston and create a logger instance with transports for logging to files and the console.",
-      "codeExample": "const winston = require('winston');\n\nconst logger = winston.createLogger({\n  level: 'info',\n  format: winston.format.combine(\n    winston.format.timestamp(),\n    winston.format.json()\n  ),\n  transports: [\n    new winston.transports.Console(),\n    new winston.transports.File({ filename: 'logs/app.log' })\n  ]\n});\n\nlogger.info('Application has started');\nlogger.error('An error occurred');"
+    "bestPractices": "For backend logging, use structured logging with Winston. For frontend logging, use console methods.",
+    "backendLogging": {
+      "setup": "In the backend, import Winston and create a logger instance with transports for logging to both files and the console.",
+      "codeExample": "const winston = require('winston');\n\nconst logger = winston.createLogger({\n  level: 'info',\n  format: winston.format.combine(\n    winston.format.timestamp(),\n    winston.format.json()\n  ),\n  transports: [\n    new winston.transports.Console(),\n    new winston.transports.File({ filename: 'logs/app.log' })\n  ]\n});\n\nlogger.info('Backend application has started');\nlogger.error('A backend error occurred');"
+    },
+    "frontendLogging": {
+      "usage": "In the frontend, use console methods for logging. Use appropriate log levels (error, warn, info, debug) to control the level of detail.",
+      "codeExample": "console.info('Frontend application has started');\nconsole.error('A frontend error occurred');"
     }
   },
   "Code Consistency": {
     "namingConventions": "Maintain consistent naming conventions across the project. Use `camelCase` for variables and functions, and `PascalCase` for classes and components. Use tools like `prettier` for automatic formatting to enforce code style."
   },
+  "Prettier": {
+    "usage": "Use Prettier for consistent code formatting across the project.",
+    "configuration": {
+      "file": ".prettierrc",
+      "rules": {
+        "semi": true,
+        "trailingComma": "es5",
+        "singleQuote": true,
+        "printWidth": 100,
+        "tabWidth": 2,
+        "useTabs": false,
+        "bracketSpacing": true,
+        "arrowParens": "avoid",
+        "endOfLine": "lf"
+      }
+    },
+    "integration": "Integrate Prettier with your IDE and set up a pre-commit hook to ensure all committed code is formatted.",
+    "example": "// .prettierrc\n{\n  \"semi\": true,\n  \"trailingComma\": \"es5\",\n  \"singleQuote\": true,\n  \"printWidth\": 100,\n  \"tabWidth\": 2,\n  \"useTabs\": false,\n  \"bracketSpacing\": true,\n  \"arrowParens\": \"avoid\",\n  \"endOfLine\": \"lf\"\n}"
+  },
   "Code Reviews": {
     "bestPractices": "During code reviews, ensure adherence to project guidelines, code quality, and best practices. Provide constructive feedback to improve the quality and maintainability of the codebase."
   },
   "General Guidelines": {
-    "itemID": "Do not set a default itemID or create an itemID preemptively, as it is used to track items. The itemID should only be created after 'New Item' is clicked in App.js.",
+    "itemID": "Do not set a default itemId or create an itemId preemptively, as it is used to track items. The itemID should only be created after 'New Item' is clicked in App.js.",
     "codeEditing": "Do not remove any code, comments, or logging not directly related to the code being edited unless explicitly instructed."
+  },
+  "JavaScript Usage": {
+    "preference": "Use JavaScript (.js) for all components and files. Do not use TypeScript or create .ts/.tsx components.",
+    "componentCreation": "Create React components using .js files only. Avoid using TypeScript features or type annotations.",
+    "propTypes": "Use PropTypes for type checking in development instead of TypeScript interfaces or types."
   },
   "Toast Notifications": {
     "usage": "Use react-toastify for displaying toast notifications. Configure toasts to be consistent across the application. Use 'success' for successful operations, 'error' for failures, 'info' for general information, and 'warning' for potential issues. Keep messages concise and user-friendly. Position toasts in the top-right corner by default.",

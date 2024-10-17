@@ -10,130 +10,6 @@ const API_URL =
   process.env.REACT_APP_BACKEND_URL ||
   `http://localhost:${process.env.REACT_APP_BACKEND_PORT || 3001}`;
 
-// Function to create a default item
-export const createDefaultItem = (itemId) => {
-  if (!itemId) {
-    throw new Error('ItemId is required when creating a new item');
-  }
-  return {
-    itemId: itemId,
-    name: '',
-    brand: '',
-    make: '',
-    model: '',
-    serialNumber: '',
-    type: '',
-    description: '',
-    category: '',
-    subcategory: '',
-    style: '',
-    vintage: false,
-    antique: false,
-    rarity: '',
-    packagingAccessoriesIncluded: '',
-    materialComposition: '',
-    clothingMeasurementsSizeLabel: '',
-    clothingMeasurementsChestBust: '',
-    clothingMeasurementsWaist: '',
-    clothingMeasurementsHips: '',
-    clothingMeasurementsShoulderWidth: '',
-    clothingMeasurementsSleeveLength: '',
-    clothingMeasurementsInseam: '',
-    clothingMeasurementsTotalLength: '',
-    footwearMeasurementsSize: '',
-    footwearMeasurementsWidth: '',
-    footwearMeasurementsInsoleLength: '',
-    footwearMeasurementsHeelHeight: '',
-    footwearMeasurementsPlatformHeight: '',
-    footwearMeasurementsBootShaftHeight: '',
-    footwearMeasurementsCalfCircumference: '',
-    jewelryMeasurementsRingSize: '',
-    jewelryMeasurementsNecklaceBraceletLength: '',
-    jewelryMeasurementsPendantDimensions: '',
-    jewelryMeasurementsJewelryDimensions: '',
-    furnitureLargeItemMeasurementsHeight: '',
-    furnitureLargeItemMeasurementsWidth: '',
-    furnitureLargeItemMeasurementsDepth: '',
-    furnitureLargeItemMeasurementsLength: '',
-    furnitureLargeItemMeasurementsSeatHeight: '',
-    furnitureLargeItemMeasurementsTabletopDimensions: '',
-    generalMeasurementsWeight: '',
-    generalMeasurementsDiameter: '',
-    generalMeasurementsVolumeCapacity: '',
-    generalMeasurementsOtherSpecificMeasurements: '',
-    conditionRating: '',
-    conditionSignsOfWear: '',
-    conditionDetailedNotes: '',
-    conditionRepairNeeds: '',
-    conditionCleaningRequirements: '',
-    conditionEstimatedRepairCosts: 0,
-    conditionEstimatedCleaningCosts: 0,
-    conditionTimeSpentOnRepairsCleaning: '',
-    financialsPurchasePrice: 0,
-    financialsTotalRepairAndCleaningCosts: 0,
-    financialsEstimatedShippingCosts: 0,
-    financialsPlatformFees: 0,
-    financialsExpectedProfit: 0,
-    financialsProfitMargin: 0,
-    financialsEstimatedMarketValue: 0,
-    financialsAcquisitionCost: 0,
-    marketAnalysisMarketDemand: '',
-    marketAnalysisHistoricalPriceTrends: '',
-    marketAnalysisMarketSaturation: '',
-    marketAnalysisSalesVelocity: '',
-    marketAnalysisSuggestedListingPrice: 0,
-    marketAnalysisMinimumAcceptablePrice: 0,
-    itemCareInstructions: '',
-    keywordsForSeo: '',
-    lotOrBundleInformation: '',
-    customizableFields: '',
-    recommendedSalePlatforms: '',
-    compliancePlatformPolicies: '',
-    complianceAuthenticityMarkers: '',
-    complianceCounterfeitRisk: '',
-    complianceStatus: '',
-    complianceRestrictedItemCheck: '',
-    inventoryDetailsInventoryId: '',
-    inventoryDetailsStorageLocation: '',
-    inventoryDetailsAcquisitionDate: null,
-    inventoryDetailsTargetMarket: '',
-    inventoryDetailsTrendingItems: '',
-    inventoryDetailsCustomerPreferences: '',
-    inventoryDetailsAcquisitionLocation: '',
-    inventoryDetailsSupplierInformation: '',
-    images: [],
-    purchaseDate: null,
-    listingDate: null,
-    sellerNotes: '',
-    contextData: {},
-    purchaseRecommendation: '',
-    detailedBreakdown: '',
-    sampleForSaleListing: '',
-    isDraft: true,
-    messages: [],
-  };
-};
-
-// Function to handle new item creation
-export const handleNewItem = (itemId, setItemId, navigate) => {
-  console.info('Creating new item', { itemId });
-  const newItem = createDefaultItem(itemId);
-
-  // Clear any existing local storage for this new item
-  localStorage.removeItem(`item_${itemId}`);
-  localStorage.removeItem(`contextData_${itemId}`);
-  localStorage.removeItem(`messages_${itemId}`);
-
-  // Save the new empty item to local storage
-  handleLocalSave(newItem, {}, []);
-
-  setItemId(itemId);
-
-  navigate(`/new-item/${itemId}`);
-  console.info('New item created and navigation triggered', { itemId });
-  return itemId;
-};
-
 // Function to handle draft save
 export const handleDraftSave = async (item, messages, currentItemId) => {
   if (!currentItemId) {
@@ -142,7 +18,6 @@ export const handleDraftSave = async (item, messages, currentItemId) => {
   }
 
   try {
-    console.info('Saving draft', { currentItemId });
     const itemCopy = { ...item, itemId: currentItemId };
 
     const existingImages = itemCopy.images
@@ -204,11 +79,10 @@ export const handleAutoSave = async (
 ) => {
   try {
     if (!item || !item.itemId) {
-      console.error('Item or itemId is missing');
+      console.error('Item or itemId is missing', { item });
       throw new Error('Item or itemId is missing');
     }
 
-    console.info('Starting autosave', { itemId: item.itemId });
     const uniqueImageUrls = new Set(item.images.map((img) => img.url));
 
     const draftData = {
@@ -226,11 +100,16 @@ export const handleAutoSave = async (
       ],
     };
 
-    console.log('Autosaving data:', JSON.stringify(draftData, null, 2));
+    const requestBody = {
+      draftData,
+      contextData: item.contextData || {},
+      messages: messages || [],
+      itemId: item.itemId,
+    };
 
     const response = await axios.post(
       `${API_URL}/api/items/autosave-draft`,
-      { draftData, contextData: item.contextData, messages },
+      requestBody,
       {
         headers: {
           'Content-Type': 'application/json',
@@ -251,12 +130,8 @@ export const handleAutoSave = async (
       throw new Error('Invalid response format from server');
     }
 
-    console.info('Autosave completed successfully', { itemId: item.itemId });
+    console.info('Autosave completed successfully');
   } catch (error) {
-    console.error('Error during autosave', {
-      error: error.message,
-      itemId: item?.itemId,
-    });
     onError(error);
   }
 };
@@ -371,7 +246,7 @@ export const saveDraft = async (draftData, contextData, messages) => {
       messages,
     });
 
-    console.log('Draft saved successfully:');
+    console.log('Draft saved successfully');
     return response.data.item;
   } catch (error) {
     console.error('Error saving draft:', error);
@@ -491,21 +366,13 @@ export const saveToLocalStorage = (itemId, data) => {
       ...data,
       images: data.images || [], // Ensure images array is included
     };
-    console.info(`Saving data to localStorage with key: ${storageKey}`, {
-      storageKey,
-      dataToSave,
-    });
     if (typeof localStorage !== 'undefined' && localStorage !== null) {
       localStorage.setItem(storageKey, JSON.stringify(dataToSave));
-      console.info('Data successfully saved to localStorage', { storageKey });
     } else {
       console.warn('localStorage is not available');
     }
   } catch (error) {
-    console.error('Error saving data to localStorage:', {
-      error: error.message,
-      stack: error.stack,
-    });
+    console.error('Error saving data to localStorage');
   }
 };
 
@@ -771,9 +638,16 @@ export const useAutosave = (itemId, setItem, setLastSaved, delay = 2000) => {
     }
 
     try {
+      const requestBody = {
+        draftData: data,
+        contextData: data.contextData,
+        messages: data.messages,
+        itemId: itemId,
+      };
+
       const response = await axios.post(
         `${API_URL}/api/items/autosave-draft`,
-        data,
+        requestBody,
         {
           headers: {
             'Content-Type': 'application/json',
@@ -807,7 +681,6 @@ export const handleSave = async (item, messages, currentItemId) => {
   }
 
   try {
-    console.info('Saving draft', { currentItemId });
     const itemCopy = { ...item, itemId: currentItemId };
 
     const existingImages = itemCopy.images

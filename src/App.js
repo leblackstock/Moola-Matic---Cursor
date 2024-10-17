@@ -278,6 +278,7 @@ function NotFound() {
  */
 function App() {
   const [currentItemId, setCurrentItemId] = useState(null);
+  const [currentItem, setCurrentItem] = useState(null);
 
   const updateCurrentItemId = async (newItemId) => {
     setCurrentItemId(newItemId);
@@ -306,6 +307,13 @@ function App() {
   const handleSetItemId = (newItemId) => {
     console.log('Setting new ItemId:', newItemId);
     setCurrentItemId(newItemId);
+    // Load the item data from localStorage
+    const itemData = localStorage.getItem(`item_${newItemId}`);
+    if (itemData) {
+      setCurrentItem(JSON.parse(itemData));
+    } else {
+      setCurrentItem(null);
+    }
   };
 
   return (
@@ -329,6 +337,8 @@ function App() {
                     <NewItemPage
                       itemId={currentItemId}
                       setItemId={handleSetItemId}
+                      item={currentItem}
+                      setItem={setCurrentItem}
                     />
                   ) : (
                     <Navigate to="/" replace />
@@ -341,6 +351,8 @@ function App() {
                   <NewItemPage
                     itemId={currentItemId || ''}
                     setItemId={handleSetItemId}
+                    item={currentItem}
+                    setItem={setCurrentItem}
                   />
                 }
               />

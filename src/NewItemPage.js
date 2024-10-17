@@ -19,7 +19,6 @@ import FormFields from './components/compFormFields.js';
 import {
   handleLocalSave,
   loadLocalData,
-  createDefaultItem,
   updateItem as updateItemFunc,
   handleFileUpload,
   handleManualSave,
@@ -65,108 +64,11 @@ const loadItemData = (itemId) => {
   return loadLocalData(itemId);
 };
 
-function NewItemPage({ setItemId }) {
-  const { itemId } = useParams();
+function NewItemPage({ itemId, item, setItem }) {
   const navigate = useNavigate();
 
-  // Update the item state to match the DraftItem schema
-  const [itemId, setItem] = useState({
-    itemId: itemId,
-    name: '',
-    description: '',
-    brand: '',
-    make: '',
-    model: '',
-    serialNumber: '',
-    type: '',
-    category: '',
-    subcategory: '',
-    style: '',
-    vintage: false,
-    antique: false,
-    rarity: '',
-    packagingAccessoriesIncluded: '',
-    materialComposition: '',
-    clothingMeasurementsSizeLabel: '',
-    clothingMeasurementsChestBust: '',
-    clothingMeasurementsWaist: '',
-    clothingMeasurementsHips: '',
-    clothingMeasurementsShoulderWidth: '',
-    clothingMeasurementsSleeveLength: '',
-    clothingMeasurementsInseam: '',
-    clothingMeasurementsTotalLength: '',
-    footwearMeasurementsSize: '',
-    footwearMeasurementsWidth: '',
-    footwearMeasurementsInsoleLength: '',
-    footwearMeasurementsHeelHeight: '',
-    footwearMeasurementsPlatformHeight: '',
-    footwearMeasurementsBootShaftHeight: '',
-    footwearMeasurementsCalfCircumference: '',
-    jewelryMeasurementsRingSize: '',
-    jewelryMeasurementsNecklaceBraceletLength: '',
-    jewelryMeasurementsPendantDimensions: '',
-    jewelryMeasurementsJewelryDimensions: '',
-    furnitureLargeItemMeasurementsHeight: '',
-    furnitureLargeItemMeasurementsWidth: '',
-    furnitureLargeItemMeasurementsDepth: '',
-    furnitureLargeItemMeasurementsLength: '',
-    furnitureLargeItemMeasurementsSeatHeight: '',
-    furnitureLargeItemMeasurementsTabletopDimensions: '',
-    generalMeasurementsWeight: '',
-    generalMeasurementsDiameter: '',
-    generalMeasurementsVolumeCapacity: '',
-    generalMeasurementsOtherSpecificMeasurements: '',
-    conditionRating: '',
-    conditionSignsOfWear: '',
-    conditionDetailedNotes: '',
-    conditionRepairNeeds: '',
-    conditionCleaningRequirements: '',
-    conditionEstimatedRepairCosts: 0,
-    conditionEstimatedCleaningCosts: 0,
-    conditionTimeSpentOnRepairsCleaning: '',
-    financialsPurchasePrice: 0,
-    financialsTotalRepairAndCleaningCosts: 0,
-    financialsEstimatedShippingCosts: 0,
-    financialsPlatformFees: 0,
-    financialsExpectedProfit: 0,
-    financialsProfitMargin: 0,
-    financialsEstimatedMarketValue: 0,
-    financialsAcquisitionCost: 0,
-    marketAnalysisMarketDemand: '',
-    marketAnalysisHistoricalPriceTrends: '',
-    marketAnalysisMarketSaturation: '',
-    marketAnalysisSalesVelocity: '',
-    marketAnalysisSuggestedListingPrice: 0,
-    marketAnalysisMinimumAcceptablePrice: 0,
-    itemCareInstructions: '',
-    keywordsForSeo: '',
-    lotOrBundleInformation: '',
-    customizableFields: '',
-    recommendedSalePlatforms: '',
-    compliancePlatformPolicies: '',
-    complianceAuthenticityMarkers: '',
-    complianceCounterfeitRisk: '',
-    complianceStatus: '',
-    complianceRestrictedItemCheck: '',
-    inventoryDetailsInventoryId: '',
-    inventoryDetailsStorageLocation: '',
-    inventoryDetailsAcquisitionDate: null,
-    inventoryDetailsTargetMarket: '',
-    inventoryDetailsTrendingItems: '',
-    inventoryDetailsCustomerPreferences: '',
-    inventoryDetailsAcquisitionLocation: '',
-    inventoryDetailsSupplierInformation: '',
-    images: [],
-    purchaseDate: null,
-    listingDate: null,
-    sellerNotes: '',
-    contextData: {},
-    purchaseRecommendation: '',
-    detailedBreakdown: '',
-    sampleForSaleListing: '',
-    isDraft: true,
-    messages: [],
-  });
+  // Remove the [item, setItem] useState as it's now passed as props
+  // const [item, setItem] = useState(null);
 
   // State declarations
   const [name, setName] = useState('');
@@ -198,14 +100,20 @@ function NewItemPage({ setItemId }) {
   const messagesContainerRef = useRef(null);
 
   // Use the autosave hook
-  const lastSaved = useAutosave(itemId, setItem);
+  const debouncedAutosave = useAutosave(itemId, setItem, setLastAutoSave);
 
-  // Update lastAutoSave when lastSaved changes
+  // Effect for autosave
   useEffect(() => {
-    if (lastSaved) {
-      setLastAutoSave(lastSaved);
+    if (item && itemId) {
+      const autosaveData = {
+        ...item,
+        images: uploadedImages,
+        messages: messages,
+        contextData: contextData,
+      };
+      debouncedAutosave(autosaveData);
     }
-  }, [lastSaved]);
+  }, [item, itemId, uploadedImages, messages, contextData, debouncedAutosave]);
 
   // ---------------------------------
   // useEffect Hook: Load or Create Item
@@ -218,40 +126,38 @@ function NewItemPage({ setItemId }) {
         return;
       }
 
-      try {
-        const localData = await loadLocalData(itemId);
+      if (!item) {
+        try {
+          const localData = await loadLocalData(itemId);
 
-        if (localData) {
-          setItem(localData);
-          setUploadedImages(
-            Array.isArray(localData.images) ? localData.images : []
-          );
-          setContextData(localData.contextData || {});
-          setMessages(localData.messages || []);
-        } else {
-          const defaultItem = createDefaultItem(itemId);
-          setItem(defaultItem);
-          setUploadedImages([]);
-          setContextData({});
-          setMessages([]);
+          if (localData) {
+            setItem(localData);
+            setUploadedImages(
+              Array.isArray(localData.images) ? localData.images : []
+            );
+            setContextData(localData.contextData || {});
+            setMessages(localData.messages || []);
+          } else {
+            console.error('No local data found for itemId:', itemId);
+            navigate('/');
+            return;
+          }
+        } catch (error) {
+          console.error('Error loading local data:', error);
+          navigate('/');
         }
-      } catch (error) {
-        console.error('Error loading local data:', error);
-        const defaultItem = createDefaultItem(itemId);
-        setItem(defaultItem);
-        setUploadedImages([]);
-        setContextData({});
-        setMessages([]);
+      } else {
+        setUploadedImages(Array.isArray(item.images) ? item.images : []);
+        setContextData(item.contextData || {});
+        setMessages(item.messages || []);
       }
     };
 
     loadData();
-  }, [itemId, navigate]);
+  }, [itemId, item, navigate, setItem]);
 
   // Second useEffect - Log item changes
-  useEffect(() => {
-    console.log('Item state updated:', itemId);
-  }, [itemId]);
+  useEffect(() => {}, [item]);
 
   // Optimize the loadDraft function
   const loadDraft = (draftData) => {
@@ -390,7 +296,7 @@ function NewItemPage({ setItemId }) {
   const handleFileChangeWrapper = (event) => {
     handleFileChange(
       event,
-      itemId, // Use itemId here instead of item.itemId
+      itemId,
       setItem,
       (newImages) => {
         console.log('Setting uploaded images:', newImages);
@@ -756,6 +662,7 @@ function NewItemPage({ setItemId }) {
             handlePurchaseRecommendationChange={
               handlePurchaseRecommendationChange
             }
+            itemId={itemId} // Add this line
           />
         </div>
       </MainContentArea>
@@ -765,6 +672,9 @@ function NewItemPage({ setItemId }) {
 
 NewItemPage.propTypes = {
   setItemId: PropTypes.func.isRequired,
+  itemId: PropTypes.string.isRequired,
+  item: PropTypes.object,
+  setItem: PropTypes.func.isRequired,
 };
 
 export default NewItemPage;
