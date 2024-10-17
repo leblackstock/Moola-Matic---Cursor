@@ -177,6 +177,14 @@ function ViewItemsPage({ currentItemId }) {
     }
   };
 
+  const handleDeletePurchasedItem = async (item) => {
+    console.log('Deleting purchased item:', item);
+    // Implement the logic to delete a purchased item
+    // This might involve calling an API endpoint and updating the state
+    // For now, let's just show an alert
+    alert('Delete purchased item functionality not implemented yet.');
+  };
+
   console.log('Rendering ViewItemsPage with drafts:', drafts);
   console.log('Rendering ViewItemsPage with purchased items:', purchasedItems);
 
@@ -205,6 +213,7 @@ function ViewItemsPage({ currentItemId }) {
       <PurchasedItemGallery
         items={purchasedItems}
         onSelect={(item) => console.log('Selected purchased item:', item)}
+        onDelete={handleDeletePurchasedItem}
       />
     </PageContainer>
   );

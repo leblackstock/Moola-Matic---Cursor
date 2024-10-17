@@ -13,6 +13,7 @@ import purchaseImageRouter from './api/apiPurchaseImage.js';
 import connectDB from './config/database.js';
 import MongoStore from 'connect-mongo';
 import logger from '../src/helpers/logger.js';
+import fsPromises from 'fs/promises';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -182,10 +183,21 @@ function split(thing) {
 
 app._router.stack.forEach(print.bind(null, []));
 
+const ensureUploadsDirectory = async () => {
+  const uploadsPath = path.join(__dirname, 'uploads', 'drafts');
+  try {
+    await fsPromises.mkdir(uploadsPath, { recursive: true });
+    console.log('Uploads directory ensured');
+  } catch (error) {
+    console.error('Error creating uploads directory:', error);
+  }
+};
+
 // Start the Server
 const startServer = async () => {
   try {
     await connectDB();
+    await ensureUploadsDirectory();
     app.listen(BACKEND_PORT, () => {
       logger.info(
         `Backend server is running on http://localhost:${BACKEND_PORT}`
@@ -195,7 +207,7 @@ const startServer = async () => {
       );
     });
   } catch (error) {
-    logger.error('Failed to connect to MongoDB:', error);
+    logger.error('Failed to start server:', error);
     process.exit(1);
   }
 };

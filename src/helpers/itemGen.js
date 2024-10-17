@@ -51,19 +51,19 @@ export const createNewItem = () => {
       throw new Error('An item has already been generated.');
     }
 
-    const ItemId = generateItemId();
-    generatedItemId = ItemId;
+    const itemId = generateItemId();
+    generatedItemId = itemId;
     isItemGenerated = true;
 
-    const newItem = createDefaultItem(ItemId);
+    const newItem = createDefaultItem(itemId);
 
     // Save the new item to localStorage
-    localStorage.setItem(`item_${ItemId}`, JSON.stringify(newItem));
+    localStorage.setItem(`item_${itemId}`, JSON.stringify(newItem));
 
     // Add a small delay to ensure localStorage is updated
     await new Promise((resolve) => setTimeout(resolve, 100));
 
-    return ItemId;
+    return itemId;
   });
 };
 
@@ -120,22 +120,23 @@ export const getNextSequentialNumber = async (itemId) => {
   return withLock(async () => {
     try {
       const response = await axios.get(
-        `${BACKEND_URL}/api/draft-images/next-sequence/${itemId}`
+        `${BACKEND_URL}/api/items/draft-images/${itemId}`
       );
       return response.data.nextSequentialNumber;
     } catch (error) {
       console.error('Error getting next sequential number:', error);
-      return 1; // Default to 1 if there's an error
+      // Return a fallback value or throw an error as appropriate for your use case
+      return 1; // Fallback to starting from 1 if we can't get the next number
     }
   });
 };
 
-export const createDefaultItem = (ItemId) => {
-  if (!ItemId) {
+export const createDefaultItem = (itemId) => {
+  if (!itemId) {
     throw new Error('ItemId is required when creating a new item');
   }
   return {
-    itemId: ItemId,
+    itemId: itemId,
     name: '',
     brand: '',
     make: '',
@@ -250,4 +251,17 @@ const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
 export const getImageUrl = (itemId, filename) => {
   if (!itemId || !filename) return null;
   return `${backendUrl}/uploads/drafts/${itemId}/${filename}`;
+};
+
+export const checkFileExists = async (itemId, filename) => {
+  try {
+    const response = await fetch(
+      `${backendUrl}/api/items/draft-images/check/${itemId}/${filename}`
+    );
+    const data = await response.json();
+    return data.exists;
+  } catch (error) {
+    console.error('Error checking file existence:', error);
+    return false;
+  }
 };

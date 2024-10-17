@@ -2,43 +2,49 @@
 
 import AsyncLock from 'async-lock';
 import { DraftItem } from '../models/draftItem.js';
-import { v4 as uuidv4 } from 'uuid';
+import winston from 'winston';
 
 const lock = new AsyncLock();
 
+// Set up Winston logger
+const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+  ),
+  transports: [
+    new winston.transports.Console(),
+    new winston.transports.File({ filename: 'logs/itemHelpers.log' }),
+  ],
+});
+
 // Get Next Sequential Number
 export const getNextSequentialNumber = async (itemId) => {
-  return lock.acquire(itemId, async () => {
-    try {
-      const draft = await DraftItem.findOne({ itemId });
-      if (!draft || !draft.images || draft.images.length === 0) {
-        return 1;
-      }
-
-      // Extract sequential numbers from existing filenames
-      const sequentialNumbers = draft.images.map((img) => {
-        const match = img.filename.match(/Draft-\w{6}-(\d{2})\./);
-        if (match && match[1]) {
-          return parseInt(match[1], 10);
-        }
-        return 0;
-      });
-
-      // Create a Set to store unique numbers
-      const uniqueNumbers = new Set(sequentialNumbers);
-
-      // Find the first available number
-      let nextNumber = 1;
-      while (uniqueNumbers.has(nextNumber)) {
-        nextNumber++;
-      }
-
-      return nextNumber;
-    } catch (error) {
-      console.error('Error in getNextSequentialNumber:', error);
-      throw error;
+  logger.info(`Getting next sequential number for itemId: ${itemId}`);
+  try {
+    const draft = await DraftItem.findOne({ itemId });
+    if (!draft) {
+      logger.info(`No draft found for itemId: ${itemId}, returning 1`);
+      return 1;
     }
-  });
+
+    const sequentialNumbers = draft.images.map((img) => {
+      const match = img.filename.match(/Draft-\w{6}-(\d{2})\./);
+      return match ? parseInt(match[1], 10) : 0;
+    });
+
+    const maxNumber = Math.max(...sequentialNumbers, 0);
+    const nextNumber = maxNumber + 1;
+    logger.info(`Next sequential number for itemId ${itemId}: ${nextNumber}`);
+    return nextNumber;
+  } catch (error) {
+    logger.error(
+      `Error in getNextSequentialNumber for itemId ${itemId}:`,
+      error
+    );
+    throw error;
+  }
 };
 
 // Generate Draft Filename
@@ -47,14 +53,37 @@ export const generateDraftFilename = (
   sequentialNumber = 1,
   originalFilename = 'image'
 ) => {
+  logger.info(
+    `Generating draft filename for itemId: ${itemId}, sequentialNumber: ${sequentialNumber}`
+  );
   const fileExtension = originalFilename.includes('.')
     ? originalFilename.split('.').pop().toLowerCase()
     : 'jpg';
   const paddedSequentialNumber = String(sequentialNumber).padStart(2, '0');
-  return `Draft-${itemId.slice(-6)}-${paddedSequentialNumber}.${fileExtension}`;
+  const filename = `Draft-${itemId.slice(-6)}-${paddedSequentialNumber}.${fileExtension}`;
+  logger.info(`Generated filename: ${filename}`);
+  return filename;
 };
 
-// Generate Item ID (UUID)
-export const generateItemId = () => {
-  return uuidv4();
+// New function to handle file upload and sequential number generation
+export const handleFileUploadAndSequentialNumber = async (
+  itemId,
+  originalFilename
+) => {
+  logger.info(
+    `Handling file upload and sequential number for itemId: ${itemId}`
+  );
+  return await lock.acquire(itemId, async () => {
+    const sequentialNumber = await getNextSequentialNumber(itemId);
+    const filename = generateDraftFilename(
+      itemId,
+      sequentialNumber,
+      originalFilename
+    );
+
+    logger.info(
+      `File upload handled for itemId: ${itemId}, sequentialNumber: ${sequentialNumber}, filename: ${filename}`
+    );
+    return { sequentialNumber, filename };
+  });
 };

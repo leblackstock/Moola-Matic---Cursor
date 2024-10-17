@@ -66,12 +66,12 @@ const loadItemData = (itemId) => {
 };
 
 function NewItemPage({ setItemId }) {
-  const { ItemId } = useParams();
+  const { itemId } = useParams();
   const navigate = useNavigate();
 
   // Update the item state to match the DraftItem schema
-  const [item, setItem] = useState({
-    itemId: ItemId,
+  const [itemId, setItem] = useState({
+    itemId: itemId,
     name: '',
     description: '',
     brand: '',
@@ -198,30 +198,28 @@ function NewItemPage({ setItemId }) {
   const messagesContainerRef = useRef(null);
 
   // Use the autosave hook
-  const debouncedAutoSave = useAutosave(
-    item,
-    uploadedImages,
-    messages,
-    backendPort,
-    setItem,
-    setUploadedImages,
-    setHasUnsavedChanges,
-    setLastAutoSave
-  );
+  const lastSaved = useAutosave(itemId, setItem);
+
+  // Update lastAutoSave when lastSaved changes
+  useEffect(() => {
+    if (lastSaved) {
+      setLastAutoSave(lastSaved);
+    }
+  }, [lastSaved]);
 
   // ---------------------------------
   // useEffect Hook: Load or Create Item
   // ---------------------------------
   useEffect(() => {
     const loadData = async () => {
-      if (!ItemId) {
-        console.error('No ItemId available');
+      if (!itemId) {
+        console.error('No itemId available');
         navigate('/');
         return;
       }
 
       try {
-        const localData = await loadLocalData(ItemId);
+        const localData = await loadLocalData(itemId);
 
         if (localData) {
           setItem(localData);
@@ -231,7 +229,7 @@ function NewItemPage({ setItemId }) {
           setContextData(localData.contextData || {});
           setMessages(localData.messages || []);
         } else {
-          const defaultItem = createDefaultItem(ItemId);
+          const defaultItem = createDefaultItem(itemId);
           setItem(defaultItem);
           setUploadedImages([]);
           setContextData({});
@@ -239,7 +237,7 @@ function NewItemPage({ setItemId }) {
         }
       } catch (error) {
         console.error('Error loading local data:', error);
-        const defaultItem = createDefaultItem(ItemId);
+        const defaultItem = createDefaultItem(itemId);
         setItem(defaultItem);
         setUploadedImages([]);
         setContextData({});
@@ -248,12 +246,12 @@ function NewItemPage({ setItemId }) {
     };
 
     loadData();
-  }, [ItemId, navigate]);
+  }, [itemId, navigate]);
 
   // Second useEffect - Log item changes
   useEffect(() => {
-    console.log('Item state updated:', item);
-  }, [item]);
+    console.log('Item state updated:', itemId);
+  }, [itemId]);
 
   // Optimize the loadDraft function
   const loadDraft = (draftData) => {
@@ -274,21 +272,21 @@ function NewItemPage({ setItemId }) {
   // useEffect Hook: Save to localStorage
   // ----------------------------
   useEffect(() => {
-    if (item && ItemId) {
-      handleLocalSave(item, contextData, messages, ItemId);
+    if (item && itemId) {
+      handleLocalSave(item, contextData, messages, itemId);
     }
-  }, [item, contextData, messages, ItemId]);
+  }, [item, contextData, messages, itemId]);
 
   // ----------------------------
   // useEffect Hook: Clear localStorage on unmount
   // ----------------------------
   useEffect(() => {
     return () => {
-      if (item && ItemId) {
-        handleLocalSave(item, contextData, messages, ItemId);
+      if (item && itemId) {
+        handleLocalSave(item, contextData, messages, itemId);
       }
     };
-  }, [item, contextData, messages, ItemId]);
+  }, [item, contextData, messages, itemId]);
 
   // ----------------------------
   // useEffect Hook: Set Selected Image if Needed
@@ -392,7 +390,7 @@ function NewItemPage({ setItemId }) {
   const handleFileChangeWrapper = (event) => {
     handleFileChange(
       event,
-      ItemId, // Use ItemId here instead of item.itemId
+      itemId, // Use itemId here instead of item.itemId
       setItem,
       (newImages) => {
         console.log('Setting uploaded images:', newImages);
@@ -577,7 +575,7 @@ function NewItemPage({ setItemId }) {
         const { newImage } = await handleFileUpload(
           file,
           backendPort,
-          ItemId, // Use ItemId here instead of item
+          itemId, // Use itemId here instead of item
           setUploadedImages
         );
 
@@ -599,8 +597,8 @@ function NewItemPage({ setItemId }) {
   }, [uploadedImages]);
 
   const handleSaveDraft = async () => {
-    if (!item || !ItemId) {
-      console.error('No item to save or missing ItemId');
+    if (!item || !itemId) {
+      console.error('No item to save or missing itemId');
       setNotificationMessage('Error: Unable to save draft');
       setShowNotification(true);
       setTimeout(() => setShowNotification(false), 3000);
@@ -643,7 +641,7 @@ function NewItemPage({ setItemId }) {
     return <div>Loading...</div>;
   }
 
-  //console.log('Current ItemId:', ItemId);
+  //console.log('Current itemId:', itemId);
 
   return (
     <PageContainer>
@@ -671,7 +669,7 @@ function NewItemPage({ setItemId }) {
             updateItem={updateItem}
             messages={messages}
             setMessages={setMessages}
-            ItemId={ItemId}
+            itemId={itemId}
             onFileChange={handleFileChangeWrapper}
             isLoading={isLoading}
             onStartLoading={handleStartLoading}
@@ -709,7 +707,7 @@ function NewItemPage({ setItemId }) {
             onSelect={handleImageSelect}
             selectedImage={selectedImage}
             onDelete={handleDeleteImageWrapper}
-            itemId={ItemId}
+            itemId={itemId}
           />
 
           {/* Image Selection Modal */}
@@ -736,7 +734,7 @@ function NewItemPage({ setItemId }) {
             multiple
             accept="image/*"
             onChange={(e) => {
-              handleFileChange(setUploadedImages, ItemId)(e);
+              handleFileChange(setUploadedImages, itemId)(e);
             }}
           />
 

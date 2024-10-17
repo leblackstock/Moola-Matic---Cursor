@@ -34,14 +34,11 @@ import {
 } from './components/compStyles.js';
 
 // Add this import near the top of the file
-import {
-  generateItemId,
-  createDefaultItem,
-  resetItemGeneration,
-  createNewItem,
-} from './helpers/itemGen.js';
+import { resetItemGeneration, createNewItem } from './helpers/itemGen.js';
 
-import { getCurrentItemId } from './helpers/itemGen.js';
+// At the top of the file, add this import
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 /**
  * Sidebar Component
@@ -312,49 +309,62 @@ function App() {
   };
 
   return (
-    <ErrorBoundary>
-      <PageContainer>
-        <Sidebar
-          handleLogout={handleLogout}
-          handleChangeItem={handleChangeItem}
-        />
-        <MainContent>
-          <Routes>
-            <Route
-              path="/"
-              element={<LandingPage setItemId={handleSetItemId} />}
-            />
-            <Route
-              path="/new-item"
-              element={
-                currentItemId ? (
+    <div className="App">
+      <ErrorBoundary>
+        <PageContainer>
+          <Sidebar
+            handleLogout={handleLogout}
+            handleChangeItem={handleChangeItem}
+          />
+          <MainContent>
+            <Routes>
+              <Route
+                path="/"
+                element={<LandingPage setItemId={handleSetItemId} />}
+              />
+              <Route
+                path="/new-item"
+                element={
+                  currentItemId ? (
+                    <NewItemPage
+                      itemId={currentItemId}
+                      setItemId={handleSetItemId}
+                    />
+                  ) : (
+                    <Navigate to="/" replace />
+                  )
+                }
+              />
+              <Route
+                path="/new-item/:itemId"
+                element={
                   <NewItemPage
-                    ItemId={currentItemId}
+                    itemId={currentItemId || ''}
                     setItemId={handleSetItemId}
                   />
-                ) : (
-                  <Navigate to="/" replace />
-                )
-              }
-            />
-            <Route
-              path="/new-item/:ItemId"
-              element={
-                <NewItemPage
-                  ItemId={currentItemId || ''}
-                  setItemId={handleSetItemId}
-                />
-              }
-            />
-            <Route
-              path="/view-items"
-              element={<ViewItemsPage currentItemId={currentItemId || ''} />}
-            />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </MainContent>
-      </PageContainer>
-    </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/view-items"
+                element={<ViewItemsPage currentItemId={currentItemId || ''} />}
+              />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </MainContent>
+        </PageContainer>
+      </ErrorBoundary>
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+      />
+    </div>
   );
 }
 

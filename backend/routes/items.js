@@ -1,23 +1,64 @@
 import express from 'express';
 import multer from 'multer';
 import { DraftItem } from '../models/draftItem.js';
-import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { v4 as uuidv4 } from 'uuid';
-import {
-  generateDraftFilename,
-  getNextSequentialNumber,
-} from '../helpers/itemHelpers.js';
+import { promises as fs } from 'fs';
+import { handleFileUploadAndSequentialNumber } from '../helpers/itemHelpers.js';
+import winston from 'winston';
+import { rateLimitedRequest } from '../utils/rateLimiter.js';
+import { pipeline } from 'stream/promises';
+import { createReadStream, createWriteStream } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const router = express.Router();
 
-// Configure multer for memory storage
-const storage = multer.memoryStorage();
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const itemId = req.body.itemId || 'temp';
+    const uploadPath = path.join(__dirname, '..', 'uploads', 'drafts', itemId);
+    fs.mkdir(uploadPath, { recursive: true }, (err) => {
+      if (err) {
+        console.error(`Error creating directory: ${uploadPath}`, err);
+        cb(err);
+      } else {
+        console.log(`Created directory: ${uploadPath}`);
+        cb(null, uploadPath);
+      }
+    });
+  },
+  filename: (req, file, cb) => {
+    const itemId = req.body.itemId || 'temp';
+    const sequentialNumber = req.body.sequentialNumber || '01';
+    const fileExtension = path.extname(file.originalname);
+    const newFilename = `Draft-${itemId.slice(-6)}-${sequentialNumber}${fileExtension}`;
+    cb(null, newFilename);
+  },
+});
+
 const upload = multer({ storage: storage });
+
+// Set up Winston logger
+const logger = winston.createLogger({
+  level: 'debug', // Changed to 'debug' for more verbose logging
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+  ),
+  transports: [
+    new winston.transports.Console(),
+    new winston.transports.File({ filename: 'logs/items.log' }),
+  ],
+});
+
+// Add this new route near the top of your file, after the imports and router initialization
+router.get('/draft-item-schema', (req, res) => {
+  const schemaFields = Object.keys(DraftItem.schema.paths);
+  res.json({ fields: schemaFields });
+});
 
 // GET /api/items/:id
 router.get('/:id', async (req, res) => {
@@ -41,82 +82,109 @@ router.post(
   '/draft-images/upload',
   upload.single('image'),
   async (req, res) => {
+    logger.info('Received request to upload draft image', {
+      method: 'POST',
+      path: '/api/items/draft-images/upload',
+    });
+
     try {
-      if (!req.file) {
-        console.log('No file uploaded');
-        return res.status(400).json({ error: 'No file uploaded' });
-      }
+      await rateLimitedRequest(async () => {
+        const { itemId } = req.body;
+        const file = req.file;
 
-      const { itemId } = req.body;
-
-      if (!itemId) {
-        console.log('Missing itemId');
-        return res.status(400).json({ error: 'itemId is required' });
-      }
-
-      const uploadDir = path.join(__dirname, '..', 'uploads', 'drafts', itemId);
-
-      // Create the upload directory if it doesn't exist
-      await fs.mkdir(uploadDir, { recursive: true });
-
-      // Determine filename with uniqueness check
-      let sequentialNumber = await getNextSequentialNumber(itemId);
-      let newFilename = generateDraftFilename(
-        itemId,
-        sequentialNumber,
-        req.file.originalname
-      );
-      let filePath = path.join(uploadDir, newFilename);
-
-      // Check if file already exists and increment if necessary
-      while (
-        await fs
-          .access(filePath)
-          .then(() => true)
-          .catch(() => false)
-      ) {
-        sequentialNumber++;
-        newFilename = generateDraftFilename(
+        logger.debug('Request details', {
           itemId,
-          sequentialNumber,
-          req.file.originalname
+          file: file
+            ? {
+                originalname: file.originalname,
+                mimetype: file.mimetype,
+                size: file.size,
+              }
+            : null,
+        });
+
+        if (!itemId || !file) {
+          logger.warn('Missing itemId or file in request', {
+            itemId,
+            fileExists: !!file,
+          });
+          return res.status(400).json({ error: 'Missing itemId or file' });
+        }
+
+        logger.info(`Processing file upload for itemId: ${itemId}`);
+
+        const { filename } = await handleFileUploadAndSequentialNumber(
+          itemId,
+          file.originalname
         );
-        filePath = path.join(uploadDir, newFilename);
-      }
+        logger.info(`Generated filename for upload`, { itemId, filename });
 
-      // Write the file to disk
-      await fs.writeFile(filePath, req.file.buffer);
+        const uploadDir = path.join(
+          __dirname,
+          '..',
+          'uploads',
+          'drafts',
+          itemId
+        );
+        const filePath = path.join(uploadDir, filename);
 
-      const url = `/uploads/drafts/${itemId}/${newFilename}`;
+        logger.debug('File paths', { uploadDir, filePath });
 
-      // Update the DraftItem document with the new image
-      const updatedDraft = await DraftItem.findOneAndUpdate(
-        { itemId: itemId },
-        {
-          $push: {
-            images: {
-              id: uuidv4(),
-              url: url,
-              filename: newFilename,
-              isNew: true,
-            },
-          },
-        },
-        { new: true, upsert: true }
-      );
+        await fs.mkdir(uploadDir, { recursive: true });
 
-      console.log('File uploaded and draft updated successfully:', newFilename);
-      res.json({
-        url: url,
-        filename: newFilename,
-        message: 'File uploaded and draft updated successfully',
-        updatedDraft: updatedDraft,
+        // Use streams for file operations
+        try {
+          await pipeline(
+            createReadStream(file.path),
+            createWriteStream(filePath)
+          );
+        } catch (error) {
+          // Fallback for older Node.js versions or if pipeline fails
+          await new Promise((resolve, reject) => {
+            const readStream = createReadStream(file.path);
+            const writeStream = createWriteStream(filePath);
+
+            readStream.on('error', reject);
+            writeStream.on('error', reject);
+            writeStream.on('finish', resolve);
+
+            readStream.pipe(writeStream);
+          });
+        }
+
+        await fs.unlink(file.path);
+
+        logger.debug('Updating DraftItem in database', { itemId, filename });
+        const draftItem = await DraftItem.findOneAndUpdate(
+          { itemId },
+          { $push: { images: { filename } } },
+          { new: true, upsert: true }
+        );
+        logger.info(`Updated DraftItem for itemId: ${itemId}`, {
+          draftItemId: draftItem._id,
+          imagesCount: draftItem.images.length,
+        });
+
+        const responseData = {
+          filename,
+          message: 'File uploaded successfully',
+          url: `/uploads/drafts/${itemId}/${filename}`,
+          id: draftItem.images[draftItem.images.length - 1]._id,
+        };
+        logger.info('File upload successful', {
+          itemId,
+          filename,
+          url: responseData.url,
+          imageId: responseData.id,
+        });
+        res.json(responseData);
       });
     } catch (error) {
-      console.error('Error uploading file:', error);
-      res
-        .status(500)
-        .json({ error: 'Failed to upload file', details: error.message });
+      logger.error('Error in file upload route:', {
+        error: error.message,
+        stack: error.stack,
+      });
+      res.status(500).json({ error: 'Failed to upload file' });
     }
   }
 );
@@ -168,41 +236,22 @@ router.delete('/draft-images/delete/:itemId/:filename', async (req, res) => {
 
 // GET /api/items/draft-images/:itemId/:filename
 router.get('/draft-images/:itemId/:filename', async (req, res) => {
+  const { itemId, filename } = req.params;
+  const imagePath = path.join(
+    __dirname,
+    '..',
+    'uploads',
+    'drafts',
+    itemId,
+    filename
+  );
+
   try {
-    const { itemId, filename } = req.params;
-    const imagePath = path.join(
-      __dirname,
-      '..',
-      'uploads',
-      'drafts',
-      itemId,
-      filename
-    );
-
-    // Check if the file exists
-    await fs.access(imagePath);
-
-    // Determine the content type based on file extension
-    const ext = path.extname(filename).toLowerCase();
-    const contentType =
-      {
-        '.png': 'image/png',
-        '.jpg': 'image/jpeg',
-        '.jpeg': 'image/jpeg',
-        '.gif': 'image/gif',
-      }[ext] || 'application/octet-stream';
-
-    // Set the content type
-    res.contentType(contentType);
-
-    // Stream the file to the response
-    const fileStream = fs.createReadStream(imagePath);
-    fileStream.pipe(res);
-
-    console.log(`Successfully served image: ${filename} for item: ${itemId}`);
+    await fs.promises.access(imagePath);
+    res.sendFile(imagePath);
   } catch (error) {
-    console.error('Error serving image:', error);
-    res.status(500).send('Error serving image');
+    console.error(`Error serving image: ${error}`);
+    res.status(404).send('Image not found');
   }
 });
 
@@ -228,6 +277,39 @@ router.get('/drafts', async (req, res) => {
     res.status(500).json({ error: 'Error fetching drafts' });
   }
 });
+
+// Helper function for recursive deletion
+async function recursiveDelete(directoryPath) {
+  try {
+    // Check if the directory exists
+    try {
+      await fs.access(directoryPath);
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        console.log(`Directory does not exist: ${directoryPath}`);
+        return; // Exit the function if the directory doesn't exist
+      }
+      throw error; // Re-throw other errors
+    }
+
+    const entries = await fs.readdir(directoryPath, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const fullPath = path.join(directoryPath, entry.name);
+      if (entry.isDirectory()) {
+        await recursiveDelete(fullPath);
+      } else {
+        await fs.unlink(fullPath);
+      }
+    }
+
+    await fs.rmdir(directoryPath);
+    console.log(`Successfully deleted directory: ${directoryPath}`);
+  } catch (error) {
+    console.error(`Error deleting directory ${directoryPath}:`, error);
+    throw error;
+  }
+}
 
 // DELETE /api/items/drafts/:id
 router.delete('/drafts/:id', async (req, res) => {
@@ -259,15 +341,7 @@ router.delete('/drafts/:id', async (req, res) => {
         'drafts',
         result.itemId
       );
-      if (
-        await fs
-          .access(imageFolderPath)
-          .then(() => true)
-          .catch(() => false)
-      ) {
-        await fs.rm(imageFolderPath, { recursive: true, force: true });
-        console.log(`Deleted image folder: ${imageFolderPath}`);
-      }
+      await recursiveDelete(imageFolderPath);
     }
 
     console.log('Draft deleted successfully:', result);
@@ -284,32 +358,30 @@ router.delete('/drafts/:id', async (req, res) => {
 router.delete('/drafts', async (req, res) => {
   try {
     const deleteImages = req.query.deleteImages === 'true';
+    const drafts = await DraftItem.find({ isDraft: true });
 
-    const drafts = await DraftItem.find({});
-    await DraftItem.deleteMany({});
-
-    if (deleteImages) {
-      const draftsFolderPath = path.join(__dirname, '..', 'uploads', 'drafts');
-      for (const draft of drafts) {
-        const imageFolderPath = path.join(draftsFolderPath, draft.itemId);
-        if (
-          await fs
-            .access(imageFolderPath)
-            .then(() => true)
-            .catch(() => false)
-        ) {
-          await fs.rm(imageFolderPath, { recursive: true, force: true });
-          console.log(`Deleted image folder: ${imageFolderPath}`);
-        }
+    for (const draft of drafts) {
+      if (deleteImages && draft.itemId) {
+        const imageFolderPath = path.join(
+          __dirname,
+          '..',
+          'uploads',
+          'drafts',
+          draft.itemId
+        );
+        await recursiveDelete(imageFolderPath);
       }
     }
 
-    res.json({ message: 'All drafts deleted successfully' });
+    const result = await DraftItem.deleteMany({ isDraft: true });
+
+    console.log(`Deleted ${result.deletedCount} drafts`);
+    res.json({ success: true, deletedCount: result.deletedCount });
   } catch (error) {
     console.error('Error deleting all drafts:', error);
     res
       .status(500)
-      .json({ error: 'Failed to delete all drafts', details: error.message });
+      .json({ success: false, error: error.message, stack: error.stack });
   }
 });
 
@@ -417,7 +489,7 @@ router.post('/save-draft', async (req, res) => {
       }
     );
 
-    console.log('Draft saved:', draft);
+    console.log('Draft saved:');
     res.status(200).json({ item: draft });
   } catch (error) {
     console.error('Error saving draft:', error);
@@ -516,6 +588,58 @@ router.post('/autosave-draft', async (req, res) => {
     res
       .status(500)
       .json({ error: 'Failed to autosave draft', details: error.message });
+  }
+});
+
+router.get('/draft-images/:itemId', async (req, res) => {
+  try {
+    const { itemId } = req.params;
+    console.log(
+      `Received request for next sequence number for itemId: ${itemId}`
+    );
+
+    const draftItem = await DraftItem.findOne({ itemId });
+    if (!draftItem) {
+      console.log(`No draft item found for itemId: ${itemId}`);
+      return res.status(404).json({ error: 'Draft item not found' });
+    }
+
+    const existingImages = draftItem.images || [];
+    const nextSequence = existingImages.length + 1;
+
+    console.log(`Next sequence number: ${nextSequence}`);
+    res.json({ nextSequentialNumber: nextSequence });
+  } catch (error) {
+    console.error('Error getting next sequence number:', error);
+    res.status(500).json({
+      error: 'Failed to get next sequence number',
+      details: error.message,
+      stack: error.stack,
+    });
+  }
+});
+
+router.get('/draft-images/check/:itemId/:filename', async (req, res) => {
+  try {
+    const { itemId, filename } = req.params;
+    const filePath = path.join(
+      __dirname,
+      '..',
+      'uploads',
+      'drafts',
+      itemId,
+      filename
+    );
+
+    await fs.promises.access(filePath, fs.constants.F_OK);
+    res.json({ exists: true });
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      res.json({ exists: false });
+    } else {
+      console.error('Error checking file existence:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
   }
 });
 
