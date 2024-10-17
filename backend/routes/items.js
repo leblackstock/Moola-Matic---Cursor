@@ -54,6 +54,10 @@ const logger = winston.createLogger({
   ],
 });
 
+// Add these variables at the top of your file, after the imports
+let lastAutosaveLog = Date.now();
+const AUTOSAVE_LOG_INTERVAL = 60000; // 1 minute in milliseconds
+
 // Add this new route near the top of your file, after the imports and router initialization
 router.get('/draft-item-schema', (req, res) => {
   const schemaFields = Object.keys(DraftItem.schema.paths);
@@ -515,7 +519,14 @@ router.post('/autosave-draft', async (req, res) => {
         .json({ error: 'draftData and itemId are required' });
     }
 
-    logger.info(`Autosaving draft for itemId: ${itemId}`);
+    // Log autosave requests only once per minute
+    const now = Date.now();
+    if (now - lastAutosaveLog > AUTOSAVE_LOG_INTERVAL) {
+      logger.info(`Autosaving draft for itemId: ${itemId}`);
+      lastAutosaveLog = now;
+    }
+
+    //logger.info(`Autosaving draft for itemId: ${itemId}`);
 
     // Handle the purchaseRecommendation field
     if (draftData.purchaseRecommendation !== undefined) {
@@ -590,7 +601,11 @@ router.post('/autosave-draft', async (req, res) => {
       }
     );
 
-    logger.info(`Draft autosaved successfully for itemId: ${itemId}`);
+    // Log success only once per minute
+    if (now - lastAutosaveLog > AUTOSAVE_LOG_INTERVAL) {
+      logger.info(`Draft autosaved successfully for itemId: ${itemId}`);
+      lastAutosaveLog = now;
+    }
     res.status(200).json({ item: draft });
   } catch (error) {
     logger.error('Error autosaving draft:', {

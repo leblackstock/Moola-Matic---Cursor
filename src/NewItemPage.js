@@ -64,11 +64,12 @@ const loadItemData = (itemId) => {
   return loadLocalData(itemId);
 };
 
-function NewItemPage({ itemId, item, setItem }) {
+function NewItemPage({ setItem: setParentItem }) {
+  const { itemId } = useParams();
   const navigate = useNavigate();
 
-  // Remove the [item, setItem] useState as it's now passed as props
-  // const [item, setItem] = useState(null);
+  // Add a state variable for item
+  const [item, setItem] = useState(null);
 
   // State declarations
   const [name, setName] = useState('');
@@ -121,40 +122,42 @@ function NewItemPage({ itemId, item, setItem }) {
   useEffect(() => {
     const loadData = async () => {
       if (!itemId) {
-        console.error('No itemId available');
+        console.error('No itemId available in URL');
         navigate('/');
         return;
       }
 
-      if (!item) {
-        try {
-          const localData = await loadLocalData(itemId);
+      try {
+        const localData = await loadLocalData(itemId);
 
-          if (localData) {
-            setItem(localData);
-            setUploadedImages(
-              Array.isArray(localData.images) ? localData.images : []
-            );
-            setContextData(localData.contextData || {});
-            setMessages(localData.messages || []);
-          } else {
-            console.error('No local data found for itemId:', itemId);
-            navigate('/');
-            return;
-          }
-        } catch (error) {
-          console.error('Error loading local data:', error);
+        if (localData) {
+          setItem(localData);
+          setParentItem(localData);
+          setUploadedImages(
+            Array.isArray(localData.images) ? localData.images : []
+          );
+          setContextData(localData.contextData || {});
+          setMessages(localData.messages || []);
+        } else {
+          console.error('No local data found for itemId:', itemId);
           navigate('/');
+          return;
         }
-      } else {
-        setUploadedImages(Array.isArray(item.images) ? item.images : []);
-        setContextData(item.contextData || {});
-        setMessages(item.messages || []);
+      } catch (error) {
+        console.error('Error loading local data:', error);
+        navigate('/');
       }
     };
 
     loadData();
-  }, [itemId, item, navigate, setItem]);
+  }, [itemId, navigate, setParentItem]);
+
+  // Update item in parent component when local item changes
+  useEffect(() => {
+    if (item) {
+      setParentItem(item);
+    }
+  }, [item, setParentItem]);
 
   // Second useEffect - Log item changes
   useEffect(() => {}, [item]);
@@ -543,6 +546,7 @@ function NewItemPage({ itemId, item, setItem }) {
     );
   };
 
+  // Render a loading state if item is not yet loaded
   if (!item) {
     return <div>Loading...</div>;
   }
@@ -671,9 +675,6 @@ function NewItemPage({ itemId, item, setItem }) {
 }
 
 NewItemPage.propTypes = {
-  setItemId: PropTypes.func.isRequired,
-  itemId: PropTypes.string.isRequired,
-  item: PropTypes.object,
   setItem: PropTypes.func.isRequired,
 };
 
