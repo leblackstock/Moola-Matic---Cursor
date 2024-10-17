@@ -100,8 +100,13 @@ function NewItemPage({ setItem: setParentItem }) {
   const cameraInputRef = useRef(null);
   const messagesContainerRef = useRef(null);
 
-  // Use the autosave hook
-  const debouncedAutosave = useAutosave(itemId, setItem, setLastAutoSave);
+  // Use the autosave hook with a custom interval (e.g., 5 minutes)
+  const updateAutosaveData = useAutosave(
+    itemId,
+    setItem,
+    setLastAutoSave,
+    300000
+  );
 
   // Effect for autosave
   useEffect(() => {
@@ -112,9 +117,9 @@ function NewItemPage({ setItem: setParentItem }) {
         messages: messages,
         contextData: contextData,
       };
-      debouncedAutosave(autosaveData);
+      updateAutosaveData(autosaveData);
     }
-  }, [item, itemId, uploadedImages, messages, contextData, debouncedAutosave]);
+  }, [item, itemId, uploadedImages, messages, contextData, updateAutosaveData]);
 
   // ---------------------------------
   // useEffect Hook: Load or Create Item

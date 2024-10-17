@@ -10,14 +10,9 @@ const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 console.log('API_BASE_URL:', API_BASE_URL);
 
 // Function to handle file upload
-const handleFileUpload = async ({ file, itemId }) => {
-  if (!itemId) {
-    console.error('ItemId is missing');
-    return;
-  }
-
+const handleFileUpload = async (file, itemId) => {
   const formData = new FormData();
-  formData.append('file', file);
+  formData.append('image', file);
   formData.append('itemId', itemId);
 
   try {
@@ -28,13 +23,27 @@ const handleFileUpload = async ({ file, itemId }) => {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        timeout: 30000, // Set a 30-second timeout
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total
+          );
+          console.log(`Upload progress: ${percentCompleted}%`);
+        },
       }
     );
-    console.log('File uploaded successfully:', response.data);
-    return response.data;
+
+    if (response.status === 200) {
+      console.log('File uploaded successfully:', response.data);
+      return response.data;
+    } else {
+      throw new Error(`Unexpected response status: ${response.status}`);
+    }
   } catch (error) {
     console.error('Error uploading file:', error);
-    console.error('Error response:', error.response?.data);
+    if (error.response) {
+      console.error('Error response:', error.response.data);
+    }
     throw error;
   }
 };
@@ -72,12 +81,11 @@ export const handleFileChange = (setUploadedImages, itemId) => async (e) => {
 
   try {
     console.log('Starting file upload process');
-    uploadQueue(files, itemId);
-    const uploadedImages = await Promise.all(uploadPromises);
-    console.log('All files uploaded:', uploadedImages);
-
+    const uploadResults = await uploadQueue(files, itemId);
+    console.log('File upload process completed', uploadResults);
+    // Handle successful uploads (e.g., update UI, state, etc.)
     setUploadedImages((prevImages) => {
-      const newImages = uploadedImages.map((img) => ({
+      const newImages = uploadResults.map((img) => ({
         id: img.id || uuidv4(),
         url: img.url,
         filename: img.filename,
@@ -201,18 +209,16 @@ export const handleImageDelete = async (image, itemId, setUploadedImages) => {
 // ... rest of the component ...
 
 const uploadQueue = async (files, itemId) => {
-  if (!itemId) {
-    console.error('ItemId is missing in uploadQueue');
-    return;
-  }
-
+  const results = [];
   for (const file of files) {
     try {
-      await handleFileUpload({ file, itemId });
+      const result = await handleFileUpload(file, itemId);
+      results.push(result);
     } catch (error) {
       console.error(`Error uploading file ${file.name}:`, error);
     }
   }
+  return results;
 };
 
 export const FileUpload = ({ onFileChange, itemId }) => {

@@ -143,17 +143,8 @@ router.post(
             createWriteStream(filePath)
           );
         } catch (error) {
-          // Fallback for older Node.js versions or if pipeline fails
-          await new Promise((resolve, reject) => {
-            const readStream = createReadStream(file.path);
-            const writeStream = createWriteStream(filePath);
-
-            readStream.on('error', reject);
-            writeStream.on('error', reject);
-            writeStream.on('finish', resolve);
-
-            readStream.pipe(writeStream);
-          });
+          logger.error('Error during file pipeline:', error);
+          throw new Error('Failed to process file upload');
         }
 
         await fs.unlink(file.path);
@@ -188,7 +179,9 @@ router.post(
         error: error.message,
         stack: error.stack,
       });
-      res.status(500).json({ error: 'Failed to upload file' });
+      res
+        .status(500)
+        .json({ error: 'Failed to upload file', details: error.message });
     }
   }
 );

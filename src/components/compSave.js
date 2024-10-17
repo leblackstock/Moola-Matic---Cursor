@@ -1,7 +1,7 @@
 // frontend\src\components\compSave.js
 
 import axios from 'axios';
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useState, useRef } from 'react';
 import debounce from 'lodash.debounce';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -630,46 +630,60 @@ export const updateItem = async (
   }
 };
 
-export const useAutosave = (itemId, setItem, setLastSaved, delay = 2000) => {
-  const autosaveDraft = async (data) => {
-    if (!data || !itemId) {
-      console.warn('Cannot autosave: invalid item data or itemId');
-      return;
-    }
+export const useAutosave = (
+  itemId,
+  setItem,
+  setLastSaved,
+  interval = 60000
+) => {
+  const savedDataRef = useRef(null);
 
-    try {
-      const requestBody = {
-        draftData: data,
-        contextData: data.contextData,
-        messages: data.messages,
-        itemId: itemId,
-      };
-
-      const response = await axios.post(
-        `${API_URL}/api/items/autosave-draft`,
-        requestBody,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      if (response.data && response.data.item) {
-        setItem(response.data.item);
-        setLastSaved(new Date());
-        console.log('Autosave completed successfully');
-      } else {
-        throw new Error('Invalid response format from server');
+  useEffect(() => {
+    const autosaveDraft = async () => {
+      if (!itemId || !savedDataRef.current) {
+        return;
       }
-    } catch (error) {
-      console.error('Error during autosave:', error);
-    }
+
+      try {
+        const requestBody = {
+          draftData: savedDataRef.current,
+          contextData: savedDataRef.current.contextData,
+          messages: savedDataRef.current.messages,
+          itemId: itemId,
+        };
+
+        const response = await axios.post(
+          `${API_URL}/api/items/autosave-draft`,
+          requestBody,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        if (response.data && response.data.item) {
+          setItem(response.data.item);
+          setLastSaved(new Date());
+          console.log('Autosave completed successfully');
+        } else {
+          throw new Error('Invalid response format from server');
+        }
+      } catch (error) {
+        console.error('Error during autosave:', error);
+      }
+    };
+
+    const timer = setInterval(autosaveDraft, interval);
+
+    return () => clearInterval(timer);
+  }, [itemId, setItem, setLastSaved, interval]);
+
+  const updateSavedData = (data) => {
+    savedDataRef.current = data;
   };
 
-  const debouncedAutosave = debounce((data) => autosaveDraft(data), delay);
-
-  return debouncedAutosave;
+  return updateSavedData;
 };
 
 // ... rest of the component ...
