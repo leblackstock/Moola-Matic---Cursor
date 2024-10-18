@@ -451,13 +451,21 @@ function NewItemPage({ setItem: setParentItem }) {
 
   // Update the handleAnalyzeImages function
   const handleAnalyzeImagesWrapper = async () => {
+    console.log('Triggering image analysis with itemId:', itemId);
+
+    if (!itemId) {
+      console.error('No itemId available for analysis');
+      setNotificationMessage('Error: No item ID available for analysis.');
+      setShowNotification(true);
+      return;
+    }
+
     setIsAnalyzing(true);
     setIsLoading(true);
     try {
       console.log('Starting image analysis...');
       const result = await handleAnalyzeImages({
-        uploadedImages,
-        item,
+        itemId,
         contextData,
         setItem,
         setMessages,

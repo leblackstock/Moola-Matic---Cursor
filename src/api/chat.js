@@ -84,140 +84,153 @@ export const handleChatWithAssistant = async (message, itemId) => {
 
 // Add this function to chat.js
 export const handleAnalyzeImages = async ({
-  uploadedImages,
-  item,
+  itemId,
   contextData,
   setItem,
   setMessages,
   setNotificationMessage,
   setShowNotification,
 }) => {
-  if (uploadedImages.length === 0) {
-    setNotificationMessage('Please upload at least one image to analyze.');
+  console.log('handleAnalyzeImages called with:', { itemId, contextData });
+
+  if (!itemId) {
+    console.error('No itemId provided for image analysis');
+    setNotificationMessage('Error: No item ID provided for analysis.');
     setShowNotification(true);
     return;
   }
 
   try {
-    console.log('Current uploadedImages:', uploadedImages);
-    const imageUrls = uploadedImages
+    // Step 1: Fetch the item and its image URLs from the database
+    const response = await axios.get(`${API_URL}/items/${itemId}`);
+    const item = response.data;
+
+    if (!item || !item.images || item.images.length === 0) {
+      setNotificationMessage('No images found for this item.');
+      setShowNotification(true);
+      return;
+    }
+
+    console.log('Fetched item:', item);
+
+    // Step 2: Process the image URLs
+    const baseUrl = `http://localhost:${process.env.REACT_APP_BACKEND_PORT}`;
+    const imageUrls = item.images
       .map((image) => {
         if (image.url) {
-          const baseUrl = `http://localhost:${process.env.REACT_APP_BACKEND_PORT}`;
           return image.url.startsWith('http')
             ? image.url
             : `${baseUrl}${image.url}`;
+        } else if (image.filename) {
+          // Construct the URL based on the provided path structure
+          return `${baseUrl}/uploads/drafts/${itemId}/${image.filename}`;
         }
-        console.error('No URL for image:', image);
+        console.error('No URL or filename for image:', image);
         return null;
       })
       .filter(Boolean);
 
     console.log('Image URLs for analysis:', imageUrls);
 
-    // Step 1: Get parsed results from the backend
-    const response = await fetch(`${API_URL}/analyze-images`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ imageUrls, item, contextData }),
-      credentials: 'include',
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(
-        errorData.error || `HTTP error! status: ${response.status}`
-      );
+    if (imageUrls.length === 0) {
+      setNotificationMessage('No valid image URLs found for analysis.');
+      setShowNotification(true);
+      return;
     }
 
-    const analysisResults = await response.json();
+    // Step 3: Send the image URLs for analysis
+    const analysisResponse = await axios.post(`${API_URL}/analyze-images`, {
+      imageUrls,
+      description: item.description || '',
+      itemId,
+      sellerNotes: item.sellerNotes || '',
+      context: contextData,
+    });
 
-    // Step 2: Map the analysis results to your form fields
+    const { analyses, summary, metadata } = analysisResponse.data;
+
+    console.log('Received analysis results:', { analyses, summary, metadata });
+
+    // Step 4: Map the analysis results to your form fields
     const mappedResult = {
       itemDetails: {
-        type: analysisResults.itemDetails?.type || item.itemDetails?.type || '',
-        brand:
-          analysisResults.itemDetails?.brand || item.itemDetails?.brand || '',
+        type: summary.itemDetails?.type || item.itemDetails?.type || '',
+        brand: summary.itemDetails?.brand || item.itemDetails?.brand || '',
         condition:
-          analysisResults.itemDetails?.condition ||
-          item.itemDetails?.condition ||
-          '',
-        rarity:
-          analysisResults.itemDetails?.rarity || item.itemDetails?.rarity || '',
+          summary.itemDetails?.condition || item.itemDetails?.condition || '',
+        rarity: summary.itemDetails?.rarity || item.itemDetails?.rarity || '',
         authenticityConfirmed:
-          analysisResults.itemDetails?.authenticityConfirmed ??
+          summary.itemDetails?.authenticityConfirmed ??
           item.itemDetails?.authenticityConfirmed ??
           false,
         packagingAccessories:
-          analysisResults.itemDetails?.packagingAccessories ||
+          summary.itemDetails?.packagingAccessories ||
           item.itemDetails?.packagingAccessories ||
           '',
       },
       financials: {
         purchasePrice:
-          analysisResults.financials?.purchasePrice ||
+          summary.financials?.purchasePrice ||
           item.financials?.purchasePrice ||
           0,
         cleaningRepairCosts:
-          analysisResults.financials?.cleaningRepairCosts ||
+          summary.financials?.cleaningRepairCosts ||
           item.financials?.cleaningRepairCosts ||
           0,
         estimatedShippingCosts:
-          analysisResults.financials?.estimatedShippingCosts ||
+          summary.financials?.estimatedShippingCosts ||
           item.financials?.estimatedShippingCosts ||
           0,
         platformFees:
-          analysisResults.financials?.platformFees ||
+          summary.financials?.platformFees ||
           item.financials?.platformFees ||
           0,
         expectedProfit:
-          analysisResults.financials?.expectedProfit ||
+          summary.financials?.expectedProfit ||
           item.financials?.expectedProfit ||
           0,
         estimatedValue:
-          analysisResults.financials?.estimatedValue ||
+          summary.financials?.estimatedValue ||
           item.financials?.estimatedValue ||
           0,
       },
       marketAnalysis: {
         marketDemand:
-          analysisResults.marketAnalysis?.marketDemand ||
+          summary.marketAnalysis?.marketDemand ||
           item.marketAnalysis?.marketDemand ||
           '',
         historicalPriceTrends:
-          analysisResults.marketAnalysis?.historicalPriceTrends ||
+          summary.marketAnalysis?.historicalPriceTrends ||
           item.marketAnalysis?.historicalPriceTrends ||
           '',
         marketSaturation:
-          analysisResults.marketAnalysis?.marketSaturation ||
+          summary.marketAnalysis?.marketSaturation ||
           item.marketAnalysis?.marketSaturation ||
           '',
         salesVelocity:
-          analysisResults.marketAnalysis?.salesVelocity ||
+          summary.marketAnalysis?.salesVelocity ||
           item.marketAnalysis?.salesVelocity ||
           '',
       },
       finalRecommendation: {
         purchaseRecommendation:
-          analysisResults.finalRecommendation?.purchaseRecommendation ||
+          summary.finalRecommendation?.purchaseRecommendation ||
           item.finalRecommendation?.purchaseRecommendation ||
           'Unknown',
         detailedBreakdown:
-          analysisResults.finalRecommendation?.detailedBreakdown ||
+          summary.finalRecommendation?.detailedBreakdown ||
           item.finalRecommendation?.detailedBreakdown ||
           '',
       },
     };
 
-    // Step 3: Update the item state with the mapped results
+    // Step 5: Update the item state with the mapped results
     setItem((prevItem) => ({
       ...prevItem,
       ...mappedResult,
     }));
 
-    // Step 4: Update messages with the analysis advice
+    // Step 6: Update messages with the analysis advice
     setMessages((prevMessages) => [
       ...prevMessages,
       createAssistantMessage(
