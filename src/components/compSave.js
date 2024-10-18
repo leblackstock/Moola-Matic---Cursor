@@ -745,3 +745,74 @@ export const handleSave = async (item, messages, currentItemId) => {
     throw error;
   }
 };
+
+export const deleteImageFromServer = async (image, itemId) => {
+  console.log('deleteImageFromServer called with:', { image, itemId });
+  try {
+    if (!itemId) {
+      console.error('ItemId is undefined when trying to delete image');
+      throw new Error('ItemId is required to delete an image');
+    }
+    const url = `${API_URL}/api/items/draft-images/delete/${itemId}/${image.filename}`;
+    console.log('Sending DELETE request to:', url);
+    const response = await axios.delete(url);
+    console.log('Image deleted from server:', response.data);
+
+    if (response.data.updatedDraft) {
+      // Update local state with the updated draft data
+      return response.data.updatedDraft;
+    } else {
+      throw new Error('Unexpected response format');
+    }
+  } catch (error) {
+    console.error('Error deleting image from server:', error);
+    if (error.response) {
+      console.error('Server response:', error.response.data);
+    }
+    throw error;
+  }
+};
+
+export const handleImageDelete = async (
+  image,
+  itemId,
+  setUploadedImages,
+  setItem
+) => {
+  console.log('handleImageDelete called with:', { image, itemId });
+  try {
+    const updatedDraft = await deleteImageFromServer(image, itemId);
+
+    // Update uploadedImages state
+    setUploadedImages((prevImages) => {
+      const updatedImages = prevImages.filter(
+        (img) => img.filename !== image.filename
+      );
+      console.log('Updated images after deletion:', updatedImages);
+      return updatedImages;
+    });
+
+    // Update item state
+    setItem((prevItem) => {
+      const updatedItem = {
+        ...prevItem,
+        images: prevItem.images.filter(
+          (img) => img.filename !== image.filename
+        ),
+      };
+      console.log('Updated item after image deletion:', updatedItem);
+
+      // Save updated item to localStorage
+      saveToLocalStorage(itemId, updatedItem);
+
+      return updatedItem;
+    });
+
+    toast.success('Image deleted successfully');
+    return updatedDraft;
+  } catch (error) {
+    console.error('Error handling image deletion:', error);
+    toast.error('Failed to delete image. Please try again.');
+    throw error;
+  }
+};

@@ -133,14 +133,20 @@ router.delete('/draft-images/delete/:itemId/:filename', async (req, res) => {
     // Check if the file exists
     try {
       await fs.access(imagePath);
+      console.log(`File found: ${imagePath}`);
     } catch (error) {
       console.log(`File not found: ${imagePath}`);
       return res.status(404).json({ error: 'Image file not found' });
     }
 
     // Delete the image file
-    await fs.unlink(imagePath);
-    console.log(`Successfully deleted image file: ${imagePath}`);
+    try {
+      await fs.unlink(imagePath);
+      console.log(`Successfully deleted image file: ${imagePath}`);
+    } catch (error) {
+      console.error(`Error deleting file: ${error.message}`);
+      return res.status(500).json({ error: 'Failed to delete image file' });
+    }
 
     // Attempt to remove the itemId directory if it's empty
     const itemDir = path.dirname(imagePath);
@@ -156,7 +162,7 @@ router.delete('/draft-images/delete/:itemId/:filename', async (req, res) => {
     const updatedDraft = await DraftItem.findOneAndUpdate(
       { itemId: itemId },
       { $pull: { images: { filename: filename } } },
-      { new: true, runValidators: false } // Skip validation
+      { new: true, runValidators: false }
     );
 
     if (!updatedDraft) {
@@ -171,7 +177,7 @@ router.delete('/draft-images/delete/:itemId/:filename', async (req, res) => {
     res.status(500).json({
       error: 'An error occurred while deleting the image',
       details: error.message,
-      stack: error.stack, // Include stack trace for debugging
+      stack: error.stack,
     });
   }
 });

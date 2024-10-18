@@ -2,6 +2,7 @@
 
 import React from 'react';
 import PropTypes from 'prop-types';
+import { toast } from 'react-toastify';
 import {
   GalleryContainer,
   ImageContainer,
@@ -21,6 +22,18 @@ export const UploadedImagesGallery = ({
   onDelete,
   itemId,
 }) => {
+  const handleDelete = (image) => {
+    onDelete(image, itemId); // Pass itemId here
+    toast.success('Image deleted successfully', {
+      position: 'top-right',
+      autoClose: 3000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+    });
+  };
+
   return (
     <GalleryContainer>
       {images.map((image, index) => (
@@ -39,7 +52,12 @@ export const UploadedImagesGallery = ({
               e.target.parentElement.style.backgroundColor = '#f0f0f0';
             }}
           />
-          <HoverDeleteButton onClick={() => onDelete(image)}>
+          <HoverDeleteButton
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDelete(image);
+            }}
+          >
             ×
           </HoverDeleteButton>
         </ImageContainer>

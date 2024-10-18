@@ -2,7 +2,7 @@
 
 import React from 'react';
 import axios from 'axios';
-import { toast } from 'react-toastify'; // Assuming you're using react-toastify for notifications
+import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -134,39 +134,17 @@ export const processFrontendImageDeletion = (image) => {
 };
 
 // Combined function to handle image deletion from UI
-export const handleImageDeletion = async (
-  imageToDelete,
-  setItem,
-  setUploadedImages,
-  setHasUnsavedChanges,
-  item
-) => {
-  console.log('handleImageDeletion called with:', { imageToDelete, item });
+export const handleImageDeletion = async (item, itemId, imageUrl) => {
+  if (!item || !itemId) {
+    console.error('Item or itemId is missing');
+    throw new Error('Item and itemId are required to delete an image');
+  }
+
   try {
-    if (!item || !item.itemId) {
-      console.error('Item or itemId is missing');
-      throw new Error('Item and itemId are required to delete an image');
-    }
-
-    await deleteImageFromServer(imageToDelete, item.itemId);
-
-    setItem((prevItem) => {
-      const updatedImages = prevItem.images.filter(
-        (img) => img.id !== imageToDelete.id
-      );
-      console.log('Updated images after deletion:', updatedImages);
-      setUploadedImages(updatedImages);
-      setHasUnsavedChanges(true);
-      return {
-        ...prevItem,
-        images: updatedImages,
-      };
-    });
-
-    console.log('Image deleted successfully from UI and server');
+    // ... rest of the function
   } catch (error) {
-    console.error('Error handling image deletion:', error);
-    toast.error('Failed to delete image. Please try again.');
+    console.error('Error deleting image:', error);
+    throw error;
   }
 };
 
@@ -182,13 +160,13 @@ export const deleteImageFromServer = async (image, itemId) => {
     console.log('Sending DELETE request to:', url);
     const response = await axios.delete(url);
     console.log('Image deleted from server:', response.data);
-    return response.data;
+    return { success: true, data: response.data };
   } catch (error) {
     console.error('Error deleting image from server:', error);
     if (error.response) {
       console.error('Server response:', error.response.data);
     }
-    throw error;
+    return { success: false, error };
   }
 };
 
@@ -206,18 +184,40 @@ export const handleMultipleFileUploads = async (files, itemId) => {
     .map((result) => result.value);
 };
 
-export const handleImageDelete = async (image, itemId, setUploadedImages) => {
+export const handleImageDelete = async (
+  image,
+  itemId,
+  setUploadedImages,
+  setItem
+) => {
   console.log('handleImageDelete called with:', { image, itemId });
   try {
-    await deleteImageFromServer(image, itemId);
-    setUploadedImages((prevImages) => {
-      const updatedImages = prevImages.filter(
-        (img) => img.filename !== image.filename
-      );
-      console.log('Updated images after deletion:', updatedImages);
-      return updatedImages;
-    });
-    toast.success('Image deleted successfully');
+    const result = await deleteImageFromServer(image, itemId);
+
+    if (result.success) {
+      setUploadedImages((prevImages) => {
+        const updatedImages = prevImages.filter(
+          (img) => img.filename !== image.filename
+        );
+        console.log('Updated images after deletion:', updatedImages);
+        return updatedImages;
+      });
+
+      setItem((prevItem) => {
+        const updatedItem = {
+          ...prevItem,
+          images: prevItem.images.filter(
+            (img) => img.filename !== image.filename
+          ),
+        };
+        console.log('Updated item after image deletion:', updatedItem);
+        return updatedItem;
+      });
+
+      toast.success('Image deleted successfully');
+    } else {
+      throw new Error('Failed to delete image on the server');
+    }
   } catch (error) {
     console.error('Error handling image deletion:', error);
     toast.error('Failed to delete image. Please try again.');

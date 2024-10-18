@@ -27,6 +27,7 @@ import {
 import {
   handleFileChange,
   handleImageDeletion,
+  handleImageDelete, // Add this line
 } from './components/compUpload.js';
 
 // Import all styled components
@@ -427,14 +428,7 @@ function NewItemPage({ setItem: setParentItem }) {
   };
 
   const handleDeleteImageWrapper = (imageToDelete) => {
-    handleImageDeletion(
-      imageToDelete,
-      setItem,
-      setUploadedImages,
-      setHasUnsavedChanges,
-      backendPort,
-      item // Pass the entire item object instead of draftData
-    );
+    handleImageDelete(imageToDelete, itemId, setUploadedImages, setItem);
   };
 
   // Update the updateItem function to handle nested properties
