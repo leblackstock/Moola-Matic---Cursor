@@ -15,21 +15,13 @@ const router = express.Router();
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    console.log('Multer destination function called');
     const itemId = req.body.itemId || 'temp';
     const uploadPath = path.join(__dirname, '..', 'uploads', 'drafts', itemId);
     fs.mkdir(uploadPath, { recursive: true })
-      .then(() => {
-        console.log(`Created directory: ${uploadPath}`);
-        cb(null, uploadPath);
-      })
-      .catch((err) => {
-        console.error(`Error creating directory: ${uploadPath}`, err);
-        cb(err);
-      });
+      .then(() => cb(null, uploadPath))
+      .catch((err) => cb(err));
   },
   filename: (req, file, cb) => {
-    // Use a temporary filename, it will be renamed later
     cb(null, file.originalname);
   },
 });
@@ -37,26 +29,21 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage: storage,
   fileFilter: (req, file, cb) => {
-    console.log(`Uploading file: ${file.originalname}`);
     cb(null, true);
   },
 }).array('images', 10); // Allow up to 10 images
 
 // POST /api/items/draft-images/upload
 router.post('/draft-images/upload', (req, res) => {
-  console.log('Received upload request');
-
   const startTime = performance.now();
   const timeout = 120000; // 2 minutes
 
   upload(req, res, async function (err) {
     if (err) {
-      // ... (keep existing error handling)
+      return res
+        .status(500)
+        .json({ error: 'File upload failed', details: err.message });
     }
-
-    console.log('log 03 - No errors in upload');
-    console.log('Parsed request body:', req.body);
-    console.log('Uploaded files:', req.files);
 
     const timeoutPromise = new Promise((_, reject) =>
       setTimeout(() => reject(new Error('Operation timed out')), timeout)
@@ -75,17 +62,13 @@ router.post('/draft-images/upload', (req, res) => {
           );
 
           const uploadedFiles = await Promise.all(
-            req.files.map(async (file) => {
-              return generateDraftFilename(itemId, file, uploadPath);
-            })
+            req.files.map(async (file) =>
+              generateDraftFilename(itemId, file, uploadPath)
+            )
           );
-
-          console.log('log 07 - Files processed:', uploadedFiles);
 
           const endTime = performance.now();
-          console.log(
-            `log 08 - Upload operation completed in ${endTime - startTime}ms`
-          );
+          console.log(`Upload operation completed in ${endTime - startTime}ms`);
           res.json({
             message: 'Files uploaded successfully',
             uploadedFiles: uploadedFiles,
@@ -132,7 +115,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// DELETE /api/items/draft-images/delete/:itemId/:filename
+// DELETE /api/items/draft-images/delete/:itemId/:filename - Delete an image
 router.delete('/draft-images/delete/:itemId/:filename', async (req, res) => {
   try {
     const { itemId, filename } = req.params;
@@ -148,17 +131,32 @@ router.delete('/draft-images/delete/:itemId/:filename', async (req, res) => {
     );
 
     // Check if the file exists
-    await fs.access(imagePath);
+    try {
+      await fs.access(imagePath);
+    } catch (error) {
+      console.log(`File not found: ${imagePath}`);
+      return res.status(404).json({ error: 'Image file not found' });
+    }
 
     // Delete the image file
     await fs.unlink(imagePath);
     console.log(`Successfully deleted image file: ${imagePath}`);
 
+    // Attempt to remove the itemId directory if it's empty
+    const itemDir = path.dirname(imagePath);
+    try {
+      await fs.rmdir(itemDir);
+      console.log(`Successfully removed empty directory: ${itemDir}`);
+    } catch (error) {
+      // Ignore error if directory is not empty or doesn't exist
+      console.log(`Could not remove directory ${itemDir}: ${error.message}`);
+    }
+
     // Remove the image reference from the DraftItem document
     const updatedDraft = await DraftItem.findOneAndUpdate(
       { itemId: itemId },
       { $pull: { images: { filename: filename } } },
-      { new: true }
+      { new: true, runValidators: false } // Skip validation
     );
 
     if (!updatedDraft) {
@@ -173,6 +171,7 @@ router.delete('/draft-images/delete/:itemId/:filename', async (req, res) => {
     res.status(500).json({
       error: 'An error occurred while deleting the image',
       details: error.message,
+      stack: error.stack, // Include stack trace for debugging
     });
   }
 });
@@ -202,34 +201,205 @@ router.get('/draft-images/:itemId/:filename', async (req, res) => {
 
   try {
     await fs.access(imagePath);
-    res.sendFile(imagePath);
+    res.setHeader('Access-Control-Allow-Origin', '*'); // Allow CORS for this route
+    res.sendFile(imagePath, (err) => {
+      if (err) {
+        console.error(`Error sending file: ${err}`);
+        res.status(err.status || 500).end();
+      }
+    });
   } catch (error) {
     console.error(`Error serving image: ${error}`);
-    res.status(404).send('Image not found');
+    res.status(404).json({ error: 'Image not found', details: error.message });
   }
 });
 
-// POST /api/items/save-draft
-router.post('/save-draft', async (req, res) => {
+// PUT /api/items/:id - Update an existing item
+router.put('/:id', async (req, res) => {
   try {
-    const { itemId, isDraft, ...itemData } = req.body;
+    const { id } = req.params;
+    const updateData = req.body;
 
-    let draftItem = await DraftItem.findOne({ itemId });
+    const updatedItem = await DraftItem.findByIdAndUpdate(id, updateData, {
+      new: true,
+      runValidators: true,
+    });
 
-    if (draftItem) {
-      // Update existing draft
-      Object.assign(draftItem, { ...itemData, isDraft: true });
-    } else {
-      // Create new draft
-      draftItem = new DraftItem({ itemId, isDraft: true, ...itemData });
+    if (!updatedItem) {
+      return res.status(404).json({ error: 'Item not found' });
     }
 
-    await draftItem.save();
+    console.log('Item updated:', updatedItem);
+    res.json(updatedItem);
+  } catch (error) {
+    console.error('Error updating item:', error);
+    res
+      .status(500)
+      .json({ error: 'Failed to update item', details: error.message });
+  }
+});
 
-    res.json({ message: 'Draft saved successfully', item: draftItem });
+// POST /api/items/save-draft - Save a draft item
+router.post('/save-draft', async (req, res) => {
+  try {
+    const itemData = req.body;
+
+    if (!itemData.itemId) {
+      return res.status(400).json({ error: 'itemId is required' });
+    }
+
+    let draft = await DraftItem.findOneAndUpdate(
+      { itemId: itemData.itemId },
+      { ...itemData, lastUpdated: new Date() },
+      {
+        new: true,
+        upsert: true,
+        runValidators: true,
+        setDefaultsOnInsert: true,
+      }
+    );
+
+    console.log('Draft saved:', draft);
+    res.status(200).json({ item: draft });
   } catch (error) {
     console.error('Error saving draft:', error);
-    res.status(500).json({ error: 'An error occurred while saving the draft' });
+    res
+      .status(500)
+      .json({ error: 'Failed to save draft', details: error.message });
+  }
+});
+
+// POST /api/items/autosave-draft - Autosave a draft item
+router.post('/autosave-draft', async (req, res) => {
+  try {
+    const { draftData, contextData, messages } = req.body;
+
+    // Handle the purchaseRecommendation field
+    if (
+      draftData.finalRecommendation &&
+      draftData.finalRecommendation.purchaseRecommendation !== undefined
+    ) {
+      if (
+        draftData.finalRecommendation.purchaseRecommendation === 'Unknown' ||
+        draftData.finalRecommendation.purchaseRecommendation === ''
+      ) {
+        draftData.finalRecommendation.purchaseRecommendation = null;
+      } else if (
+        typeof draftData.finalRecommendation.purchaseRecommendation === 'string'
+      ) {
+        draftData.finalRecommendation.purchaseRecommendation =
+          draftData.finalRecommendation.purchaseRecommendation.toLowerCase() ===
+          'true';
+      }
+    }
+
+    let draft = await DraftItem.findOneAndUpdate(
+      { itemId: draftData.itemId },
+      {
+        ...draftData,
+        contextData, // Save contextData
+        messages, // Save messages
+        lastUpdated: new Date(),
+      },
+      {
+        new: true,
+        upsert: true,
+        runValidators: true,
+        setDefaultsOnInsert: true,
+      }
+    );
+
+    console.log('Draft autosaved with contextData and messages');
+    res.status(200).json({ item: draft });
+  } catch (error) {
+    console.error('Error autosaving draft:', error);
+    res
+      .status(500)
+      .json({ error: 'Failed to autosave draft', details: error.message });
+  }
+});
+
+// DELETE /api/items/drafts/:id - Delete a specific draft
+router.delete('/drafts/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deleteImages = req.query.deleteImages === 'true';
+    console.log('Attempting to delete draft with ID:', id);
+
+    let result;
+    if (id.match(/^[0-9a-fA-F]{24}$/)) {
+      // If it's a valid MongoDB ObjectId
+      result = await DraftItem.findByIdAndDelete(id);
+    } else {
+      // If it's not a MongoDB ObjectId, assume it's a UUID
+      result = await DraftItem.findOneAndDelete({ itemId: id });
+    }
+
+    if (!result) {
+      console.log('Draft not found for deletion');
+      return res.status(404).json({ error: 'Draft not found' });
+    }
+
+    if (deleteImages) {
+      // Delete the image folder
+      const imageFolderPath = path.join(
+        __dirname,
+        '..',
+        'uploads',
+        'drafts',
+        result.itemId
+      );
+      if (
+        await fs
+          .access(imageFolderPath)
+          .then(() => true)
+          .catch(() => false)
+      ) {
+        await fs.rm(imageFolderPath, { recursive: true, force: true });
+        console.log(`Deleted image folder: ${imageFolderPath}`);
+      }
+    }
+
+    console.log('Draft deleted successfully:', result);
+    res.json({ message: 'Draft deleted successfully', deletedDraft: result });
+  } catch (error) {
+    console.error('Error deleting draft:', error);
+    res
+      .status(500)
+      .json({ error: 'Failed to delete draft', details: error.message });
+  }
+});
+
+// DELETE /api/items/drafts - Delete all drafts
+router.delete('/drafts', async (req, res) => {
+  try {
+    const deleteImages = req.query.deleteImages === 'true';
+
+    const drafts = await DraftItem.find({});
+    await DraftItem.deleteMany({});
+
+    if (deleteImages) {
+      const draftsFolderPath = path.join(__dirname, '..', 'uploads', 'drafts');
+      for (const draft of drafts) {
+        const imageFolderPath = path.join(draftsFolderPath, draft.itemId);
+        if (
+          await fs
+            .access(imageFolderPath)
+            .then(() => true)
+            .catch(() => false)
+        ) {
+          await fs.rm(imageFolderPath, { recursive: true, force: true });
+          console.log(`Deleted image folder: ${imageFolderPath}`);
+        }
+      }
+    }
+
+    res.json({ message: 'All drafts deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting all drafts:', error);
+    res
+      .status(500)
+      .json({ error: 'Failed to delete all drafts', details: error.message });
   }
 });
 
