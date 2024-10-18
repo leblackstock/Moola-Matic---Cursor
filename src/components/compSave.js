@@ -20,11 +20,14 @@ export const handleDraftSave = async (item, messages, currentItemId) => {
   try {
     const itemCopy = { ...item, itemId: currentItemId };
 
-    const existingImages = itemCopy.images
+    // Ensure images is an array
+    const images = Array.isArray(itemCopy.images) ? itemCopy.images : [];
+
+    const existingImages = images
       .filter((image) => image.url && !image.file)
       .map((image) => ({ ...image, isNew: false }));
 
-    const newImages = itemCopy.images
+    const newImages = images
       .filter((image) => image.file)
       .map((image) => ({ ...image, isNew: true }));
 
@@ -32,9 +35,10 @@ export const handleDraftSave = async (item, messages, currentItemId) => {
 
     const dataToSend = {
       ...itemCopy,
-      messages,
+      messages: Array.isArray(messages) ? messages : [],
       itemId: currentItemId,
       images: allImages,
+      isDraft: true, // Ensure isDraft is set to true
     };
 
     const response = await axios.post(
@@ -634,7 +638,7 @@ export const useAutosave = (
   itemId,
   setItem,
   setLastSaved,
-  interval = 60000
+  interval = 30000
 ) => {
   const savedDataRef = useRef(null);
 

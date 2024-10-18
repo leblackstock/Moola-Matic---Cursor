@@ -2,6 +2,8 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import axios from 'axios';
+import { toast } from 'react-toastify';
+import { handleDraftSave } from '../components/compSave.js';
 
 let isItemGenerated = false;
 let generatedItemId = null;
@@ -48,22 +50,37 @@ const withLock = (operation) => {
 export const createNewItem = () => {
   return withLock(async () => {
     if (isItemGenerated) {
+      toast.error('An item has already been generated.');
       throw new Error('An item has already been generated.');
     }
 
-    const itemId = generateItemId();
-    generatedItemId = itemId;
-    isItemGenerated = true;
+    try {
+      const itemId = generateItemId();
+      generatedItemId = itemId;
+      isItemGenerated = true;
 
-    const newItem = createDefaultItem(itemId);
+      const newItem = await createDefaultItem(itemId);
 
-    // Save the new item to localStorage
-    localStorage.setItem(`item_${itemId}`, JSON.stringify(newItem));
+      // Save the new item using handleDraftSave from compSave
+      try {
+        const savedItem = await handleDraftSave(newItem, [], itemId);
+        console.log('New draft item saved to database:', savedItem);
+        toast.success('New draft item saved successfully');
+      } catch (saveError) {
+        console.error('Error saving new draft item to database:', saveError);
+        toast.error('Server connection error. Draft saved locally only.');
+        // Save the new item to localStorage as a fallback
+        localStorage.setItem(`item_${itemId}`, JSON.stringify(newItem));
+      }
 
-    // Add a small delay to ensure localStorage is updated
-    await new Promise((resolve) => setTimeout(resolve, 100));
+      // Add a small delay to ensure localStorage is updated
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
-    return itemId;
+      return itemId;
+    } catch (error) {
+      toast.error('Failed to create a new item. Please try again.');
+      throw error; // Re-throw the error to be caught in App.js
+    }
   });
 };
 
@@ -125,6 +142,7 @@ export const getNextSequentialNumber = async (itemId) => {
       return response.data.nextSequentialNumber;
     } catch (error) {
       console.error('Error getting next sequential number:', error);
+      toast.error('Server connection error. Please try again later.');
       // Return a fallback value or throw an error as appropriate for your use case
       return 1; // Fallback to starting from 1 if we can't get the next number
     }
@@ -133,6 +151,7 @@ export const getNextSequentialNumber = async (itemId) => {
 
 export const createDefaultItem = async (itemId) => {
   if (!itemId) {
+    toast.error('ItemId is required when creating a new item');
     throw new Error('ItemId is required when creating a new item');
   }
 
@@ -141,7 +160,7 @@ export const createDefaultItem = async (itemId) => {
     const response = await axios.get(
       `${BACKEND_URL}/api/items/draft-item-schema`
     );
-    const schemaFields = response.data.fields;
+    const schemaData = response.data;
 
     // Create a new item object based on the schema fields
     const newItem = {
@@ -149,27 +168,37 @@ export const createDefaultItem = async (itemId) => {
       isDraft: true,
     };
 
-    // Initialize fields based on the schema
-    schemaFields.forEach((field) => {
-      if (field !== '_id' && field !== '__v') {
-        switch (field) {
-          case 'messages':
-            newItem[field] = [];
-            break;
-          case 'vintage':
-          case 'antique':
-            newItem[field] = false;
-            break;
-          default:
-            newItem[field] = '';
+    // Check if schemaData is an object and has keys
+    if (typeof schemaData === 'object' && Object.keys(schemaData).length > 0) {
+      Object.keys(schemaData).forEach((field) => {
+        if (field !== '_id' && field !== '__v') {
+          switch (field) {
+            case 'messages':
+              newItem[field] = [];
+              break;
+            case 'vintage':
+            case 'antique':
+              newItem[field] = false;
+              break;
+            case 'images':
+              newItem[field] = [];
+              break;
+            default:
+              newItem[field] = '';
+          }
         }
-      }
-    });
+      });
+    } else {
+      console.error('Invalid schema data received:', schemaData);
+      toast.error('Error creating new item: Invalid schema data');
+      throw new Error('Invalid schema data received from server');
+    }
 
     return newItem;
   } catch (error) {
-    console.error('Error fetching draft item schema:', error);
-    throw new Error('Failed to create default item');
+    console.error('Error creating default item:', error);
+    toast.error('Server connection error. Please try again later.');
+    throw error; // Re-throw the error to be caught in App.js
   }
 };
 
@@ -189,6 +218,7 @@ export const checkFileExists = async (itemId, filename) => {
     return data.exists;
   } catch (error) {
     console.error('Error checking file existence:', error);
+    toast.error('Server connection error. Please try again later.');
     return false;
   }
 };

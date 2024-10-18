@@ -9,40 +9,50 @@ import { v4 as uuidv4 } from 'uuid';
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 console.log('API_BASE_URL:', API_BASE_URL);
 
-// Function to handle file upload
-const handleFileUpload = async (file, itemId) => {
+// Updated handleFileUpload function
+const handleFileUpload = async (files, itemId) => {
+  console.log(`Starting upload for ${files.length} files, itemId: ${itemId}`);
   const formData = new FormData();
-  formData.append('image', file);
+  files.forEach((file) => formData.append('images', file));
   formData.append('itemId', itemId);
 
   try {
+    console.log(
+      `Sending POST request to: ${API_BASE_URL}/api/items/draft-images/upload`
+    );
     const response = await axios.post(
-      '/api/items/draft-images/upload',
+      `${API_BASE_URL}/api/items/draft-images/upload`,
       formData,
       {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
-        timeout: 30000, // Set a 30-second timeout
         onUploadProgress: (progressEvent) => {
           const percentCompleted = Math.round(
             (progressEvent.loaded * 100) / progressEvent.total
           );
           console.log(`Upload progress: ${percentCompleted}%`);
         },
+        timeout: 60000, // 60 seconds timeout for multiple files
       }
     );
 
+    console.log(`Upload response:`, response);
+
     if (response.status === 200) {
-      console.log('File uploaded successfully:', response.data);
+      console.log(`Files uploaded successfully:`, response.data);
       return response.data;
     } else {
       throw new Error(`Unexpected response status: ${response.status}`);
     }
   } catch (error) {
-    console.error('Error uploading file:', error);
+    console.error(`Error uploading files:`, error);
     if (error.response) {
       console.error('Error response:', error.response.data);
+    } else if (error.request) {
+      console.error('No response received:', error.request);
+    } else {
+      console.error('Error setting up request:', error.message);
     }
     throw error;
   }
@@ -64,41 +74,49 @@ const checkFileExists = async (itemId, filename) => {
   }
 };
 
-// Function to handle file change (multiple file upload)
-export const handleFileChange = (setUploadedImages, itemId) => async (e) => {
-  console.log('handleFileChange called with itemId:', itemId);
-  const files = Array.from(e.target.files || []);
-  console.log(
-    'Files selected:',
-    files.map((f) => f.name)
-  );
+// Updated handleFileChange function
+export const handleFileChange = async (
+  event,
+  itemId,
+  setItem,
+  setHasUnsavedChanges,
+  setImageUploaded
+) => {
+  const files = Array.from(event.target.files);
+  const formData = new FormData();
+  formData.append('itemId', itemId);
 
-  if (!files.length) {
-    console.log('No files selected');
-    toast.info('No files selected');
-    return;
-  }
+  files.forEach((file) => {
+    formData.append('images', file);
+  });
 
   try {
-    console.log('Starting file upload process');
-    const uploadResults = await uploadQueue(files, itemId);
-    console.log('File upload process completed', uploadResults);
-    // Handle successful uploads (e.g., update UI, state, etc.)
-    setUploadedImages((prevImages) => {
-      const newImages = uploadResults.map((img) => ({
-        id: img.id || uuidv4(),
-        url: img.url,
-        filename: img.filename,
-        isNew: true,
-      }));
-      console.log('New images to add:', newImages);
-      return [...prevImages, ...newImages];
-    });
+    const response = await axios.post(
+      `${API_BASE_URL}/api/items/draft-images/upload`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
 
-    toast.success(`${files.length} image(s) uploaded successfully`);
+    console.log('Upload response:', response.data);
+
+    if (response.data && response.data.uploadedFiles) {
+      setItem((prevItem) => ({
+        ...prevItem,
+        images: [...(prevItem.images || []), ...response.data.uploadedFiles],
+      }));
+      setHasUnsavedChanges(true);
+      setImageUploaded(true);
+      return response.data;
+    } else {
+      throw new Error('Unexpected response format');
+    }
   } catch (error) {
-    console.error('Error handling file change:', error);
-    toast.error('Failed to upload some images. Please try again.');
+    console.error('Error uploading images:', error);
+    throw error;
   }
 };
 
@@ -208,19 +226,6 @@ export const handleImageDelete = async (image, itemId, setUploadedImages) => {
 
 // ... rest of the component ...
 
-const uploadQueue = async (files, itemId) => {
-  const results = [];
-  for (const file of files) {
-    try {
-      const result = await handleFileUpload(file, itemId);
-      results.push(result);
-    } catch (error) {
-      console.error(`Error uploading file ${file.name}:`, error);
-    }
-  }
-  return results;
-};
-
 export const FileUpload = ({ onFileChange, itemId }) => {
   const handleChange = async (event) => {
     const files = Array.from(event.target.files);
@@ -233,7 +238,10 @@ export const FileUpload = ({ onFileChange, itemId }) => {
 
     try {
       console.log('Starting file upload process');
-      await uploadQueue(files, itemId);
+      const uploadPromises = files.map((file) =>
+        handleFileUpload(file, itemId)
+      );
+      await Promise.all(uploadPromises);
       onFileChange(files);
     } catch (error) {
       console.error('Error handling file change:', error);

@@ -14,6 +14,7 @@ import connectDB from './config/database.js';
 import MongoStore from 'connect-mongo';
 import logger from '../src/helpers/logger.js';
 import fsPromises from 'fs/promises';
+import morgan from 'morgan';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -98,9 +99,14 @@ app.use(
   })
 );
 
+// Add this before other middleware
+app.use(morgan('dev'));
+
 // Logging incoming requests
 app.use((req, res, next) => {
-  //console.log(`Received request: ${req.method} ${req.url}`);
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  console.log('Request Headers:', req.headers);
+  console.log('Request Body:', req.body);
   next();
 });
 
@@ -198,13 +204,18 @@ const startServer = async () => {
   try {
     await connectDB();
     await ensureUploadsDirectory();
-    app.listen(BACKEND_PORT, () => {
+    const server = app.listen(BACKEND_PORT, () => {
       logger.info(
         `Backend server is running on http://localhost:${BACKEND_PORT}`
       );
       logger.info(
         `Frontend is expected to run on http://localhost:${FRONTEND_PORT}`
       );
+    });
+
+    // Add error logging for the server
+    server.on('error', (error) => {
+      logger.error('Server error:', error);
     });
   } catch (error) {
     logger.error('Failed to start server:', error);

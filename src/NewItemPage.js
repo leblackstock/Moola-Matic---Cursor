@@ -301,18 +301,31 @@ function NewItemPage({ setItem: setParentItem }) {
   //   }
   // };
 
-  const handleFileChangeWrapper = (event) => {
-    handleFileChange(
-      event,
-      itemId,
-      setItem,
-      (newImages) => {
-        console.log('Setting uploaded images:', newImages);
-        setUploadedImages(Array.isArray(newImages) ? newImages : []);
-      },
-      setHasUnsavedChanges,
-      setImageUploaded
-    );
+  const handleFileChangeWrapper = async (event) => {
+    try {
+      const result = await handleFileChange(
+        event,
+        itemId,
+        setItem,
+        setHasUnsavedChanges,
+        setImageUploaded
+      );
+
+      console.log('File change result:', result);
+
+      if (result && result.uploadedFiles) {
+        setUploadedImages((prevImages) => [
+          ...prevImages,
+          ...result.uploadedFiles,
+        ]);
+      } else {
+        console.error('Unexpected response format:', result);
+      }
+    } catch (error) {
+      console.error('Error in handleFileChangeWrapper:', error);
+      setNotificationMessage('Error uploading images. Please try again.');
+      setShowNotification(true);
+    }
   };
 
   // Send Image Message
@@ -619,7 +632,7 @@ function NewItemPage({ setItem: setParentItem }) {
 
           <UploadedImagesGallery
             images={uploadedImages || []}
-            onSelect={handleImageSelect}
+            onSelect={(image) => setSelectedImage(image)}
             selectedImage={selectedImage}
             onDelete={handleDeleteImageWrapper}
             itemId={itemId}
@@ -648,9 +661,7 @@ function NewItemPage({ setItem: setParentItem }) {
             style={{ display: 'none' }}
             multiple
             accept="image/*"
-            onChange={(e) => {
-              handleFileChange(setUploadedImages, itemId)(e);
-            }}
+            onChange={handleFileChangeWrapper}
           />
 
           {/* New Save Draft button */}

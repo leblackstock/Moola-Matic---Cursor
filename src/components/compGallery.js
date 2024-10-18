@@ -21,64 +21,29 @@ export const UploadedImagesGallery = ({
   onDelete,
   itemId,
 }) => {
-  const imagesArray = Array.isArray(images) ? images : [];
-
-  const retryImage = (imageId) => {
-    setRetryCount((prev) => ({
-      ...prev,
-      [imageId]: (prev[imageId] || 0) + 1,
-    }));
-  };
-
-  if (!itemId) {
-    console.error('itemId is undefined in UploadedImagesGallery');
-    return <div>Error: Unable to display images</div>;
-  }
-
-  const validImages = imagesArray.filter(
-    (image) => image && typeof image === 'object' && image.filename
-  );
-
-  if (validImages.length === 0) {
-    return <div>No images available</div>;
-  }
-
   return (
     <GalleryContainer>
-      {validImages.map((image, index) => {
-        const imageUrl = getImageUrl(itemId, image.filename);
-        const uniqueKey = `${image.id || image.filename || ''}-${index}`;
-        return (
-          <ImageContainer
-            key={uniqueKey}
+      {images.map((image, index) => (
+        <ImageContainer key={`${image.id || image.filename}-${index}`}>
+          <StyledImage
+            src={`/uploads/drafts/${itemId}/${image.filename}`}
+            alt={`Uploaded image ${index + 1}`}
             onClick={() => onSelect(image)}
-            $isSelected={selectedImage === image}
-          >
-            {imageUrl ? (
-              <StyledImage
-                src={imageUrl}
-                alt={`Uploaded image ${image.filename || 'unnamed'}`}
-                onError={(e) => {
-                  console.error(`Failed to load image: ${imageUrl}`);
-                  e.target.onerror = null;
-                  e.target.style.display = 'none';
-                  e.target.parentElement.style.backgroundColor = '#f0f0f0';
-                }}
-              />
-            ) : (
-              <ErrorImagePlaceholder>No Image</ErrorImagePlaceholder>
-            )}
-            <HoverDeleteButton
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete(image);
-              }}
-            >
-              ×
-            </HoverDeleteButton>
-          </ImageContainer>
-        );
-      })}
+            style={{
+              border: selectedImage === image ? '2px solid blue' : 'none',
+            }}
+            onError={(e) => {
+              console.error(`Failed to load image: ${image.filename}`);
+              e.target.onerror = null;
+              e.target.style.display = 'none';
+              e.target.parentElement.style.backgroundColor = '#f0f0f0';
+            }}
+          />
+          <HoverDeleteButton onClick={() => onDelete(image)}>
+            ×
+          </HoverDeleteButton>
+        </ImageContainer>
+      ))}
     </GalleryContainer>
   );
 };
