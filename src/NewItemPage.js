@@ -451,15 +451,6 @@ function NewItemPage({ setItem: setParentItem }) {
 
   // Update the handleAnalyzeImages function
   const handleAnalyzeImagesWrapper = async () => {
-    console.log('Triggering image analysis with itemId:', itemId);
-
-    if (!itemId) {
-      console.error('No itemId available for analysis');
-      setNotificationMessage('Error: No item ID available for analysis.');
-      setShowNotification(true);
-      return;
-    }
-
     setIsAnalyzing(true);
     setIsLoading(true);
     try {
@@ -473,13 +464,35 @@ function NewItemPage({ setItem: setParentItem }) {
         setShowNotification,
       });
 
-      console.log('Analysis result:', result);
+      console.log('Raw analysis result:', JSON.stringify(result, null, 2));
 
       if (result && typeof result === 'object') {
-        setItem((prevItem) => ({
-          ...prevItem,
-          analysisResult: result,
-        }));
+        console.log('Analysis result structure:', Object.keys(result));
+
+        if (result.analyses) {
+          console.log('Number of individual analyses:', result.analyses.length);
+        }
+
+        if (result.summary) {
+          console.log('Summary available:', Boolean(result.summary));
+          console.log('Summary content:', result.summary);
+        }
+
+        if (result.metadata) {
+          console.log('Metadata available:', Boolean(result.metadata));
+          console.log('Metadata content:', result.metadata);
+        }
+
+        setItem((prevItem) => {
+          console.log('Previous item state:', prevItem);
+          const newItem = {
+            ...prevItem,
+            analysisResult: result,
+          };
+          console.log('New item state:', newItem);
+          return newItem;
+        });
+
         setNotificationMessage('Image analysis completed successfully!');
         setShowNotification(true);
       } else {
@@ -684,7 +697,8 @@ function NewItemPage({ setItem: setParentItem }) {
             handlePurchaseRecommendationChange={
               handlePurchaseRecommendationChange
             }
-            itemId={itemId} // Add this line
+            itemId={itemId}
+            analysisResult={item.analysisResult} // Pass the analysis result to FormFields
           />
         </div>
       </MainContentArea>

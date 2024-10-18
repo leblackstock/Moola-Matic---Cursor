@@ -20,10 +20,10 @@ import { combineAnalyses } from './chatCombineAnalysis.js';
 import { DraftItem } from '../models/draftItem.js';
 import {
   calculateMessageTokens,
-  calculateImageTokens,
+  // calculateImageTokens,
 } from '../utils/tokenCalculator.js';
 //import { uploadLocalImage } from './chatAssistant.js';
-import { uploadBase64Image } from './chatAssistant.js';
+//import { uploadBase64Image } from './chatAssistant.js';
 
 // ... rest of the file
 
@@ -119,19 +119,32 @@ router.post('/analyze-images', async (req, res) => {
           analysisPrompt,
           base64Image
         );
+        console.log(
+          `Analysis result for ${filename}:`,
+          JSON.stringify(analysis, null, 2)
+        );
         analyses.push(analysis);
       } catch (error) {
         console.error(`Failed to analyze image: ${filename}`, error);
       }
     }
 
+    console.log('All analyses:', JSON.stringify(analyses, null, 2));
+
+    // Combine all analyses
     const combinedAnalysis = combineAnalyses(analyses);
-    const { summary, metadata } = await summarizeAnalyses(
+    console.log(
+      'Combined analysis:',
+      JSON.stringify(combinedAnalysis, null, 2)
+    );
+
+    // Summarize the combined analysis
+    const summary = await summarizeAnalyses(
       combinedAnalysis,
       combineAndSummarizeAnalysisPrompt
     );
 
-    res.json({ analyses, summary, metadata });
+    res.json({ analyses, combinedAnalysis, summary });
   } catch (error) {
     console.error('Error in /analyze-images:', error);
     res

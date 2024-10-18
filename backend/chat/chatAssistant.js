@@ -117,7 +117,7 @@ const analyzeImagesWithVision = async (analysisPrompt, base64Image) => {
     // Log the analysis result for this image
     console.log('Image analysis result:', analysis);
 
-    // Combine the analysis using combineAnalyses
+    // Use combineAnalyses to parse and combine the analysis
     const combinedAnalysis = combineAnalyses([analysis]);
 
     return { analysis, combinedAnalysis };
@@ -128,43 +128,38 @@ const analyzeImagesWithVision = async (analysisPrompt, base64Image) => {
 
 /**
  * Summarizes combined analyses using gpt-4-turbo.
- * @param {string} combinedAnalyses - The combined analyses to summarize.
+ * @param {string} combinedAnalysis - The combined analysis to summarize.
  * @param {string} summarizePrompt - The prompt for summarization.
  * @returns {Promise<string>} - The summarized analysis.
  */
-const summarizeAnalyses = async (combinedAnalyses, summarizePrompt) => {
+const summarizeAnalyses = async (combinedAnalysis, summarizePrompt) => {
   try {
-    const userContent = `${summarizePrompt}\n\nAnalyses to summarize:\n\n${JSON.stringify(combinedAnalyses)}`;
+    if (!combinedAnalysis) {
+      console.warn('No combined analysis to summarize');
+      return null;
+    }
+
+    const analysisString = JSON.stringify(combinedAnalysis, null, 2);
+    const fullPrompt = `${summarizePrompt}\n\nCombined Analysis:\n${analysisString}`;
+
     const response = await openai.chat.completions.create({
       model: 'gpt-4-turbo',
       messages: [
         {
           role: 'user',
-          content: userContent,
+          content: fullPrompt,
         },
       ],
-      temperature: 0.5,
-      max_tokens: 1024,
-      top_p: 1,
-      frequency_penalty: 0,
-      presence_penalty: 0,
-      response_format: { type: 'text' },
+      temperature: 0.7,
+      max_tokens: 2048,
     });
 
     const summary = response.choices[0].message.content;
-
-    // Log the summary of the analyses
     console.log('Analysis summary:', summary);
 
-    return {
-      summary,
-      metadata: {
-        model: 'gpt-4-turbo',
-        summaryLength: summary.length,
-        timestamp: new Date().toISOString(),
-      },
-    };
+    return summary;
   } catch (error) {
+    console.error('Error in summarizeAnalyses:', error);
     throw error;
   }
 };

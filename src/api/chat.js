@@ -151,90 +151,17 @@ export const handleAnalyzeImages = async ({
 
     console.log('Received analysis results:', { analyses, summary, metadata });
 
-    // Step 4: Map the analysis results to your form fields
-    const mappedResult = {
-      itemDetails: {
-        type: summary.itemDetails?.type || item.itemDetails?.type || '',
-        brand: summary.itemDetails?.brand || item.itemDetails?.brand || '',
-        condition:
-          summary.itemDetails?.condition || item.itemDetails?.condition || '',
-        rarity: summary.itemDetails?.rarity || item.itemDetails?.rarity || '',
-        authenticityConfirmed:
-          summary.itemDetails?.authenticityConfirmed ??
-          item.itemDetails?.authenticityConfirmed ??
-          false,
-        packagingAccessories:
-          summary.itemDetails?.packagingAccessories ||
-          item.itemDetails?.packagingAccessories ||
-          '',
-      },
-      financials: {
-        purchasePrice:
-          summary.financials?.purchasePrice ||
-          item.financials?.purchasePrice ||
-          0,
-        cleaningRepairCosts:
-          summary.financials?.cleaningRepairCosts ||
-          item.financials?.cleaningRepairCosts ||
-          0,
-        estimatedShippingCosts:
-          summary.financials?.estimatedShippingCosts ||
-          item.financials?.estimatedShippingCosts ||
-          0,
-        platformFees:
-          summary.financials?.platformFees ||
-          item.financials?.platformFees ||
-          0,
-        expectedProfit:
-          summary.financials?.expectedProfit ||
-          item.financials?.expectedProfit ||
-          0,
-        estimatedValue:
-          summary.financials?.estimatedValue ||
-          item.financials?.estimatedValue ||
-          0,
-      },
-      marketAnalysis: {
-        marketDemand:
-          summary.marketAnalysis?.marketDemand ||
-          item.marketAnalysis?.marketDemand ||
-          '',
-        historicalPriceTrends:
-          summary.marketAnalysis?.historicalPriceTrends ||
-          item.marketAnalysis?.historicalPriceTrends ||
-          '',
-        marketSaturation:
-          summary.marketAnalysis?.marketSaturation ||
-          item.marketAnalysis?.marketSaturation ||
-          '',
-        salesVelocity:
-          summary.marketAnalysis?.salesVelocity ||
-          item.marketAnalysis?.salesVelocity ||
-          '',
-      },
-      finalRecommendation: {
-        purchaseRecommendation:
-          summary.finalRecommendation?.purchaseRecommendation ||
-          item.finalRecommendation?.purchaseRecommendation ||
-          'Unknown',
-        detailedBreakdown:
-          summary.finalRecommendation?.detailedBreakdown ||
-          item.finalRecommendation?.detailedBreakdown ||
-          '',
-      },
-    };
-
-    // Step 5: Update the item state with the mapped results
+    // Instead of mapping the results here, we'll pass them to setItem
     setItem((prevItem) => ({
       ...prevItem,
-      ...mappedResult,
+      analysisResult: { analyses, summary, metadata },
     }));
 
-    // Step 6: Update messages with the analysis advice
+    // Update messages with the analysis advice
     setMessages((prevMessages) => [
       ...prevMessages,
       createAssistantMessage(
-        `Analysis complete. ${mappedResult.finalRecommendation.detailedBreakdown}`
+        `Analysis complete. ${summary.finalRecommendation?.detailedBreakdown || 'No detailed breakdown available.'}`
       ),
     ]);
 
@@ -243,7 +170,7 @@ export const handleAnalyzeImages = async ({
     );
     setShowNotification(true);
 
-    return mappedResult;
+    return { analyses, summary, metadata };
   } catch (error) {
     console.error('Error in handleAnalyzeImages:', error);
     setNotificationMessage(

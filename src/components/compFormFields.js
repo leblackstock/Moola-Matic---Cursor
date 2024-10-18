@@ -1,7 +1,8 @@
 // frontend/src/components/compFormFields.js
 
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
+import _ from 'lodash'; // Import the full lodash library
 import {
   StyledForm,
   StyledFormGroup,
@@ -19,7 +20,8 @@ function FormFields({
   handleSubmit,
   handleSaveDraft,
   handlePurchaseRecommendationChange,
-  itemId, // Add this line
+  itemId,
+  analysisResult, // Add this prop
 }) {
   const isAnyFieldPopulated = useMemo(() => {
     return Object.values(item).some(
@@ -27,11 +29,137 @@ function FormFields({
     );
   }, [item]);
 
+  // Debounce the save function to avoid too frequent saves
+  const debouncedSave = useCallback(
+    _.debounce((newItem) => {
+      handleSaveDraft(itemId, newItem);
+    }, 1000),
+    [handleSaveDraft, itemId]
+  );
+
   useEffect(() => {
-    if (item.analysisResult) {
-      // ... (keep existing analysis result handling)
+    console.log('FormFields received new analysisResult:', analysisResult);
+
+    if (analysisResult && analysisResult.summary) {
+      console.log('Processing summary:', analysisResult.summary);
+
+      const { summary } = analysisResult;
+
+      // Update form fields based on the analysis result
+      if (summary.itemDetails) {
+        console.log('Updating item details:', summary.itemDetails);
+        Object.entries(summary.itemDetails).forEach(([key, value]) => {
+          if (value !== undefined) {
+            console.log(`Updating ${key} to ${value}`);
+            updateItem(key, value);
+          }
+        });
+      }
+
+      if (summary.financials) {
+        Object.entries(summary.financials).forEach(([key, value]) => {
+          if (value !== undefined) {
+            updateItem(
+              `financials${key.charAt(0).toUpperCase() + key.slice(1)}`,
+              value
+            );
+          }
+        });
+      }
+
+      if (summary.marketAnalysis) {
+        Object.entries(summary.marketAnalysis).forEach(([key, value]) => {
+          if (value !== undefined) {
+            updateItem(
+              `marketAnalysis${key.charAt(0).toUpperCase() + key.slice(1)}`,
+              value
+            );
+          }
+        });
+      }
+
+      if (summary.condition) {
+        Object.entries(summary.condition).forEach(([key, value]) => {
+          if (value !== undefined) {
+            updateItem(
+              `condition${key.charAt(0).toUpperCase() + key.slice(1)}`,
+              value
+            );
+          }
+        });
+      }
+
+      if (summary.measurements) {
+        Object.entries(summary.measurements).forEach(
+          ([category, measurements]) => {
+            if (typeof measurements === 'object') {
+              Object.entries(measurements).forEach(([key, value]) => {
+                if (value !== undefined) {
+                  updateItem(
+                    `${category}${key.charAt(0).toUpperCase() + key.slice(1)}`,
+                    value
+                  );
+                }
+              });
+            }
+          }
+        );
+      }
+
+      if (summary.compliance) {
+        Object.entries(summary.compliance).forEach(([key, value]) => {
+          if (value !== undefined) {
+            updateItem(
+              `compliance${key.charAt(0).toUpperCase() + key.slice(1)}`,
+              value
+            );
+          }
+        });
+      }
+
+      if (summary.additionalInfo) {
+        Object.entries(summary.additionalInfo).forEach(([key, value]) => {
+          if (value !== undefined) {
+            updateItem(key, value);
+          }
+        });
+      }
+
+      if (summary.finalRecommendation) {
+        console.log(
+          'Updating final recommendation:',
+          summary.finalRecommendation
+        );
+        if (summary.finalRecommendation.purchaseRecommendation !== undefined) {
+          console.log(
+            `Updating purchaseRecommendation to ${summary.finalRecommendation.purchaseRecommendation}`
+          );
+          updateItem(
+            'purchaseRecommendation',
+            summary.finalRecommendation.purchaseRecommendation
+          );
+        }
+        if (summary.finalRecommendation.detailedBreakdown !== undefined) {
+          console.log(`Updating detailedBreakdown`);
+          updateItem(
+            'detailedBreakdown',
+            summary.finalRecommendation.detailedBreakdown
+          );
+        }
+      }
+    } else {
+      console.log('No valid analysisResult or summary available');
     }
-  }, [item.analysisResult, updateItem]);
+  }, [analysisResult, updateItem]);
+
+  const handleFieldChange = useCallback(
+    (key, value) => {
+      const newItem = { ...item, [key]: value };
+      updateItem(key, value);
+      debouncedSave(newItem);
+    },
+    [item, updateItem, debouncedSave]
+  );
 
   const renderField = (key, label, type = 'text') => (
     <StyledFormGroup key={key}>
@@ -40,7 +168,7 @@ function FormFields({
         <StyledTextarea
           id={key}
           value={item[key] || ''}
-          onChange={(e) => updateItem(key, e.target.value)}
+          onChange={(e) => handleFieldChange(key, e.target.value)}
           rows="3"
         />
       ) : type === 'number' ? (
@@ -48,7 +176,7 @@ function FormFields({
           type="number"
           id={key}
           value={item[key] || ''}
-          onChange={(e) => updateItem(key, parseFloat(e.target.value))}
+          onChange={(e) => handleFieldChange(key, parseFloat(e.target.value))}
         />
       ) : type === 'date' ? (
         <StyledInput
@@ -57,13 +185,13 @@ function FormFields({
           value={
             item[key] ? new Date(item[key]).toISOString().split('T')[0] : ''
           }
-          onChange={(e) => updateItem(key, e.target.value)}
+          onChange={(e) => handleFieldChange(key, e.target.value)}
         />
       ) : type === 'boolean' ? (
         <StyledSelect
           id={key}
           value={item[key] === true ? 'true' : 'false'}
-          onChange={(e) => updateItem(key, e.target.value === 'true')}
+          onChange={(e) => handleFieldChange(key, e.target.value === 'true')}
         >
           <option value="true">Yes</option>
           <option value="false">No</option>
@@ -73,7 +201,7 @@ function FormFields({
           type={type}
           id={key}
           value={item[key] || ''}
-          onChange={(e) => updateItem(key, e.target.value)}
+          onChange={(e) => handleFieldChange(key, e.target.value)}
         />
       )}
     </StyledFormGroup>
@@ -294,8 +422,6 @@ function FormFields({
     </>
   );
 
-  // You can now use itemId within your component if needed
-  // For example, you might want to use it in the form submission:
   const onSubmit = (e) => {
     e.preventDefault();
     handleSubmit(itemId);
@@ -316,7 +442,7 @@ function FormFields({
               type="text"
               id="name"
               value={item.name || ''}
-              onChange={(e) => updateItem('name', e.target.value)}
+              onChange={(e) => handleFieldChange('name', e.target.value)}
               required
             />
           </StyledFormGroup>
@@ -324,7 +450,7 @@ function FormFields({
       </StyledForm>
 
       {isAnyFieldPopulated && (
-        <StyledButton onClick={() => handleSaveDraft(itemId)}>
+        <StyledButton onClick={() => handleSaveDraft(itemId, item)}>
           Save Draft
         </StyledButton>
       )}
@@ -339,6 +465,7 @@ FormFields.propTypes = {
   handleSaveDraft: PropTypes.func.isRequired,
   handlePurchaseRecommendationChange: PropTypes.func.isRequired,
   itemId: PropTypes.string.isRequired,
+  analysisResult: PropTypes.object, // Add this prop type
 };
 
 export default FormFields;

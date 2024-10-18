@@ -2,38 +2,54 @@
 
 const combineAnalyses = (analysisResults) => {
   try {
-    const combinedAnalysis = analysisResults.reduce((combined, result) => {
-      const { parsedJson, remainingText } = parseJsonResponse(result);
+    // Check if analysisResults is undefined, null, or not an array
+    if (!Array.isArray(analysisResults) || analysisResults.length === 0) {
+      console.warn('combineAnalyses: Invalid or empty analysisResults');
+      return null;
+    }
 
-      if (!parsedJson) {
-        console.error('Failed to parse JSON response', result);
+    console.log(
+      'Received analysis results:',
+      JSON.stringify(analysisResults, null, 2)
+    );
+
+    const parsedResults = analysisResults.map(parseJsonResponse);
+
+    console.log('Parsed results:', JSON.stringify(parsedResults, null, 2));
+
+    const combinedAnalysis = parsedResults.reduce((combined, result) => {
+      // Check if the current result is a valid object
+      if (typeof result !== 'object' || result === null) {
+        console.warn('combineAnalyses: Invalid result item', result);
         return combined;
       }
 
-      // Merge the parsed JSON with the combined result
-      Object.keys(parsedJson).forEach((key) => {
+      // Merge the current result with the combined result
+      Object.keys(result).forEach((key) => {
         if (
           combined[key] === undefined ||
           combined[key] === null ||
           combined[key] === ''
         ) {
-          combined[key] = parsedJson[key];
+          combined[key] = result[key];
+        } else if (key === 'detailedBreakdown') {
+          // Concatenate detailed breakdowns
+          combined[key] = (combined[key] || '') + '\n' + (result[key] || '');
         }
       });
-
-      // Append any remaining text to the detailedBreakdown
-      if (remainingText) {
-        combined.detailedBreakdown =
-          (combined.detailedBreakdown || '') + '\n' + remainingText;
-      }
 
       return combined;
     }, {});
 
-    return isValidAnalysis(combinedAnalysis) ? combinedAnalysis : null;
+    console.log(
+      'Combined analysis:',
+      JSON.stringify(combinedAnalysis, null, 2)
+    );
+
+    return combinedAnalysis; // Return the combined analysis directly
   } catch (error) {
     console.error('Error in combineAnalyses:', error);
-    throw error;
+    return null;
   }
 };
 
@@ -42,27 +58,26 @@ const combineAnalyses = (analysisResults) => {
  * @param {string} inputString - The input string that may contain JSON.
  * @returns {Object} - An object containing parsed JSON (if any) and remaining text.
  */
-const parseJsonResponse = (inputString) => {
-  const result = {
-    parsedJson: null,
-    remainingText: '',
-  };
+const parseJsonResponse = (input) => {
+  if (typeof input === 'object' && input !== null) {
+    console.log('parseJsonResponse: Input is already an object', input);
+    return input; // Return the input as-is if it's already an object
+  }
 
-  if (typeof inputString !== 'string') {
-    console.error('parseJsonResponse: Input is not a string', inputString);
-    result.remainingText = JSON.stringify(inputString);
-    return result;
+  if (typeof input !== 'string') {
+    console.error('parseJsonResponse: Input is not a string or object', input);
+    return { rawAnalysis: JSON.stringify(input) };
   }
 
   try {
-    result.parsedJson = JSON.parse(inputString);
-    result.remainingText = '';
+    return JSON.parse(input);
   } catch (error) {
+    console.warn('Failed to parse JSON, attempting to extract JSON object');
     const jsonRegex = /{[^{}]*}|[[^\[\]]*]/g;
-    const matches = inputString.match(jsonRegex);
+    const matches = input.match(jsonRegex);
 
     if (matches) {
-      result.parsedJson = matches
+      const parsedJson = matches
         .map((match) => {
           try {
             return JSON.parse(match);
@@ -72,13 +87,14 @@ const parseJsonResponse = (inputString) => {
         })
         .filter((item) => item !== null)[0]; // Take the first valid JSON object
 
-      result.remainingText = inputString.replace(jsonRegex, '').trim();
-    } else {
-      result.remainingText = inputString;
+      if (parsedJson) {
+        return parsedJson;
+      }
     }
-  }
 
-  return result;
+    console.warn('No valid JSON found, returning raw analysis');
+    return { rawAnalysis: input };
+  }
 };
 
 /**
