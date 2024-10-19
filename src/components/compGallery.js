@@ -10,10 +10,7 @@ import {
   HoverDeleteButton,
   ErrorImagePlaceholder,
 } from './compStyles.js';
-
 import { getImageUrl } from '../helpers/itemGen.js';
-
-const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:3001';
 
 export const UploadedImagesGallery = ({
   images,
@@ -36,32 +33,39 @@ export const UploadedImagesGallery = ({
 
   return (
     <GalleryContainer>
-      {images.map((image, index) => (
-        <ImageContainer key={`${image.id || image.filename}-${index}`}>
-          <StyledImage
-            src={`/uploads/drafts/${itemId}/${image.filename}`}
-            alt={`Uploaded image ${index + 1}`}
-            onClick={() => onSelect(image)}
-            style={{
-              border: selectedImage === image ? '2px solid blue' : 'none',
-            }}
-            onError={(e) => {
-              console.error(`Failed to load image: ${image.filename}`);
-              e.target.onerror = null;
-              e.target.style.display = 'none';
-              e.target.parentElement.style.backgroundColor = '#f0f0f0';
-            }}
-          />
-          <HoverDeleteButton
-            onClick={(e) => {
-              e.stopPropagation();
-              handleDelete(image);
-            }}
-          >
-            ×
-          </HoverDeleteButton>
-        </ImageContainer>
-      ))}
+      {images.map((image, index) => {
+        const imageUrl = getImageUrl(itemId, image.filename);
+        return (
+          <ImageContainer key={`${image.id || image.filename}-${index}`}>
+            {imageUrl ? (
+              <StyledImage
+                src={imageUrl}
+                alt={`Uploaded image ${index + 1}`}
+                onClick={() => onSelect(image, itemId)} // Pass itemId here
+                style={{
+                  border: selectedImage === image ? '2px solid blue' : 'none',
+                }}
+                onError={(e) => {
+                  console.error(`Failed to load image: ${image.filename}`);
+                  e.target.onerror = null;
+                  e.target.style.display = 'none';
+                  e.target.parentElement.style.backgroundColor = '#f0f0f0';
+                }}
+              />
+            ) : (
+              <ErrorImagePlaceholder>No Image</ErrorImagePlaceholder>
+            )}
+            <HoverDeleteButton
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDelete(image);
+              }}
+            >
+              ×
+            </HoverDeleteButton>
+          </ImageContainer>
+        );
+      })}
     </GalleryContainer>
   );
 };
@@ -87,7 +91,6 @@ export const DraftItemGallery = ({ items, onSelect, onDelete }) => {
   return (
     <GalleryContainer>
       {items.map((item, index) => {
-        // Improved image URL selection logic
         const imageUrl =
           item.imageUrl ||
           (item.images &&
@@ -98,7 +101,11 @@ export const DraftItemGallery = ({ items, onSelect, onDelete }) => {
 
         const uniqueKey = `${item.itemId || item._id || ''}-${index}`;
         return (
-          <ImageContainer key={uniqueKey} onClick={() => onSelect(item)}>
+          <ImageContainer
+            key={uniqueKey}
+            onClick={() => onSelect(item)}
+            $noImage={!imageUrl}
+          >
             {imageUrl ? (
               <StyledImage
                 src={imageUrl}
@@ -107,7 +114,8 @@ export const DraftItemGallery = ({ items, onSelect, onDelete }) => {
                   console.error(`Failed to load image: ${imageUrl}`);
                   e.target.onerror = null;
                   e.target.style.display = 'none';
-                  e.target.parentElement.style.backgroundColor = '#f0f0f0';
+                  e.target.parentElement.style.backgroundColor =
+                    'rgba(138, 43, 226, 0.2)';
                 }}
               />
             ) : (

@@ -137,6 +137,7 @@ function NewItemPage({ setItem: setParentItem }) {
         const localData = await loadLocalData(itemId);
 
         if (localData) {
+          // Load local data first
           setItem(localData);
           setParentItem(localData);
           setUploadedImages(
@@ -144,13 +145,69 @@ function NewItemPage({ setItem: setParentItem }) {
           );
           setContextData(localData.contextData || {});
           setMessages(localData.messages || []);
+
+          // Now check the database for updates
+          try {
+            const response = await axios.get(
+              `${API_BASE_URL}/api/items/${itemId}`
+            );
+            const dbItem = response.data;
+
+            if (dbItem && dbItem.lastUpdated > localData.lastUpdated) {
+              // DB data is newer, update the state
+              setItem(dbItem);
+              setParentItem(dbItem);
+              setUploadedImages(
+                Array.isArray(dbItem.images) ? dbItem.images : []
+              );
+              setContextData(dbItem.contextData || {});
+              setMessages(dbItem.messages || []);
+
+              // Update local storage with the newer data
+              handleLocalSave(
+                dbItem,
+                dbItem.contextData,
+                dbItem.messages,
+                itemId
+              );
+            }
+          } catch (dbError) {
+            console.error('Error fetching item from database:', dbError);
+            // Continue with local data if database fetch fails
+          }
         } else {
-          console.error('No local data found for itemId:', itemId);
-          navigate('/');
-          return;
+          // If no local data, fetch from database
+          try {
+            const response = await axios.get(
+              `${API_BASE_URL}/api/items/${itemId}`
+            );
+            const dbItem = response.data;
+            if (dbItem) {
+              setItem(dbItem);
+              setParentItem(dbItem);
+              setUploadedImages(
+                Array.isArray(dbItem.images) ? dbItem.images : []
+              );
+              setContextData(dbItem.contextData || {});
+              setMessages(dbItem.messages || []);
+              // Save to local storage
+              handleLocalSave(
+                dbItem,
+                dbItem.contextData,
+                dbItem.messages,
+                itemId
+              );
+            } else {
+              console.error('No data found for itemId:', itemId);
+              navigate('/');
+            }
+          } catch (dbError) {
+            console.error('Error fetching item from database:', dbError);
+            navigate('/');
+          }
         }
       } catch (error) {
-        console.error('Error loading local data:', error);
+        console.error('Error loading data:', error);
         navigate('/');
       }
     };

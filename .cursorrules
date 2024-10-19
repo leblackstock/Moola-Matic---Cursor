@@ -1,4 +1,18 @@
 {
+  "Project Structure": {
+    "rootDirectory": "The project root is at C:\\Users\\outdo\\OneDrive\\Desktop\\Reseller Inventory\\Moola-Matic - Cursor\\moola-matic_react. All file paths should be relative to this directory."
+  },
+  "New Coder Guidance": {
+    "approach": "Recognize that the coder is new to development. Provide clear explanations, best practices, and helpful advice with each response.",
+    "explanations": "Offer detailed explanations for complex concepts or code snippets. Break down information into digestible parts.",
+    "bestPractices": "Suggest and explain industry best practices, focusing on code readability, maintainability, and efficiency.",
+    "resources": "Recommend relevant documentation, tutorials, or articles for further learning when appropriate.",
+    "codeExamples": "Provide practical code examples to illustrate concepts or solutions.",
+    "encouragement": "Offer encouragement and positive reinforcement for good coding practices or problem-solving approaches.",
+    "terminology": "Explain technical terms or jargon that might be unfamiliar to a new coder.",
+    "debugging": "Guide through debugging processes, explaining common debugging techniques and tools.",
+    "askQuestions": "Don't hesitate to ask clarifying questions to ensure the coder's needs are fully understood and addressed."
+  },
   "OpenAI API": {
     "instructions": "Follow OpenAI's official guidelines for API integration to manage API keys, error handling, and rate limits. Use version 4.61.0 and `@web` for the latest features. Only modify the selected AI models if specifically requested."
   },
@@ -25,10 +39,10 @@
     "navigation": "Implement navigation using React Router for defining routes, including nested and dynamic routing, as needed for your application. Use `React.lazy()` for code splitting to improve performance."
   },
   "Styled Components": {
-    "CSSinJS": "Use Styled Components as the primary styling method for dynamic and scoped styling. Leverage its theme support and component-based styles. All styles should be saved in `moola-matic_react/src/components/compStyles.js`."
+    "CSSinJS": "Use Styled Components as the primary styling method for dynamic and scoped styling. Leverage its theme support and component-based styles. All styles should be saved in `src/components/compStyles.js`."
   },
   "App.css": {
-    "styling": "Use `moola-matic_react/src/App.css` as the secondary styling method for global styles and shared utility classes."
+    "styling": "Use `src/App.css` as the secondary styling method for global styles and shared utility classes."
   },
   "Bootstrap": {
     "stylingFramework": "Use Bootstrap as the tertiary styling method for responsive design and pre-styled components, adhering to its grid system and utility classes for consistency."
@@ -39,11 +53,8 @@
   "Webpack": {
     "bundling": "Use Webpack to bundle JavaScript modules, specifying entry points and outputs as well as loaders for handling different types of files. Include optimization plugins such as `TerserPlugin` or `BundleAnalyzerPlugin` for production builds to reduce bundle size."
   },
-  "Babel": {
-    "transpilation": "Configure Babel to transpile modern JavaScript to older syntax for compatibility. Ensure presets for React and TypeScript are included."
-  },
   "ESLint": {
-    "linting": "Configure ESLint for code quality, with rules that enforce TypeScript and React best practices."
+    "linting": "Configure ESLint for code quality, with rules that enforce React best practices."
   },
   "Jest": {
     "testing": "Write unit tests for all components using Jest, ensuring key functionalities are covered. Use mocking libraries such as `msw` or `nock` for testing components that make HTTP requests."
@@ -92,9 +103,10 @@
     "codeEditing": "Do not remove any code, comments, or logging not directly related to the code being edited unless explicitly instructed."
   },
   "JavaScript Usage": {
-    "preference": "Use JavaScript (.js) for all components and files. Do not use TypeScript or create .ts/.tsx components.",
-    "componentCreation": "Create React components using .js files only. Avoid using TypeScript features or type annotations.",
-    "propTypes": "Use PropTypes for type checking in development instead of TypeScript interfaces or types."
+    "preference": "Use JavaScript (.js) for all components and files.",
+    "componentCreation": "Create React components using .js files only.",
+    "propTypes": "Use PropTypes for type checking in development.",
+    "noTypeScript": "This project does not use TypeScript. Do not create .ts or .tsx files, do not add type annotations, and do not use TypeScript-specific features. Stick to standard JavaScript and use JSDoc comments for documentation when necessary."
   },
   "Toast Notifications": {
     "usage": "Use react-toastify for displaying toast notifications. Configure toasts to be consistent across the application. Use 'success' for successful operations, 'error' for failures, 'info' for general information, and 'warning' for potential issues. Keep messages concise and user-friendly. Position toasts in the top-right corner by default.",

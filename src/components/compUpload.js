@@ -103,10 +103,10 @@ export const handleFileChange = async (
 
     console.log('Upload response:', response.data);
 
-    if (response.data && response.data.uploadedFiles) {
+    if (Array.isArray(response.data)) {
       setItem((prevItem) => ({
         ...prevItem,
-        images: [...(prevItem.images || []), ...response.data.uploadedFiles],
+        images: [...(prevItem.images || []), ...response.data],
       }));
       setHasUnsavedChanges(true);
       setImageUploaded(true);

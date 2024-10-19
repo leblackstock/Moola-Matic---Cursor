@@ -84,29 +84,23 @@ export const createNewItem = () => {
   });
 };
 
-export const getGeneratedItemId = () => {
-  return withLock(async () => generatedItemId);
-};
+export const getGeneratedItemId = () => withLock(async () => generatedItemId);
 
-export const resetItemGeneration = () => {
-  return withLock(async () => {
+export const resetItemGeneration = () =>
+  withLock(async () => {
     isItemGenerated = false;
     generatedItemId = null;
   });
-};
 
 export const generateItemId = () => uuidv4();
 
-export const getCurrentItemId = () => {
-  return withLock(async () => generatedItemId);
-};
+export const getCurrentItemId = () => withLock(async () => generatedItemId);
 
-export const setCurrentItemId = (itemId) => {
-  return withLock(async () => {
+export const setCurrentItemId = (itemId) =>
+  withLock(async () => {
     generatedItemId = itemId;
     isItemGenerated = true;
   });
-};
 
 export const generateDraftFilename = (
   itemId,

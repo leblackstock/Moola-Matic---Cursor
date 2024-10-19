@@ -120,6 +120,10 @@ const DraftItemSchema = new mongoose.Schema(
       },
     ],
 
+    // New fields for locking mechanism
+    lockedAt: Date,
+    expiresAt: Date,
+
     // Dates
     purchaseDate: Date,
     listingDate: Date,

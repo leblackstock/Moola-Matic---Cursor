@@ -4,7 +4,7 @@ import { DraftItem } from '../models/draftItem.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { promises as fs } from 'fs';
-import { performance } from 'perf_hooks';
+//import { performance } from 'perf_hooks';
 import { generateDraftFilename } from '../utils/nextSequentialNumber.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -34,55 +34,41 @@ const upload = multer({
 }).array('images', 10); // Allow up to 10 images
 
 // POST /api/items/draft-images/upload
-router.post('/draft-images/upload', (req, res) => {
-  const startTime = performance.now();
-  const timeout = 120000; // 2 minutes
+router.post('/draft-images/upload', upload, async (req, res) => {
+  try {
+    const itemId = req.body.itemId;
 
-  upload(req, res, async function (err) {
-    if (err) {
+    // Check if DraftItem exists
+    const existingDraftItem = await DraftItem.findOne({ itemId: itemId });
+
+    if (!existingDraftItem) {
+      return res.status(404).json({ error: 'DraftItem not found' });
+    }
+
+    const uploadPath = path.join(__dirname, '..', 'uploads', 'drafts', itemId);
+
+    // Create the upload path if it doesn't exist
+    try {
+      await fs.mkdir(uploadPath, { recursive: true });
+      console.log(`Created upload directory: ${uploadPath}`);
+    } catch (error) {
+      console.error(`Error creating upload directory: ${error}`);
       return res
         .status(500)
-        .json({ error: 'File upload failed', details: err.message });
+        .json({ error: 'Failed to create upload directory' });
     }
 
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Operation timed out')), timeout)
-    );
-
-    try {
-      await Promise.race([
-        (async () => {
-          const itemId = req.body.itemId || 'temp';
-          const uploadPath = path.join(
-            __dirname,
-            '..',
-            'uploads',
-            'drafts',
-            itemId
-          );
-
-          const uploadedFiles = await Promise.all(
-            req.files.map(async (file) =>
-              generateDraftFilename(itemId, file, uploadPath)
-            )
-          );
-
-          const endTime = performance.now();
-          console.log(`Upload operation completed in ${endTime - startTime}ms`);
-          res.json({
-            message: 'Files uploaded successfully',
-            uploadedFiles: uploadedFiles,
-          });
-        })(),
-        timeoutPromise,
-      ]);
-    } catch (error) {
-      console.error('Error in file upload:', error);
-      res
-        .status(error.message === 'Operation timed out' ? 504 : 500)
-        .json({ error: error.message });
+    const results = [];
+    for (const file of req.files) {
+      const result = await generateDraftFilename(itemId, file, uploadPath);
+      results.push(result);
     }
-  });
+
+    res.json(results);
+  } catch (error) {
+    console.error('Error in file upload:', error);
+    res.status(500).json({ error: 'An error occurred during file upload' });
+  }
 });
 
 // GET /api/items/draft-item-schema

@@ -1,6 +1,7 @@
 // frontend\src\components\compStyles.js
 
 import styled, { keyframes } from 'styled-components';
+import { ToastContainer } from 'react-toastify';
 
 // Keyframes
 const fadeInOut = keyframes`
@@ -40,6 +41,7 @@ const squareToCircle = keyframes`
 
 const popIn = keyframes`
   0% { transform: scale(0.5); opacity: 0; }
+  70% { transform: scale(1.1); }
   100% { transform: scale(1); opacity: 1; }
 `;
 
@@ -58,7 +60,7 @@ const float = keyframes`
 `;
 
 // Define a subtle pulse animation
-const pulse = keyframes`
+const subtlePulse = keyframes`
   0% { transform: scale(1); }
   50% { transform: scale(1.05); }
   100% { transform: scale(1); }
@@ -79,12 +81,16 @@ export const ImageContainer = styled.div`
   position: relative;
   aspect-ratio: 1;
   cursor: pointer;
-  border-radius: 8px; // Increased from 5px to 8px
+  border-radius: 8px;
   overflow: hidden;
   transition:
     transform 0.3s ease,
     box-shadow 0.3s ease;
-  height: 150px; // Added fixed height
+  height: 150px;
+  background-color: ${(props) =>
+    props.$noImage
+      ? 'rgba(138, 43, 226, 0.2)'
+      : 'transparent'}; // Light purple background for items with no image
 
   ${(props) =>
     props.$isSelected &&
@@ -1018,11 +1024,11 @@ export const FormButton = styled(StyledButton)`
 // `;
 
 export const ErrorImagePlaceholder = styled.div`
-  display: none;
+  display: flex; // Changed from 'none' to 'flex'
   width: 100%;
   height: 100%;
-  background-color: #ff6b6b; // A light red color, you can adjust as needed
-  color: white;
+  background-color: rgba(138, 43, 226, 0.2); // Light purple background
+  color: #f5deb3; // Changed to wheat color for better visibility
   justify-content: center;
   align-items: center;
   text-align: center;
@@ -1086,5 +1092,145 @@ export const ItemOverlay = styled.div`
   p {
     margin: 0 0 5px 0;
     font-size: 12px;
+  }
+`;
+
+// New animations
+export const bounce = keyframes`
+  0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-30px); }
+  60% { transform: translateY(-15px); }
+`;
+
+export const shake = keyframes`
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-10px); }
+  20%, 40%, 60%, 80% { transform: translateX(10px); }
+`;
+
+export const rotate360 = keyframes`
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+`;
+
+export const slideInFromLeft = keyframes`
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(0); }
+`;
+
+export const pulse = keyframes`
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+`;
+
+// Example usage of new animations
+export const BouncingElement = styled.div`
+  animation: ${bounce} 2s ease infinite;
+`;
+
+export const ShakingElement = styled.div`
+  animation: ${shake} 0.82s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+`;
+
+export const SpinningElement = styled.div`
+  animation: ${rotate360} 2s linear infinite;
+`;
+
+export const SlideInElement = styled.div`
+  animation: ${slideInFromLeft} 0.5s ease-out;
+`;
+
+export const PulsingElement = styled.div`
+  animation: ${pulse} 2s infinite;
+`;
+
+export const PopInElement = styled.div`
+  animation: ${popIn} 0.5s cubic-bezier(0.26, 0.53, 0.74, 1.48);
+`;
+
+// New styled components using these animations
+export const AnimatedGlowingButton = styled(StyledButton)`
+  animation: ${glow} 2s infinite;
+`;
+
+export const FloatingIcon = styled.i`
+  animation: ${float} 3s ease-in-out infinite;
+`;
+
+export const PulsingLogo = styled(Logo)`
+  animation: ${subtlePulse} 2s ease-in-out infinite;
+`;
+
+export const GlowingFloatingElement = styled.div`
+  animation:
+    ${glow} 2s infinite,
+    ${float} 3s ease-in-out infinite;
+`;
+
+export const PulsingGlowCard = styled.div`
+  animation:
+    ${subtlePulse} 2s ease-in-out infinite,
+    ${glow} 2s infinite;
+  padding: 20px;
+  border-radius: 10px;
+  background-color: rgba(13, 0, 26, 0.6);
+`;
+
+// Add this new styled component for custom toast notifications
+export const StyledToastContainer = styled(ToastContainer)`
+  .Toastify__toast {
+    background: rgba(13, 0, 26, 0.9);
+    color: #f5deb3;
+    border-radius: 15px;
+    padding: 15px;
+    box-shadow: 0 0 30px rgba(138, 43, 226, 0.4);
+    border: 2px solid #4a0e4e;
+    transition: all 0.3s ease;
+  }
+
+  .Toastify__toast:hover {
+    box-shadow: 0 0 40px rgba(138, 43, 226, 0.6);
+    transform: translateY(-2px);
+  }
+
+  .Toastify__toast-body {
+    font-family: your-font-family, sans-serif;
+  }
+
+  .Toastify__progress-bar {
+    background: linear-gradient(to right, #f5deb3, #00ffff);
+    height: 3px;
+  }
+
+  .Toastify__close-button {
+    color: #f5deb3;
+    opacity: 0.7;
+    transition: all 0.3s ease;
+  }
+
+  .Toastify__close-button:hover {
+    color: #00ffff;
+    opacity: 1;
+  }
+
+  .Toastify__toast--success {
+    background: linear-gradient(45deg, #2d0037, #4a0e4e);
+  }
+
+  .Toastify__toast--error {
+    background: linear-gradient(45deg, #8b0000, #4a0e4e);
+  }
+
+  .Toastify__toast--warning {
+    background: linear-gradient(45deg, #ffa500, #4a0e4e);
+  }
+
+  .Toastify__toast--info {
+    background: linear-gradient(45deg, #00ced1, #4a0e4e);
+  }
+
+  .Toastify__toast-icon {
+    color: #00ffff;
   }
 `;
