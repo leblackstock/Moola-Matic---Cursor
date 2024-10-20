@@ -25,11 +25,11 @@ export const handleDraftSave = async (item, messages, currentItemId) => {
 
     const existingImages = images
       .filter((image) => image.url && !image.file)
-      .map((image) => ({ ...image, isNew: false }));
+      .map((image) => ({ ...image, isNewItem: false }));
 
     const newImages = images
       .filter((image) => image.file)
-      .map((image) => ({ ...image, isNew: true }));
+      .map((image) => ({ ...image, isNewItem: true }));
 
     const allImages = [...existingImages, ...newImages];
 
@@ -99,7 +99,7 @@ export const handleAutoSave = async (
             id: image.id,
             url: image.url,
             filename: image.filename,
-            isNew: image.isNew,
+            isNewItem: image.isNewItem,
           })),
       ],
     };
@@ -173,7 +173,7 @@ export const handleLocalSave = (item, contextData, messages, itemId) => {
           id: img.id,
           url: img.url,
           filename: img.filename,
-          isNew: img.isNew,
+          isNewItem: img.isNewItem,
         }))
       : [],
     messages: validMessages,
@@ -328,7 +328,7 @@ export const handleDraftSaveWithImages = async (
         id: image.id,
         url: image.url,
         filename: image.filename,
-        isNew: image.isNew,
+        isNewItem: image.isNewItem,
       }));
     }
 
@@ -400,7 +400,7 @@ export const handleManualSave = async (
         id: img.id || uuidv4(),
         url: img.url,
         filename: img.filename,
-        isNew: img.isNew,
+        isNewItem: img.isNewItem,
       })),
   ];
 
@@ -739,11 +739,11 @@ export const handleSave = async (item, messages, currentItemId) => {
 
     const existingImages = itemCopy.images
       .filter((image) => image.url && !image.file)
-      .map((image) => ({ ...image, isNew: false }));
+      .map((image) => ({ ...image, isNewItem: false }));
 
     const newImages = itemCopy.images
       .filter((image) => image.file)
-      .map((image) => ({ ...image, isNew: true }));
+      .map((image) => ({ ...image, isNewItem: true }));
 
     const allImages = [...existingImages, ...newImages];
 

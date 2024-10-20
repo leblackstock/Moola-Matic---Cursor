@@ -35,7 +35,7 @@ export const generateDraftFilename = async (itemId, file, uploadPath) => {
               images: {
                 filename: newFilename,
                 url: newPath,
-                isNew: true,
+                isNewItem: true,
               },
             },
             $set: { lastUpdated: new Date() },

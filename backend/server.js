@@ -1,7 +1,6 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
-import fs from 'fs';
 import dotenv from 'dotenv';
 import helmet from 'helmet';
 import session from 'express-session';
@@ -13,8 +12,9 @@ import purchaseImageRouter from './api/apiPurchaseImage.js';
 import connectDB from './config/database.js';
 import MongoStore from 'connect-mongo';
 import logger from '../src/helpers/logger.js';
-import fsPromises from 'fs/promises';
+import { promises as fs } from 'fs';
 import morgan from 'morgan';
+import mongoose from 'mongoose';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,6 +31,9 @@ if (!assistantId) {
   logger.error('MOOLA_MATIC_ASSISTANT_ID is not defined in the .env file.');
   process.exit(1);
 }
+
+// Add this line near the top of the file, after imports
+mongoose.set('strictQuery', false);
 
 const app = express();
 app.set('trust proxy', 1);
@@ -117,18 +120,15 @@ app.use('/api/purchase-images', purchaseImageRouter);
 app.use('/api', chatHandler);
 
 // Logout Route
-app.post('/api/logout', (req, res) => {
+app.post('/api/logout', async (req, res) => {
   const uploadedImages = req.session.uploadedImages || [];
 
-  uploadedImages.forEach((imagePath) => {
-    fs.unlink(imagePath, (err) => {
-      if (err) {
-        logger.error(`Error deleting uploaded image file ${imagePath}:`, err);
-      } else {
-        logger.debug(`Uploaded image file ${imagePath} deleted successfully.`);
-      }
-    });
-  });
+  try {
+    await Promise.all(uploadedImages.map((imagePath) => fs.unlink(imagePath)));
+    logger.debug('All uploaded image files deleted successfully.');
+  } catch (err) {
+    logger.error('Error deleting uploaded image files:', err);
+  }
 
   req.session.destroy((err) => {
     if (err) {
@@ -192,7 +192,7 @@ app._router.stack.forEach(print.bind(null, []));
 const ensureUploadsDirectory = async () => {
   const uploadsPath = path.join(__dirname, 'uploads', 'drafts');
   try {
-    await fsPromises.mkdir(uploadsPath, { recursive: true });
+    await fs.mkdir(uploadsPath, { recursive: true });
     console.log('Uploads directory ensured');
   } catch (error) {
     console.error('Error creating uploads directory:', error);
@@ -216,6 +216,19 @@ const startServer = async () => {
     // Add error logging for the server
     server.on('error', (error) => {
       logger.error('Server error:', error);
+    });
+
+    // Add MongoDB connection error handling
+    mongoose.connection.on('error', (error) => {
+      logger.error('MongoDB connection error:', error);
+    });
+
+    mongoose.connection.on('disconnected', () => {
+      logger.warn('MongoDB disconnected. Attempting to reconnect...');
+    });
+
+    mongoose.connection.on('reconnected', () => {
+      logger.info('MongoDB reconnected');
     });
   } catch (error) {
     logger.error('Failed to start server:', error);

@@ -111,8 +111,8 @@ const addImageAnimation = keyframes`
 // Gallery Components
 export const ImageContainer = styled.div`
   position: relative;
+  cursor: grab;
   aspect-ratio: 1;
-  cursor: pointer;
   border-radius: 8px;
   overflow: hidden;
   transition:
@@ -143,6 +143,10 @@ export const ImageContainer = styled.div`
 
   &.adding {
     animation: ${addImageAnimation} 0.5s ease-in-out;
+  }
+
+  &:active {
+    cursor: grabbing;
   }
 `;
 
@@ -881,6 +885,8 @@ export const GalleryContainer = styled.div`
   flex-wrap: wrap;
   gap: 10px;
   justify-content: flex-start;
+  padding: 10px;
+  user-select: none; // Prevent text selection during drag
 
   ${(props) =>
     props.$isDraftGallery &&
