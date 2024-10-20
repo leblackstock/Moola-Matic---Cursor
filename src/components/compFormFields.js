@@ -1,6 +1,12 @@
 // frontend/src/components/compFormFields.js
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from 'react';
 import PropTypes from 'prop-types';
 import _ from 'lodash'; // Import the full lodash library
 import {
@@ -24,8 +30,11 @@ function FormFields({
   analysisResult,
   aiRecommendation,
 }) {
+  console.log('FormFields render start');
+
   const [hasPopulatedFields, setHasPopulatedFields] = useState(false);
   const previousAnalysisResultRef = useRef();
+  const [updatedFields, setUpdatedFields] = useState(new Set());
 
   // Debounce the save function to avoid too frequent saves
   const debouncedSave = useCallback(
@@ -36,140 +45,72 @@ function FormFields({
   );
 
   useEffect(() => {
-    if (
-      analysisResult &&
-      analysisResult !== previousAnalysisResultRef.current
-    ) {
-      console.log('FormFields received new analysisResult:', analysisResult);
-      previousAnalysisResultRef.current = analysisResult;
+    console.log('FormFields effect triggered');
+    if (analysisResult) {
+      console.log('Processing analysisResult:', analysisResult);
+      if (
+        analysisResult &&
+        analysisResult !== previousAnalysisResultRef.current
+      ) {
+        console.log('Processing new analysisResult');
+        previousAnalysisResultRef.current = analysisResult;
 
-      if (analysisResult.summary) {
-        console.log('Processing summary:', analysisResult.summary);
+        if (analysisResult.summary) {
+          console.log('Processing summary:', analysisResult.summary);
 
-        const { summary } = analysisResult;
+          let summaryObject;
+          try {
+            // Remove markdown formatting if present
+            const cleanedSummary = analysisResult.summary
+              .replace(/```json\n/, '') // Remove opening ```json
+              .replace(/\n```$/, '') // Remove closing ```
+              .trim(); // Remove any leading/trailing whitespace
 
-        // Update form fields based on the analysis result
-        if (summary.itemDetails) {
-          console.log('Updating item details:', summary.itemDetails);
-          Object.entries(summary.itemDetails).forEach(([key, value]) => {
+            summaryObject = JSON.parse(cleanedSummary);
+          } catch (error) {
+            console.error('Error parsing summary:', error);
+            summaryObject = {};
+          }
+
+          // Create a new item object with updated fields
+          const updatedItem = { ...item };
+
+          // Update form fields based on the analysis result
+          Object.entries(summaryObject).forEach(([key, value]) => {
             if (value !== undefined) {
               console.log(`Updating ${key} to ${value}`);
-              updateItem(key, value);
+              updatedItem[key] = value;
             }
           });
-        }
 
-        if (summary.financials) {
-          Object.entries(summary.financials).forEach(([key, value]) => {
-            if (value !== undefined) {
-              updateItem(
-                `financials${key.charAt(0).toUpperCase() + key.slice(1)}`,
-                value
-              );
-            }
-          });
-        }
+          // Update the item state with all the changes at once
+          updateItem(updatedItem);
 
-        if (summary.marketAnalysis) {
-          Object.entries(summary.marketAnalysis).forEach(([key, value]) => {
-            if (value !== undefined) {
-              updateItem(
-                `marketAnalysis${key.charAt(0).toUpperCase() + key.slice(1)}`,
-                value
-              );
-            }
-          });
+          setHasPopulatedFields(true);
         }
-
-        if (summary.condition) {
-          Object.entries(summary.condition).forEach(([key, value]) => {
-            if (value !== undefined) {
-              updateItem(
-                `condition${key.charAt(0).toUpperCase() + key.slice(1)}`,
-                value
-              );
-            }
-          });
-        }
-
-        if (summary.measurements) {
-          Object.entries(summary.measurements).forEach(
-            ([category, measurements]) => {
-              if (typeof measurements === 'object') {
-                Object.entries(measurements).forEach(([key, value]) => {
-                  if (value !== undefined) {
-                    updateItem(
-                      `${category}${key.charAt(0).toUpperCase() + key.slice(1)}`,
-                      value
-                    );
-                  }
-                });
-              }
-            }
-          );
-        }
-
-        if (summary.compliance) {
-          Object.entries(summary.compliance).forEach(([key, value]) => {
-            if (value !== undefined) {
-              updateItem(
-                `compliance${key.charAt(0).toUpperCase() + key.slice(1)}`,
-                value
-              );
-            }
-          });
-        }
-
-        if (summary.additionalInfo) {
-          Object.entries(summary.additionalInfo).forEach(([key, value]) => {
-            if (value !== undefined) {
-              updateItem(key, value);
-            }
-          });
-        }
-
-        if (summary.finalRecommendation) {
-          console.log(
-            'Updating final recommendation:',
-            summary.finalRecommendation
-          );
-          if (
-            summary.finalRecommendation.purchaseRecommendation !== undefined
-          ) {
-            console.log(
-              `Updating purchaseRecommendation to ${summary.finalRecommendation.purchaseRecommendation}`
-            );
-            updateItem(
-              'purchaseRecommendation',
-              summary.finalRecommendation.purchaseRecommendation
-            );
-          }
-          if (summary.finalRecommendation.detailedBreakdown !== undefined) {
-            console.log(`Updating detailedBreakdown`);
-            updateItem(
-              'detailedBreakdown',
-              summary.finalRecommendation.detailedBreakdown
-            );
-          }
-        }
-      } else {
-        console.log('No valid summary available in the analysisResult');
       }
     }
-  }, [analysisResult, updateItem]);
+  }, [analysisResult, updateItem, item]);
 
   const handleFieldChange = useCallback(
     (key, value) => {
+      console.log('handleFieldChange called', key, value);
+      console.log(`Updating field: ${key} with value: ${value}`);
       const newItem = { ...item, [key]: value };
       updateItem(key, value);
       debouncedSave(newItem);
+      setUpdatedFields((prev) => new Set(prev).add(key));
     },
     [item, updateItem, debouncedSave]
   );
 
   const renderField = (key, label, type = 'text') => {
     const value = item[key];
-    if (value === null || value === undefined || value === '') return null;
+    console.log(`Rendering field: ${key}, value: ${value}`);
+    if (value === null || value === undefined || value === '') {
+      console.log(`Skipping render for empty field: ${key}`);
+      return null;
+    }
 
     return (
       <StyledFormGroup key={key}>
@@ -218,20 +159,24 @@ function FormFields({
     );
   };
 
-  const renderFieldGroup = (title, fields) => {
-    const renderedFields = fields
-      .map(([key, label, type]) => renderField(key, label, type))
-      .filter(Boolean);
-    if (renderedFields.length === 0) return null;
-    return (
-      <>
-        <StyledTitle>{title}</StyledTitle>
-        {renderedFields}
-      </>
-    );
-  };
+  const renderFieldGroup = useCallback(
+    (title, fields) => {
+      const renderedFields = fields
+        .filter(([key]) => updatedFields.has(key) || item[key] != null)
+        .map(([key, label, type]) => renderField(key, label, type))
+        .filter(Boolean);
+      if (renderedFields.length === 0) return null;
+      return (
+        <>
+          <StyledTitle>{title}</StyledTitle>
+          {renderedFields}
+        </>
+      );
+    },
+    [updatedFields, item, renderField]
+  );
 
-  const renderAllFields = () => {
+  const memoizedFields = useMemo(() => {
     const fieldGroups = [
       [
         'Basic Item Information',
@@ -436,16 +381,14 @@ function FormFields({
       ],
     ];
 
-    const renderedGroups = fieldGroups
+    return fieldGroups
       .map(([title, fields]) => renderFieldGroup(title, fields))
       .filter(Boolean);
+  }, [renderFieldGroup]);
 
-    useEffect(() => {
-      setHasPopulatedFields(renderedGroups.length > 0);
-    }, [renderedGroups.length]);
-
-    return renderedGroups;
-  };
+  useEffect(() => {
+    setHasPopulatedFields(memoizedFields.length > 0);
+  }, [memoizedFields.length]);
 
   const renderPurchaseRecommendation = () => {
     if (
@@ -471,16 +414,36 @@ function FormFields({
     );
   };
 
+  const renderSampleListing = () => {
+    if (!item.sampleForSaleListing) return null;
+    return (
+      <StyledFormGroup>
+        <StyledTitle>Sample For Sale Listing</StyledTitle>
+        <StyledTextarea
+          value={item.sampleForSaleListing}
+          onChange={(e) =>
+            handleFieldChange('sampleForSaleListing', e.target.value)
+          }
+          rows="10"
+          readOnly
+        />
+      </StyledFormGroup>
+    );
+  };
+
   const onSubmit = (e) => {
     e.preventDefault();
     handleSubmit(itemId);
   };
 
+  console.log('FormFields render end');
+
   return (
     <>
       <StyledForm onSubmit={onSubmit}>
-        {renderAllFields()}
+        {memoizedFields}
         {renderPurchaseRecommendation()}
+        {renderSampleListing()} {/* Add this line */}
         {hasPopulatedFields && (
           <>
             <StyledButton type="submit">Purchase Item</StyledButton>

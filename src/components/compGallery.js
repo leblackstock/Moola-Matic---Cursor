@@ -19,7 +19,6 @@ export const UploadedImagesGallery = ({
   onDelete,
   itemId,
 }) => {
-  console.log('UploadedImagesGallery received images:', images);
   const [deletingImages, setDeletingImages] = useState([]);
   const [addedImages, setAddedImages] = useState([]);
 

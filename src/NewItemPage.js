@@ -67,6 +67,8 @@ const loadItemData = (itemId) => {
 };
 
 function NewItemPage({ setItem: setParentItem }) {
+  console.log('NewItemPage render start');
+
   const { itemId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -116,12 +118,14 @@ function NewItemPage({ setItem: setParentItem }) {
     setLastAutoSave,
     10000,
     60000,
-    isUploading // Pass isUploading state to the hook
+    isUploading
   );
 
   // Effect for autosave
   useEffect(() => {
+    console.log('Autosave effect triggered');
     if (item && itemId) {
+      console.log('Preparing autosave data');
       const autosaveData = {
         ...item,
         images: uploadedImages,
@@ -136,6 +140,7 @@ function NewItemPage({ setItem: setParentItem }) {
   // useEffect Hook: Load or Create Item
   // ---------------------------------
   useEffect(() => {
+    console.log('Load or Create Item effect triggered');
     const loadData = async () => {
       if (!itemId || !location.pathname.includes(`/new-item/${itemId}`)) {
         console.error('No valid itemId in URL');
@@ -235,13 +240,17 @@ function NewItemPage({ setItem: setParentItem }) {
 
   // Update item in parent component when local item changes
   useEffect(() => {
+    console.log('Update parent item effect triggered');
     if (item) {
+      console.log('Updating parent item');
       setParentItem(item);
     }
   }, [item, setParentItem]);
 
-  // Second useEffect - Log item changes
-  useEffect(() => {}, [item]);
+  // Log item changes
+  useEffect(() => {
+    console.log('Item changed:', item);
+  }, [item]);
 
   // Optimize the loadDraft function
   const loadDraft = (draftData) => {
@@ -262,7 +271,9 @@ function NewItemPage({ setItem: setParentItem }) {
   // useEffect Hook: Save to localStorage
   // ----------------------------
   useEffect(() => {
+    console.log('Save to localStorage effect triggered');
     if (item && itemId) {
+      console.log('Saving to localStorage');
       handleLocalSave(item, contextData, messages, itemId);
     }
   }, [item, contextData, messages, itemId]);
@@ -282,13 +293,21 @@ function NewItemPage({ setItem: setParentItem }) {
   // useEffect Hook: Set Selected Image if Needed
   // ----------------------------
   useEffect(() => {
+    console.log('Set Selected Image effect triggered');
     if (uploadedImages.length > 0 && !selectedImage) {
+      console.log('Setting selected image');
       setSelectedImage(uploadedImages[uploadedImages.length - 1]);
     }
   }, [uploadedImages, selectedImage]);
 
-  // Event handlers
+  // Log uploaded images changes
+  useEffect(() => {
+    console.log('uploadedImages state updated:', uploadedImages);
+  }, [uploadedImages]);
+
+  // Event handlers with added logging
   const handleSubmit = async (e) => {
+    console.log('handleSubmit called');
     e.preventDefault();
     console.log('Submitting item:', item);
     // Add your submission logic here
@@ -401,6 +420,7 @@ function NewItemPage({ setItem: setParentItem }) {
   };
 
   const handleFileChangeWrapper = async (event) => {
+    console.log('handleFileChangeWrapper called');
     setIsUploading(true);
     try {
       const result = await handleFileChange(
@@ -506,12 +526,13 @@ function NewItemPage({ setItem: setParentItem }) {
 
   // Replace it with this simplified version that uses the existing handleFileChange function
   const handleImageSelect = (event) => {
-    console.log('Image select triggered');
+    console.log('handleImageSelect called');
     console.log('Selected files:', event.target.files);
     handleFileChangeWrapper(event);
   };
 
   const handleImageButtonClick = () => {
+    console.log('handleImageButtonClick called');
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
@@ -539,22 +560,32 @@ function NewItemPage({ setItem: setParentItem }) {
   };
 
   const handleDeleteImageWrapper = (imageToDelete) => {
+    console.log('handleDeleteImageWrapper called', imageToDelete);
     handleImageDelete(imageToDelete, itemId, setUploadedImages, setItem);
   };
 
   // Update the updateItem function to handle nested properties safely
   const updateItem = (field, value) => {
+    console.log('updateItem called', field, value);
     setItem((prevItem) => {
       const newItem = { ...prevItem };
-      const fields = field.split('.');
-      let current = newItem;
-      for (let i = 0; i < fields.length - 1; i++) {
-        if (!current[fields[i]]) {
-          current[fields[i]] = {};
+      if (typeof field === 'string') {
+        const fields = field.split('.');
+        let current = newItem;
+        for (let i = 0; i < fields.length - 1; i++) {
+          if (!current[fields[i]]) {
+            current[fields[i]] = {};
+          }
+          current = current[fields[i]];
         }
-        current = current[fields[i]];
+        current[fields[fields.length - 1]] = value;
+      } else if (typeof field === 'object') {
+        // If field is an object, assume it's a full item update
+        return { ...newItem, ...field };
+      } else {
+        // For simple key updates
+        newItem[field] = value;
       }
-      current[fields[fields.length - 1]] = value;
       return newItem;
     });
     setHasUnsavedChanges(true);
@@ -562,6 +593,7 @@ function NewItemPage({ setItem: setParentItem }) {
 
   // Update handlePurchaseRecommendationChange to use the updateItem function
   const handlePurchaseRecommendationChange = (value) => {
+    console.log('handlePurchaseRecommendationChange called', value);
     updateItem(
       'finalRecommendation.purchaseRecommendation',
       value === 'true' ? true : value === 'false' ? false : null
@@ -570,15 +602,20 @@ function NewItemPage({ setItem: setParentItem }) {
 
   // Add this useEffect to update aiRecommendation when item changes
   useEffect(() => {
+    console.log('Update aiRecommendation effect triggered');
     if (item && item.finalRecommendation) {
+      console.log('Updating aiRecommendation');
       setAiRecommendation(item.finalRecommendation);
     }
   }, [item]);
 
-  // Update the handleAnalyzeImages function
+  // Add this state to track if an analysis has been performed
+  const [analysisPerformed, setAnalysisPerformed] = useState(false);
+
+  // Modify the handleAnalyzeImagesWrapper function
   const handleAnalyzeImagesWrapper = async () => {
+    console.log('handleAnalyzeImagesWrapper called');
     setIsAnalyzing(true);
-    setIsLoading(true);
     try {
       console.log('Starting image analysis...');
       const result = await handleAnalyzeImages({
@@ -590,35 +627,12 @@ function NewItemPage({ setItem: setParentItem }) {
         setShowNotification,
       });
 
-      console.log('Raw analysis result:', JSON.stringify(result, null, 2));
-
       if (result && typeof result === 'object') {
-        console.log('Analysis result structure:', Object.keys(result));
-
-        if (result.analyses) {
-          console.log('Number of individual analyses:', result.analyses.length);
-        }
-
-        if (result.summary) {
-          console.log('Summary available:', Boolean(result.summary));
-          console.log('Summary content:', result.summary);
-        }
-
-        if (result.metadata) {
-          console.log('Metadata available:', Boolean(result.metadata));
-          console.log('Metadata content:', result.metadata);
-        }
-
-        setItem((prevItem) => {
-          console.log('Previous item state:', prevItem);
-          const newItem = {
-            ...prevItem,
-            analysisResult: result,
-          };
-          console.log('New item state:', newItem);
-          return newItem;
-        });
-
+        setItem((prevItem) => ({
+          ...prevItem,
+          analysisResult: result,
+        }));
+        setAnalysisPerformed(true); // Set this to true after successful analysis
         setNotificationMessage('Image analysis completed successfully!');
         setShowNotification(true);
       } else {
@@ -632,7 +646,6 @@ function NewItemPage({ setItem: setParentItem }) {
       setShowNotification(true);
     } finally {
       setIsAnalyzing(false);
-      setIsLoading(false);
     }
   };
 
@@ -660,11 +673,8 @@ function NewItemPage({ setItem: setParentItem }) {
     }
   };
 
-  useEffect(() => {
-    console.log('uploadedImages state updated:', uploadedImages);
-  }, [uploadedImages]);
-
   const handleSaveDraft = async () => {
+    console.log('handleSaveDraft called');
     if (!item || !itemId) {
       console.error('No item to save or missing itemId');
       setNotificationMessage('Error: Unable to save draft');
@@ -710,6 +720,8 @@ function NewItemPage({ setItem: setParentItem }) {
 
   //console.log('Current itemId:', itemId);
 
+  console.log('NewItemPage render end');
+
   return (
     <PageContainer>
       {showNotification && (
@@ -751,13 +763,13 @@ function NewItemPage({ setItem: setParentItem }) {
           <ButtonContainer>
             <GlowingButton
               onClick={handleImageButtonClick}
-              disabled={isLoading}
+              disabled={isAnalyzing}
             >
               <i className="fas fa-image"></i> Add Images
             </GlowingButton>
             <GlowingButton
               onClick={handleAnalyzeImagesWrapper}
-              disabled={isLoading || isAnalyzing || uploadedImages.length === 0}
+              disabled={isAnalyzing || uploadedImages.length === 0}
             >
               {isAnalyzing ? (
                 <>
@@ -768,6 +780,15 @@ function NewItemPage({ setItem: setParentItem }) {
               )}
             </GlowingButton>
           </ButtonContainer>
+
+          {isAnalyzing && (
+            <div>
+              <p>
+                Image analysis in progress... You can continue to interact with
+                other parts of the page.
+              </p>
+            </div>
+          )}
 
           <UploadedImagesGallery
             key={galleryKey}
@@ -824,8 +845,8 @@ function NewItemPage({ setItem: setParentItem }) {
               handlePurchaseRecommendationChange
             }
             itemId={itemId}
-            analysisResult={item.analysisResult}
-            aiRecommendation={aiRecommendation} // Pass aiRecommendation to FormFields
+            analysisResult={analysisPerformed ? item.analysisResult : null}
+            aiRecommendation={aiRecommendation}
           />
         </div>
       </MainContentArea>
