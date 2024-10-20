@@ -76,6 +76,38 @@ const glowAnimation = keyframes`
   }
 `;
 
+// Add this near the top of the file with other keyframe animations
+const deleteAnimation = keyframes`
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.75) rotate(5deg);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0) rotate(15deg);
+  }
+`;
+
+// Add this near the top of the file with other keyframe animations
+const addImageAnimation = keyframes`
+  0% {
+    opacity: 0;
+    transform: scale(0.5) rotate(-10deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1) rotate(5deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+`;
+
 // Gallery Components
 export const ImageContainer = styled.div`
   position: relative;
@@ -97,11 +129,21 @@ export const ImageContainer = styled.div`
     `
     transform: scale(1.05);
     z-index: 1;
+    animation: ${glow} 2s infinite;
     box-shadow: 
       0 0 10px 5px rgba(0, 255, 255, 0.5),
       0 0 20px 10px rgba(0, 255, 255, 0.3),
       0 0 30px 15px rgba(0, 255, 255, 0.1);
   `}
+
+  &.deleting {
+    animation: ${deleteAnimation} 0.5s ease-in-out forwards;
+    pointer-events: none;
+  }
+
+  &.adding {
+    animation: ${addImageAnimation} 0.5s ease-in-out;
+  }
 `;
 
 // Layout Components

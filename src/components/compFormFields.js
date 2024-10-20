@@ -1,6 +1,6 @@
 // frontend/src/components/compFormFields.js
 
-import React, { useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import PropTypes from 'prop-types';
 import _ from 'lodash'; // Import the full lodash library
 import {
@@ -21,13 +21,11 @@ function FormFields({
   handleSaveDraft,
   handlePurchaseRecommendationChange,
   itemId,
-  analysisResult, // Add this prop
+  analysisResult,
+  aiRecommendation,
 }) {
-  const isAnyFieldPopulated = useMemo(() => {
-    return Object.values(item).some(
-      (value) => value !== null && value !== undefined && value !== ''
-    );
-  }, [item]);
+  const [hasPopulatedFields, setHasPopulatedFields] = useState(false);
+  const previousAnalysisResultRef = useRef();
 
   // Debounce the save function to avoid too frequent saves
   const debouncedSave = useCallback(
@@ -38,117 +36,125 @@ function FormFields({
   );
 
   useEffect(() => {
-    console.log('FormFields received new analysisResult:', analysisResult);
+    if (
+      analysisResult &&
+      analysisResult !== previousAnalysisResultRef.current
+    ) {
+      console.log('FormFields received new analysisResult:', analysisResult);
+      previousAnalysisResultRef.current = analysisResult;
 
-    if (analysisResult && analysisResult.summary) {
-      console.log('Processing summary:', analysisResult.summary);
+      if (analysisResult.summary) {
+        console.log('Processing summary:', analysisResult.summary);
 
-      const { summary } = analysisResult;
+        const { summary } = analysisResult;
 
-      // Update form fields based on the analysis result
-      if (summary.itemDetails) {
-        console.log('Updating item details:', summary.itemDetails);
-        Object.entries(summary.itemDetails).forEach(([key, value]) => {
-          if (value !== undefined) {
-            console.log(`Updating ${key} to ${value}`);
-            updateItem(key, value);
-          }
-        });
-      }
-
-      if (summary.financials) {
-        Object.entries(summary.financials).forEach(([key, value]) => {
-          if (value !== undefined) {
-            updateItem(
-              `financials${key.charAt(0).toUpperCase() + key.slice(1)}`,
-              value
-            );
-          }
-        });
-      }
-
-      if (summary.marketAnalysis) {
-        Object.entries(summary.marketAnalysis).forEach(([key, value]) => {
-          if (value !== undefined) {
-            updateItem(
-              `marketAnalysis${key.charAt(0).toUpperCase() + key.slice(1)}`,
-              value
-            );
-          }
-        });
-      }
-
-      if (summary.condition) {
-        Object.entries(summary.condition).forEach(([key, value]) => {
-          if (value !== undefined) {
-            updateItem(
-              `condition${key.charAt(0).toUpperCase() + key.slice(1)}`,
-              value
-            );
-          }
-        });
-      }
-
-      if (summary.measurements) {
-        Object.entries(summary.measurements).forEach(
-          ([category, measurements]) => {
-            if (typeof measurements === 'object') {
-              Object.entries(measurements).forEach(([key, value]) => {
-                if (value !== undefined) {
-                  updateItem(
-                    `${category}${key.charAt(0).toUpperCase() + key.slice(1)}`,
-                    value
-                  );
-                }
-              });
+        // Update form fields based on the analysis result
+        if (summary.itemDetails) {
+          console.log('Updating item details:', summary.itemDetails);
+          Object.entries(summary.itemDetails).forEach(([key, value]) => {
+            if (value !== undefined) {
+              console.log(`Updating ${key} to ${value}`);
+              updateItem(key, value);
             }
-          }
-        );
-      }
+          });
+        }
 
-      if (summary.compliance) {
-        Object.entries(summary.compliance).forEach(([key, value]) => {
-          if (value !== undefined) {
+        if (summary.financials) {
+          Object.entries(summary.financials).forEach(([key, value]) => {
+            if (value !== undefined) {
+              updateItem(
+                `financials${key.charAt(0).toUpperCase() + key.slice(1)}`,
+                value
+              );
+            }
+          });
+        }
+
+        if (summary.marketAnalysis) {
+          Object.entries(summary.marketAnalysis).forEach(([key, value]) => {
+            if (value !== undefined) {
+              updateItem(
+                `marketAnalysis${key.charAt(0).toUpperCase() + key.slice(1)}`,
+                value
+              );
+            }
+          });
+        }
+
+        if (summary.condition) {
+          Object.entries(summary.condition).forEach(([key, value]) => {
+            if (value !== undefined) {
+              updateItem(
+                `condition${key.charAt(0).toUpperCase() + key.slice(1)}`,
+                value
+              );
+            }
+          });
+        }
+
+        if (summary.measurements) {
+          Object.entries(summary.measurements).forEach(
+            ([category, measurements]) => {
+              if (typeof measurements === 'object') {
+                Object.entries(measurements).forEach(([key, value]) => {
+                  if (value !== undefined) {
+                    updateItem(
+                      `${category}${key.charAt(0).toUpperCase() + key.slice(1)}`,
+                      value
+                    );
+                  }
+                });
+              }
+            }
+          );
+        }
+
+        if (summary.compliance) {
+          Object.entries(summary.compliance).forEach(([key, value]) => {
+            if (value !== undefined) {
+              updateItem(
+                `compliance${key.charAt(0).toUpperCase() + key.slice(1)}`,
+                value
+              );
+            }
+          });
+        }
+
+        if (summary.additionalInfo) {
+          Object.entries(summary.additionalInfo).forEach(([key, value]) => {
+            if (value !== undefined) {
+              updateItem(key, value);
+            }
+          });
+        }
+
+        if (summary.finalRecommendation) {
+          console.log(
+            'Updating final recommendation:',
+            summary.finalRecommendation
+          );
+          if (
+            summary.finalRecommendation.purchaseRecommendation !== undefined
+          ) {
+            console.log(
+              `Updating purchaseRecommendation to ${summary.finalRecommendation.purchaseRecommendation}`
+            );
             updateItem(
-              `compliance${key.charAt(0).toUpperCase() + key.slice(1)}`,
-              value
+              'purchaseRecommendation',
+              summary.finalRecommendation.purchaseRecommendation
             );
           }
-        });
-      }
-
-      if (summary.additionalInfo) {
-        Object.entries(summary.additionalInfo).forEach(([key, value]) => {
-          if (value !== undefined) {
-            updateItem(key, value);
+          if (summary.finalRecommendation.detailedBreakdown !== undefined) {
+            console.log(`Updating detailedBreakdown`);
+            updateItem(
+              'detailedBreakdown',
+              summary.finalRecommendation.detailedBreakdown
+            );
           }
-        });
-      }
-
-      if (summary.finalRecommendation) {
-        console.log(
-          'Updating final recommendation:',
-          summary.finalRecommendation
-        );
-        if (summary.finalRecommendation.purchaseRecommendation !== undefined) {
-          console.log(
-            `Updating purchaseRecommendation to ${summary.finalRecommendation.purchaseRecommendation}`
-          );
-          updateItem(
-            'purchaseRecommendation',
-            summary.finalRecommendation.purchaseRecommendation
-          );
         }
-        if (summary.finalRecommendation.detailedBreakdown !== undefined) {
-          console.log(`Updating detailedBreakdown`);
-          updateItem(
-            'detailedBreakdown',
-            summary.finalRecommendation.detailedBreakdown
-          );
-        }
+      } else {
+        console.log('No valid summary available in the analysisResult');
       }
-    } else {
-      console.log('No valid analysisResult or summary available');
     }
   }, [analysisResult, updateItem]);
 
@@ -161,251 +167,300 @@ function FormFields({
     [item, updateItem, debouncedSave]
   );
 
-  const renderField = (key, label, type = 'text') => (
-    <StyledFormGroup key={key}>
-      <StyledLabel htmlFor={key}>{label}</StyledLabel>
-      {type === 'textarea' ? (
-        <StyledTextarea
-          id={key}
-          value={item[key] || ''}
-          onChange={(e) => handleFieldChange(key, e.target.value)}
-          rows="3"
-        />
-      ) : type === 'number' ? (
-        <StyledInput
-          type="number"
-          id={key}
-          value={item[key] || ''}
-          onChange={(e) => handleFieldChange(key, parseFloat(e.target.value))}
-        />
-      ) : type === 'date' ? (
-        <StyledInput
-          type="date"
-          id={key}
-          value={
-            item[key] ? new Date(item[key]).toISOString().split('T')[0] : ''
-          }
-          onChange={(e) => handleFieldChange(key, e.target.value)}
-        />
-      ) : type === 'boolean' ? (
-        <StyledSelect
-          id={key}
-          value={item[key] === true ? 'true' : 'false'}
-          onChange={(e) => handleFieldChange(key, e.target.value === 'true')}
-        >
-          <option value="true">Yes</option>
-          <option value="false">No</option>
-        </StyledSelect>
-      ) : (
-        <StyledInput
-          type={type}
-          id={key}
-          value={item[key] || ''}
-          onChange={(e) => handleFieldChange(key, e.target.value)}
-        />
-      )}
-    </StyledFormGroup>
-  );
+  const renderField = (key, label, type = 'text') => {
+    const value = item[key];
+    if (value === null || value === undefined || value === '') return null;
 
-  const renderAllFields = () => (
-    <>
-      <StyledTitle>Basic Item Information</StyledTitle>
-      {renderField('itemId', 'Item ID')}
-      {renderField('name', 'Item Name')}
-      {renderField('brand', 'Brand')}
-      {renderField('make', 'Make')}
-      {renderField('model', 'Model')}
-      {renderField('serialNumber', 'Serial Number')}
-      {renderField('type', 'Type')}
-      {renderField('description', 'Description', 'textarea')}
-      {renderField('category', 'Category')}
-      {renderField('subcategory', 'Subcategory')}
-      {renderField('style', 'Style')}
-      {renderField('vintage', 'Vintage', 'boolean')}
-      {renderField('antique', 'Antique', 'boolean')}
-      {renderField('rarity', 'Rarity')}
-      {renderField(
-        'packagingAccessoriesIncluded',
-        'Packaging/Accessories Included'
-      )}
-      {renderField('materialComposition', 'Material Composition')}
+    return (
+      <StyledFormGroup key={key}>
+        <StyledLabel htmlFor={key}>{label}</StyledLabel>
+        {type === 'textarea' ? (
+          <StyledTextarea
+            id={key}
+            value={value}
+            onChange={(e) => handleFieldChange(key, e.target.value)}
+            rows="3"
+          />
+        ) : type === 'number' ? (
+          <StyledInput
+            type="number"
+            id={key}
+            value={value}
+            onChange={(e) => handleFieldChange(key, parseFloat(e.target.value))}
+          />
+        ) : type === 'date' ? (
+          <StyledInput
+            type="date"
+            id={key}
+            value={
+              value instanceof Date ? value.toISOString().split('T')[0] : value
+            }
+            onChange={(e) => handleFieldChange(key, e.target.value)}
+          />
+        ) : type === 'boolean' ? (
+          <StyledSelect
+            id={key}
+            value={value.toString()}
+            onChange={(e) => handleFieldChange(key, e.target.value === 'true')}
+          >
+            <option value="true">Yes</option>
+            <option value="false">No</option>
+          </StyledSelect>
+        ) : (
+          <StyledInput
+            type={type}
+            id={key}
+            value={value}
+            onChange={(e) => handleFieldChange(key, e.target.value)}
+          />
+        )}
+      </StyledFormGroup>
+    );
+  };
 
-      <StyledTitle>Clothing Measurements</StyledTitle>
-      {renderField('clothingMeasurementsSizeLabel', 'Size Label')}
-      {renderField('clothingMeasurementsChestBust', 'Chest/Bust')}
-      {renderField('clothingMeasurementsWaist', 'Waist')}
-      {renderField('clothingMeasurementsHips', 'Hips')}
-      {renderField('clothingMeasurementsShoulderWidth', 'Shoulder Width')}
-      {renderField('clothingMeasurementsSleeveLength', 'Sleeve Length')}
-      {renderField('clothingMeasurementsInseam', 'Inseam')}
-      {renderField('clothingMeasurementsTotalLength', 'Total Length')}
+  const renderFieldGroup = (title, fields) => {
+    const renderedFields = fields
+      .map(([key, label, type]) => renderField(key, label, type))
+      .filter(Boolean);
+    if (renderedFields.length === 0) return null;
+    return (
+      <>
+        <StyledTitle>{title}</StyledTitle>
+        {renderedFields}
+      </>
+    );
+  };
 
-      <StyledTitle>Footwear Measurements</StyledTitle>
-      {renderField('footwearMeasurementsSize', 'Size')}
-      {renderField('footwearMeasurementsWidth', 'Width')}
-      {renderField('footwearMeasurementsInsoleLength', 'Insole Length')}
-      {renderField('footwearMeasurementsHeelHeight', 'Heel Height')}
-      {renderField('footwearMeasurementsPlatformHeight', 'Platform Height')}
-      {renderField('footwearMeasurementsBootShaftHeight', 'Boot Shaft Height')}
-      {renderField(
-        'footwearMeasurementsCalfCircumference',
-        'Calf Circumference'
-      )}
+  const renderAllFields = () => {
+    const fieldGroups = [
+      [
+        'Basic Item Information',
+        [
+          ['name', 'Item Name'],
+          ['brand', 'Brand'],
+          ['make', 'Make'],
+          ['model', 'Model'],
+          ['serialNumber', 'Serial Number'],
+          ['type', 'Type'],
+          ['description', 'Description', 'textarea'],
+          ['category', 'Category'],
+          ['subcategory', 'Subcategory'],
+          ['style', 'Style'],
+          ['vintage', 'Vintage', 'boolean'],
+          ['antique', 'Antique', 'boolean'],
+          ['rarity', 'Rarity'],
+          ['packagingAccessoriesIncluded', 'Packaging/Accessories Included'],
+          ['materialComposition', 'Material Composition'],
+        ],
+      ],
+      [
+        'Clothing Measurements',
+        [
+          ['clothingMeasurementsSizeLabel', 'Size Label'],
+          ['clothingMeasurementsChestBust', 'Chest/Bust'],
+          ['clothingMeasurementsWaist', 'Waist'],
+          ['clothingMeasurementsHips', 'Hips'],
+          ['clothingMeasurementsShoulderWidth', 'Shoulder Width'],
+          ['clothingMeasurementsSleeveLength', 'Sleeve Length'],
+          ['clothingMeasurementsInseam', 'Inseam'],
+          ['clothingMeasurementsTotalLength', 'Total Length'],
+        ],
+      ],
+      [
+        'Footwear Measurements',
+        [
+          ['footwearMeasurementsSize', 'Size'],
+          ['footwearMeasurementsWidth', 'Width'],
+          ['footwearMeasurementsInsoleLength', 'Insole Length'],
+          ['footwearMeasurementsHeelHeight', 'Heel Height'],
+          ['footwearMeasurementsPlatformHeight', 'Platform Height'],
+          ['footwearMeasurementsBootShaftHeight', 'Boot Shaft Height'],
+          ['footwearMeasurementsCalfCircumference', 'Calf Circumference'],
+        ],
+      ],
+      [
+        'Jewelry Measurements',
+        [
+          ['jewelryMeasurementsRingSize', 'Ring Size'],
+          [
+            'jewelryMeasurementsNecklaceBraceletLength',
+            'Necklace/Bracelet Length',
+          ],
+          ['jewelryMeasurementsPendantDimensions', 'Pendant Dimensions'],
+          ['jewelryMeasurementsJewelryDimensions', 'Jewelry Dimensions'],
+        ],
+      ],
+      [
+        'Furniture and Large Item Measurements',
+        [
+          ['furnitureLargeItemMeasurementsHeight', 'Height'],
+          ['furnitureLargeItemMeasurementsWidth', 'Width'],
+          ['furnitureLargeItemMeasurementsDepth', 'Depth'],
+          ['furnitureLargeItemMeasurementsLength', 'Length'],
+          ['furnitureLargeItemMeasurementsSeatHeight', 'Seat Height'],
+          [
+            'furnitureLargeItemMeasurementsTabletopDimensions',
+            'Tabletop Dimensions',
+          ],
+        ],
+      ],
+      [
+        'General Measurements',
+        [
+          ['generalMeasurementsWeight', 'Weight'],
+          ['generalMeasurementsDiameter', 'Diameter'],
+          ['generalMeasurementsVolumeCapacity', 'Volume/Capacity'],
+          [
+            'generalMeasurementsOtherSpecificMeasurements',
+            'Other Specific Measurements',
+          ],
+        ],
+      ],
+      [
+        'Condition',
+        [
+          ['conditionRating', 'Condition Rating'],
+          ['conditionSignsOfWear', 'Signs of Wear'],
+          ['conditionDetailedNotes', 'Detailed Notes', 'textarea'],
+          ['conditionRepairNeeds', 'Repair Needs'],
+          ['conditionCleaningRequirements', 'Cleaning Requirements'],
+          ['conditionEstimatedRepairCosts', 'Estimated Repair Costs', 'number'],
+          [
+            'conditionEstimatedCleaningCosts',
+            'Estimated Cleaning Costs',
+            'number',
+          ],
+          [
+            'conditionTimeSpentOnRepairsCleaning',
+            'Time Spent on Repairs/Cleaning',
+          ],
+        ],
+      ],
+      [
+        'Financials',
+        [
+          ['financialsPurchasePrice', 'Purchase Price', 'number'],
+          [
+            'financialsTotalRepairAndCleaningCosts',
+            'Total Repair and Cleaning Costs',
+            'number',
+          ],
+          [
+            'financialsEstimatedShippingCosts',
+            'Estimated Shipping Costs',
+            'number',
+          ],
+          ['financialsPlatformFees', 'Platform Fees', 'number'],
+          ['financialsExpectedProfit', 'Expected Profit', 'number'],
+          ['financialsProfitMargin', 'Profit Margin', 'number'],
+          [
+            'financialsEstimatedMarketValue',
+            'Estimated Market Value',
+            'number',
+          ],
+          ['financialsAcquisitionCost', 'Acquisition Cost', 'number'],
+        ],
+      ],
+      [
+        'Market Analysis',
+        [
+          ['marketAnalysisMarketDemand', 'Market Demand'],
+          ['marketAnalysisHistoricalPriceTrends', 'Historical Price Trends'],
+          ['marketAnalysisMarketSaturation', 'Market Saturation'],
+          ['marketAnalysisSalesVelocity', 'Sales Velocity'],
+          [
+            'marketAnalysisSuggestedListingPrice',
+            'Suggested Listing Price',
+            'number',
+          ],
+          [
+            'marketAnalysisMinimumAcceptablePrice',
+            'Minimum Acceptable Price',
+            'number',
+          ],
+        ],
+      ],
+      [
+        'Additional Information',
+        [
+          ['itemCareInstructions', 'Item Care Instructions', 'textarea'],
+          ['keywordsForSeo', 'Keywords for SEO', 'textarea'],
+          ['lotOrBundleInformation', 'Lot or Bundle Information'],
+          ['customizableFields', 'Customizable Fields'],
+          ['recommendedSalePlatforms', 'Recommended Sale Platforms'],
+        ],
+      ],
+      [
+        'Compliance',
+        [
+          ['compliancePlatformPolicies', 'Platform Policies'],
+          ['complianceAuthenticityMarkers', 'Authenticity Markers'],
+          ['complianceCounterfeitRisk', 'Counterfeit Risk'],
+          ['complianceStatus', 'Compliance Status'],
+          ['complianceRestrictedItemCheck', 'Restricted Item Check'],
+        ],
+      ],
+      [
+        'Inventory Details',
+        [
+          ['inventoryDetailsInventoryId', 'Inventory ID'],
+          ['inventoryDetailsStorageLocation', 'Storage Location'],
+          ['inventoryDetailsAcquisitionDate', 'Acquisition Date', 'date'],
+          ['inventoryDetailsTargetMarket', 'Target Market'],
+          ['inventoryDetailsTrendingItems', 'Trending Items'],
+          ['inventoryDetailsCustomerPreferences', 'Customer Preferences'],
+          ['inventoryDetailsAcquisitionLocation', 'Acquisition Location'],
+          ['inventoryDetailsSupplierInformation', 'Supplier Information'],
+        ],
+      ],
+      [
+        'Dates',
+        [
+          ['purchaseDate', 'Purchase Date', 'date'],
+          ['listingDate', 'Listing Date', 'date'],
+        ],
+      ],
+      [
+        'Additional Notes',
+        [
+          ['sellerNotes', 'Seller Notes', 'textarea'],
+          ['contextData', 'Context Data', 'textarea'],
+        ],
+      ],
+      [
+        'Final Recommendation',
+        [
+          ['detailedBreakdown', 'Detailed Breakdown', 'textarea'],
+          ['sampleForSaleListing', 'Sample For Sale Listing', 'textarea'],
+        ],
+      ],
+    ];
 
-      <StyledTitle>Jewelry Measurements</StyledTitle>
-      {renderField('jewelryMeasurementsRingSize', 'Ring Size')}
-      {renderField(
-        'jewelryMeasurementsNecklaceBraceletLength',
-        'Necklace/Bracelet Length'
-      )}
-      {renderField(
-        'jewelryMeasurementsPendantDimensions',
-        'Pendant Dimensions'
-      )}
-      {renderField(
-        'jewelryMeasurementsJewelryDimensions',
-        'Jewelry Dimensions'
-      )}
+    const renderedGroups = fieldGroups
+      .map(([title, fields]) => renderFieldGroup(title, fields))
+      .filter(Boolean);
 
-      <StyledTitle>Furniture and Large Item Measurements</StyledTitle>
-      {renderField('furnitureLargeItemMeasurementsHeight', 'Height')}
-      {renderField('furnitureLargeItemMeasurementsWidth', 'Width')}
-      {renderField('furnitureLargeItemMeasurementsDepth', 'Depth')}
-      {renderField('furnitureLargeItemMeasurementsLength', 'Length')}
-      {renderField('furnitureLargeItemMeasurementsSeatHeight', 'Seat Height')}
-      {renderField(
-        'furnitureLargeItemMeasurementsTabletopDimensions',
-        'Tabletop Dimensions'
-      )}
+    useEffect(() => {
+      setHasPopulatedFields(renderedGroups.length > 0);
+    }, [renderedGroups.length]);
 
-      <StyledTitle>General Measurements</StyledTitle>
-      {renderField('generalMeasurementsWeight', 'Weight')}
-      {renderField('generalMeasurementsDiameter', 'Diameter')}
-      {renderField('generalMeasurementsVolumeCapacity', 'Volume/Capacity')}
-      {renderField(
-        'generalMeasurementsOtherSpecificMeasurements',
-        'Other Specific Measurements'
-      )}
+    return renderedGroups;
+  };
 
-      <StyledTitle>Condition</StyledTitle>
-      {renderField('conditionRating', 'Condition Rating')}
-      {renderField('conditionSignsOfWear', 'Signs of Wear')}
-      {renderField('conditionDetailedNotes', 'Detailed Notes', 'textarea')}
-      {renderField('conditionRepairNeeds', 'Repair Needs')}
-      {renderField('conditionCleaningRequirements', 'Cleaning Requirements')}
-      {renderField(
-        'conditionEstimatedRepairCosts',
-        'Estimated Repair Costs',
-        'number'
-      )}
-      {renderField(
-        'conditionEstimatedCleaningCosts',
-        'Estimated Cleaning Costs',
-        'number'
-      )}
-      {renderField(
-        'conditionTimeSpentOnRepairsCleaning',
-        'Time Spent on Repairs/Cleaning'
-      )}
-
-      <StyledTitle>Financials</StyledTitle>
-      {renderField('financialsPurchasePrice', 'Purchase Price', 'number')}
-      {renderField(
-        'financialsTotalRepairAndCleaningCosts',
-        'Total Repair and Cleaning Costs',
-        'number'
-      )}
-      {renderField(
-        'financialsEstimatedShippingCosts',
-        'Estimated Shipping Costs',
-        'number'
-      )}
-      {renderField('financialsPlatformFees', 'Platform Fees', 'number')}
-      {renderField('financialsExpectedProfit', 'Expected Profit', 'number')}
-      {renderField('financialsProfitMargin', 'Profit Margin', 'number')}
-      {renderField(
-        'financialsEstimatedMarketValue',
-        'Estimated Market Value',
-        'number'
-      )}
-      {renderField('financialsAcquisitionCost', 'Acquisition Cost', 'number')}
-
-      <StyledTitle>Market Analysis</StyledTitle>
-      {renderField('marketAnalysisMarketDemand', 'Market Demand')}
-      {renderField(
-        'marketAnalysisHistoricalPriceTrends',
-        'Historical Price Trends'
-      )}
-      {renderField('marketAnalysisMarketSaturation', 'Market Saturation')}
-      {renderField('marketAnalysisSalesVelocity', 'Sales Velocity')}
-      {renderField(
-        'marketAnalysisSuggestedListingPrice',
-        'Suggested Listing Price',
-        'number'
-      )}
-      {renderField(
-        'marketAnalysisMinimumAcceptablePrice',
-        'Minimum Acceptable Price',
-        'number'
-      )}
-
-      <StyledTitle>Additional Information</StyledTitle>
-      {renderField(
-        'itemCareInstructions',
-        'Item Care Instructions',
-        'textarea'
-      )}
-      {renderField('keywordsForSeo', 'Keywords for SEO', 'textarea')}
-      {renderField('lotOrBundleInformation', 'Lot or Bundle Information')}
-      {renderField('customizableFields', 'Customizable Fields')}
-      {renderField('recommendedSalePlatforms', 'Recommended Sale Platforms')}
-
-      <StyledTitle>Compliance</StyledTitle>
-      {renderField('compliancePlatformPolicies', 'Platform Policies')}
-      {renderField('complianceAuthenticityMarkers', 'Authenticity Markers')}
-      {renderField('complianceCounterfeitRisk', 'Counterfeit Risk')}
-      {renderField('complianceStatus', 'Compliance Status')}
-      {renderField('complianceRestrictedItemCheck', 'Restricted Item Check')}
-
-      <StyledTitle>Inventory Details</StyledTitle>
-      {renderField('inventoryDetailsInventoryId', 'Inventory ID')}
-      {renderField('inventoryDetailsStorageLocation', 'Storage Location')}
-      {renderField(
-        'inventoryDetailsAcquisitionDate',
-        'Acquisition Date',
-        'date'
-      )}
-      {renderField('inventoryDetailsTargetMarket', 'Target Market')}
-      {renderField('inventoryDetailsTrendingItems', 'Trending Items')}
-      {renderField(
-        'inventoryDetailsCustomerPreferences',
-        'Customer Preferences'
-      )}
-      {renderField(
-        'inventoryDetailsAcquisitionLocation',
-        'Acquisition Location'
-      )}
-      {renderField(
-        'inventoryDetailsSupplierInformation',
-        'Supplier Information'
-      )}
-
-      <StyledTitle>Dates</StyledTitle>
-      {renderField('purchaseDate', 'Purchase Date', 'date')}
-      {renderField('listingDate', 'Listing Date', 'date')}
-
-      <StyledTitle>Additional Notes</StyledTitle>
-      {renderField('sellerNotes', 'Seller Notes', 'textarea')}
-      {renderField('contextData', 'Context Data', 'textarea')}
-
-      <StyledTitle>Final Recommendation</StyledTitle>
+  const renderPurchaseRecommendation = () => {
+    if (
+      !item.purchaseRecommendation ||
+      item.purchaseRecommendation === 'Unknown'
+    )
+      return null;
+    return (
       <StyledFormGroup>
         <StyledLabel htmlFor="purchaseRecommendation">
           Purchase Recommendation
         </StyledLabel>
         <StyledSelect
           id="purchaseRecommendation"
-          value={item.purchaseRecommendation || 'Unknown'}
+          value={item.purchaseRecommendation}
           onChange={(e) => handlePurchaseRecommendationChange(e.target.value)}
         >
           <option value="Yes">Yes</option>
@@ -413,14 +468,8 @@ function FormFields({
           <option value="Unknown">Unknown</option>
         </StyledSelect>
       </StyledFormGroup>
-      {renderField('detailedBreakdown', 'Detailed Breakdown', 'textarea')}
-      {renderField(
-        'sampleForSaleListing',
-        'Sample For Sale Listing',
-        'textarea'
-      )}
-    </>
-  );
+    );
+  };
 
   const onSubmit = (e) => {
     e.preventDefault();
@@ -430,30 +479,32 @@ function FormFields({
   return (
     <>
       <StyledForm onSubmit={onSubmit}>
-        {isAnyFieldPopulated ? (
+        {renderAllFields()}
+        {renderPurchaseRecommendation()}
+        {hasPopulatedFields && (
           <>
-            {renderAllFields()}
             <StyledButton type="submit">Purchase Item</StyledButton>
+            <StyledButton onClick={() => handleSaveDraft(itemId, item)}>
+              Save Draft
+            </StyledButton>
           </>
-        ) : (
-          <StyledFormGroup>
-            <StyledLabel htmlFor="name">Item Name</StyledLabel>
-            <StyledInput
-              type="text"
-              id="name"
-              value={item.name || ''}
-              onChange={(e) => handleFieldChange('name', e.target.value)}
-              required
-            />
-          </StyledFormGroup>
         )}
       </StyledForm>
-
-      {isAnyFieldPopulated && (
-        <StyledButton onClick={() => handleSaveDraft(itemId, item)}>
-          Save Draft
-        </StyledButton>
-      )}
+      <StyledFormGroup>
+        <StyledLabel>Item ID</StyledLabel>
+        <div>{itemId || 'Not assigned yet'}</div>
+      </StyledFormGroup>
+      <div>
+        <label>AI Recommendation:</label>
+        <p>
+          {aiRecommendation?.purchaseRecommendation !== undefined
+            ? `Purchase Recommendation: ${aiRecommendation.purchaseRecommendation ? 'Yes' : 'No'}`
+            : 'No recommendation available'}
+        </p>
+        {aiRecommendation?.explanation && (
+          <p>Explanation: {aiRecommendation.explanation}</p>
+        )}
+      </div>
     </>
   );
 }
@@ -465,7 +516,8 @@ FormFields.propTypes = {
   handleSaveDraft: PropTypes.func.isRequired,
   handlePurchaseRecommendationChange: PropTypes.func.isRequired,
   itemId: PropTypes.string.isRequired,
-  analysisResult: PropTypes.object, // Add this prop type
+  analysisResult: PropTypes.object,
+  aiRecommendation: PropTypes.object,
 };
 
 export default FormFields;

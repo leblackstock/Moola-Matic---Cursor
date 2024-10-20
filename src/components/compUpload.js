@@ -104,13 +104,9 @@ export const handleFileChange = async (
     console.log('Upload response:', response.data);
 
     if (Array.isArray(response.data)) {
-      setItem((prevItem) => ({
-        ...prevItem,
-        images: [...(prevItem.images || []), ...response.data],
-      }));
       setHasUnsavedChanges(true);
       setImageUploaded(true);
-      return response.data;
+      return response.data; // Return the newly uploaded images
     } else {
       throw new Error('Unexpected response format');
     }

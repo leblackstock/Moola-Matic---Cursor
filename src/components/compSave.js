@@ -1,7 +1,7 @@
 // frontend\src\components\compSave.js
 
 import axios from 'axios';
-import { useEffect, useCallback, useState, useRef } from 'react';
+import { useEffect, useCallback, useState, useRef, useMemo } from 'react';
 import debounce from 'lodash.debounce';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -638,54 +638,90 @@ export const useAutosave = (
   itemId,
   setItem,
   setLastSaved,
-  interval = 30000
+  debounceDelay = 10000,
+  forceSaveInterval = 60000,
+  isPaused = false // Add this parameter
 ) => {
   const savedDataRef = useRef(null);
+  const lastSavedRef = useRef(null);
+  const timeoutRef = useRef(null);
 
-  useEffect(() => {
-    const autosaveDraft = async () => {
-      if (!itemId || !savedDataRef.current) {
+  const saveData = useCallback(async () => {
+    if (!itemId || !savedDataRef.current) {
+      return;
+    }
+
+    try {
+      const requestBody = {
+        draftData: savedDataRef.current,
+        contextData: savedDataRef.current.contextData,
+        messages: savedDataRef.current.messages,
+        itemId: itemId,
+      };
+
+      const response = await axios.post(
+        `${API_URL}/api/items/autosave-draft`,
+        requestBody,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (response.data && response.data.item) {
+        setItem(response.data.item);
+        setLastSaved(new Date());
+        lastSavedRef.current = Date.now();
+        console.log('Autosave completed successfully');
+      } else {
+        throw new Error('Invalid response format from server');
+      }
+    } catch (error) {
+      console.error('Error during autosave:', error);
+    }
+  }, [itemId, setItem, setLastSaved]);
+
+  const debouncedSave = useMemo(
+    () => debounce(saveData, debounceDelay),
+    [saveData, debounceDelay]
+  );
+
+  const updateSavedData = useCallback(
+    (data) => {
+      if (isPaused) {
+        console.log('Autosave is paused');
         return;
       }
 
-      try {
-        const requestBody = {
-          draftData: savedDataRef.current,
-          contextData: savedDataRef.current.contextData,
-          messages: savedDataRef.current.messages,
-          itemId: itemId,
-        };
+      savedDataRef.current = data;
+      debouncedSave();
 
-        const response = await axios.post(
-          `${API_URL}/api/items/autosave-draft`,
-          requestBody,
-          {
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          }
-        );
-
-        if (response.data && response.data.item) {
-          setItem(response.data.item);
-          setLastSaved(new Date());
-          console.log('Autosave completed successfully');
-        } else {
-          throw new Error('Invalid response format from server');
+      // Clear existing timeout and set a new one
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      timeoutRef.current = setTimeout(() => {
+        const now = Date.now();
+        if (
+          !lastSavedRef.current ||
+          now - lastSavedRef.current >= forceSaveInterval
+        ) {
+          saveData();
         }
-      } catch (error) {
-        console.error('Error during autosave:', error);
+      }, forceSaveInterval);
+    },
+    [debouncedSave, saveData, forceSaveInterval, isPaused] // Add isPaused to the dependency array
+  );
+
+  useEffect(() => {
+    return () => {
+      debouncedSave.cancel();
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
       }
     };
-
-    const timer = setInterval(autosaveDraft, interval);
-
-    return () => clearInterval(timer);
-  }, [itemId, setItem, setLastSaved, interval]);
-
-  const updateSavedData = (data) => {
-    savedDataRef.current = data;
-  };
+  }, [debouncedSave]);
 
   return updateSavedData;
 };

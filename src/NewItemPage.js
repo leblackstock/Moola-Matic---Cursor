@@ -1,7 +1,7 @@
 // frontend/src/NewItemPage.js
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 import treasureSpecs from './Images/Treasure_Specs01.jpeg';
@@ -57,6 +57,7 @@ import {
   WarningBoxButtons,
   WarningButton,
 } from './components/compStyles.js';
+import { toast } from 'react-toastify';
 
 export const API_BASE_URL =
   process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001';
@@ -68,6 +69,7 @@ const loadItemData = (itemId) => {
 function NewItemPage({ setItem: setParentItem }) {
   const { itemId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Add a state variable for item
   const [item, setItem] = useState(null);
@@ -80,7 +82,7 @@ function NewItemPage({ setItem: setParentItem }) {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [lastAutoSave, setLastAutoSave] = useState(null);
   const backendPort = process.env.REACT_APP_BACKEND_PORT || 3001;
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [imageUploaded, setImageUploaded] = useState(false);
   const [imagePreview, setImagePreview] = useState('');
   const [uploadedImages, setUploadedImages] = useState([]);
@@ -96,17 +98,25 @@ function NewItemPage({ setItem: setParentItem }) {
   const [notificationMessage, setNotificationMessage] = useState('');
   const [imageURL, setImageURL] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [galleryKey, setGalleryKey] = useState(0);
+
+  // Add this state for AI recommendation
+  const [aiRecommendation, setAiRecommendation] = useState(null);
 
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
   const messagesContainerRef = useRef(null);
 
-  // Use the autosave hook with a custom interval (e.g., 5 minutes)
+  const [isUploading, setIsUploading] = useState(false);
+
+  // Use the autosave hook with a 10-second interval
   const updateAutosaveData = useAutosave(
     itemId,
     setItem,
     setLastAutoSave,
-    300000
+    10000,
+    60000,
+    isUploading // Pass isUploading state to the hook
   );
 
   // Effect for autosave
@@ -127,8 +137,8 @@ function NewItemPage({ setItem: setParentItem }) {
   // ---------------------------------
   useEffect(() => {
     const loadData = async () => {
-      if (!itemId) {
-        console.error('No itemId available in URL');
+      if (!itemId || !location.pathname.includes(`/new-item/${itemId}`)) {
+        console.error('No valid itemId in URL');
         navigate('/');
         return;
       }
@@ -145,6 +155,7 @@ function NewItemPage({ setItem: setParentItem }) {
           );
           setContextData(localData.contextData || {});
           setMessages(localData.messages || []);
+          setAiRecommendation(localData.finalRecommendation || null);
 
           // Now check the database for updates
           try {
@@ -162,6 +173,7 @@ function NewItemPage({ setItem: setParentItem }) {
               );
               setContextData(dbItem.contextData || {});
               setMessages(dbItem.messages || []);
+              setAiRecommendation(dbItem.finalRecommendation || null);
 
               // Update local storage with the newer data
               handleLocalSave(
@@ -190,6 +202,7 @@ function NewItemPage({ setItem: setParentItem }) {
               );
               setContextData(dbItem.contextData || {});
               setMessages(dbItem.messages || []);
+              setAiRecommendation(dbItem.finalRecommendation || null);
               // Save to local storage
               handleLocalSave(
                 dbItem,
@@ -200,20 +213,25 @@ function NewItemPage({ setItem: setParentItem }) {
             } else {
               console.error('No data found for itemId:', itemId);
               navigate('/');
+              return;
             }
           } catch (dbError) {
             console.error('Error fetching item from database:', dbError);
             navigate('/');
+            return;
           }
         }
       } catch (error) {
         console.error('Error loading data:', error);
         navigate('/');
+        return;
+      } finally {
+        setIsLoading(false);
       }
     };
 
     loadData();
-  }, [itemId, navigate, setParentItem]);
+  }, [itemId, navigate, setParentItem, location]);
 
   // Update item in parent component when local item changes
   useEffect(() => {
@@ -359,7 +377,31 @@ function NewItemPage({ setItem: setParentItem }) {
   //   }
   // };
 
+  // New function to fetch the latest item data from the server
+  const fetchLatestItemData = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/items/${itemId}`);
+      const serverItem = response.data;
+      console.log('Fetched item data:', serverItem);
+      setItem(serverItem);
+      setParentItem(serverItem);
+      setUploadedImages(
+        Array.isArray(serverItem.images) ? serverItem.images : []
+      );
+      handleLocalSave(
+        serverItem,
+        serverItem.contextData,
+        serverItem.messages,
+        itemId
+      );
+      setGalleryKey((prevKey) => prevKey + 1);
+    } catch (error) {
+      console.error('Error fetching latest item data:', error);
+    }
+  };
+
   const handleFileChangeWrapper = async (event) => {
+    setIsUploading(true);
     try {
       const result = await handleFileChange(
         event,
@@ -371,11 +413,21 @@ function NewItemPage({ setItem: setParentItem }) {
 
       console.log('File change result:', result);
 
-      if (result && result.uploadedFiles) {
-        setUploadedImages((prevImages) => [
-          ...prevImages,
-          ...result.uploadedFiles,
-        ]);
+      if (Array.isArray(result)) {
+        setUploadedImages((prevImages) => [...prevImages, ...result]);
+
+        // Trigger manual save after images are uploaded
+        await handleManualSave(
+          item,
+          [...uploadedImages, ...result],
+          messages,
+          backendPort,
+          setItem,
+          setUploadedImages,
+          setHasUnsavedChanges,
+          setLastAutoSave
+        );
+        toast.success('Images uploaded and saved successfully!');
       } else {
         console.error('Unexpected response format:', result);
       }
@@ -383,6 +435,8 @@ function NewItemPage({ setItem: setParentItem }) {
       console.error('Error in handleFileChangeWrapper:', error);
       setNotificationMessage('Error uploading images. Please try again.');
       setShowNotification(true);
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -488,7 +542,7 @@ function NewItemPage({ setItem: setParentItem }) {
     handleImageDelete(imageToDelete, itemId, setUploadedImages, setItem);
   };
 
-  // Update the updateItem function to handle nested properties
+  // Update the updateItem function to handle nested properties safely
   const updateItem = (field, value) => {
     setItem((prevItem) => {
       const newItem = { ...prevItem };
@@ -505,6 +559,21 @@ function NewItemPage({ setItem: setParentItem }) {
     });
     setHasUnsavedChanges(true);
   };
+
+  // Update handlePurchaseRecommendationChange to use the updateItem function
+  const handlePurchaseRecommendationChange = (value) => {
+    updateItem(
+      'finalRecommendation.purchaseRecommendation',
+      value === 'true' ? true : value === 'false' ? false : null
+    );
+  };
+
+  // Add this useEffect to update aiRecommendation when item changes
+  useEffect(() => {
+    if (item && item.finalRecommendation) {
+      setAiRecommendation(item.finalRecommendation);
+    }
+  }, [item]);
 
   // Update the handleAnalyzeImages function
   const handleAnalyzeImagesWrapper = async () => {
@@ -592,7 +661,7 @@ function NewItemPage({ setItem: setParentItem }) {
   };
 
   useEffect(() => {
-    //  console.log('uploadedImages updated:', uploadedImages);
+    console.log('uploadedImages state updated:', uploadedImages);
   }, [uploadedImages]);
 
   const handleSaveDraft = async () => {
@@ -629,16 +698,14 @@ function NewItemPage({ setItem: setParentItem }) {
     }
   };
 
-  const handlePurchaseRecommendationChange = (value) => {
-    updateItem(
-      'finalRecommendation.purchaseRecommendation',
-      value === 'true' ? true : value === 'false' ? false : null
-    );
-  };
-
   // Render a loading state if item is not yet loaded
-  if (!item) {
+  if (isLoading) {
     return <div>Loading...</div>;
+  }
+
+  if (!item) {
+    navigate('/');
+    return null;
   }
 
   //console.log('Current itemId:', itemId);
@@ -703,7 +770,8 @@ function NewItemPage({ setItem: setParentItem }) {
           </ButtonContainer>
 
           <UploadedImagesGallery
-            images={uploadedImages || []}
+            key={galleryKey}
+            images={uploadedImages}
             onSelect={(image) => setSelectedImage(image)}
             selectedImage={selectedImage}
             onDelete={handleDeleteImageWrapper}
@@ -734,6 +802,7 @@ function NewItemPage({ setItem: setParentItem }) {
             multiple
             accept="image/*"
             onChange={handleFileChangeWrapper}
+            disabled={isUploading}
           />
 
           {/* New Save Draft button */}
@@ -755,7 +824,8 @@ function NewItemPage({ setItem: setParentItem }) {
               handlePurchaseRecommendationChange
             }
             itemId={itemId}
-            analysisResult={item.analysisResult} // Pass the analysis result to FormFields
+            analysisResult={item.analysisResult}
+            aiRecommendation={aiRecommendation} // Pass aiRecommendation to FormFields
           />
         </div>
       </MainContentArea>
