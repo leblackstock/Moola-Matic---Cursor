@@ -20,7 +20,7 @@ import {
   StyledTitle,
 } from './compStyles.js';
 
-function FormFields({
+const FormFields = React.memo(function FormFields({
   item,
   updateItem,
   handleSubmit,
@@ -28,137 +28,175 @@ function FormFields({
   handlePurchaseRecommendationChange,
   itemId,
   analysisResult,
-  aiRecommendation,
 }) {
-  console.log('FormFields render start');
-
   const [hasPopulatedFields, setHasPopulatedFields] = useState(false);
   const previousAnalysisResultRef = useRef();
   const [updatedFields, setUpdatedFields] = useState(new Set());
 
-  // Debounce the save function to avoid too frequent saves
-  const debouncedSave = useCallback(
-    _.debounce((newItem) => {
-      handleSaveDraft(itemId, newItem);
-    }, 1000),
+  // Memoize the debouncedSave function
+  const debouncedSave = useMemo(
+    () =>
+      _.debounce((newItem) => {
+        handleSaveDraft(itemId, newItem);
+      }, 1000),
     [handleSaveDraft, itemId]
   );
 
+  // Optimize the main useEffect
   useEffect(() => {
-    console.log('FormFields effect triggered');
-    if (analysisResult) {
-      console.log('Processing analysisResult:', analysisResult);
-      if (
-        analysisResult &&
-        analysisResult !== previousAnalysisResultRef.current
-      ) {
-        console.log('Processing new analysisResult');
-        previousAnalysisResultRef.current = analysisResult;
+    if (
+      analysisResult &&
+      analysisResult !== previousAnalysisResultRef.current
+    ) {
+      previousAnalysisResultRef.current = analysisResult;
 
-        if (analysisResult.summary) {
-          console.log('Processing summary:', analysisResult.summary);
+      if (analysisResult.summary) {
+        let summaryObject;
+        try {
+          // Remove markdown formatting if present
+          const cleanedSummary = analysisResult.summary
+            .replace(/```json\n/, '') // Remove opening ```json
+            .replace(/\n```$/, '') // Remove closing ```
+            .trim(); // Remove any leading/trailing whitespace
 
-          let summaryObject;
-          try {
-            // Remove markdown formatting if present
-            const cleanedSummary = analysisResult.summary
-              .replace(/```json\n/, '') // Remove opening ```json
-              .replace(/\n```$/, '') // Remove closing ```
-              .trim(); // Remove any leading/trailing whitespace
-
-            summaryObject = JSON.parse(cleanedSummary);
-          } catch (error) {
-            console.error('Error parsing summary:', error);
-            summaryObject = {};
-          }
-
-          // Create a new item object with updated fields
-          const updatedItem = { ...item };
-
-          // Update form fields based on the analysis result
-          Object.entries(summaryObject).forEach(([key, value]) => {
-            if (value !== undefined) {
-              console.log(`Updating ${key} to ${value}`);
-              updatedItem[key] = value;
-            }
-          });
-
-          // Update the item state with all the changes at once
-          updateItem(updatedItem);
-
-          setHasPopulatedFields(true);
+          // Attempt to parse the cleaned summary
+          summaryObject = JSON.parse(cleanedSummary);
+        } catch (error) {
+          console.error('Error parsing summary:', error);
+          // If parsing fails, treat the entire summary as detailedBreakdown
+          summaryObject = { detailedBreakdown: analysisResult.summary };
         }
+
+        // Create a new item object with updated fields
+        const updatedItem = { ...item };
+
+        // Update form fields based on the analysis result
+        Object.entries(summaryObject).forEach(([key, value]) => {
+          if (value !== undefined) {
+            console.log(`Updating ${key} to ${value}`);
+            updatedItem[key] = value;
+          }
+        });
+
+        // Update the item state with all the changes at once
+        updateItem(updatedItem);
+
+        setHasPopulatedFields(true);
       }
     }
   }, [analysisResult, updateItem, item]);
 
+  // Add this function to format dates
+  const formatDate = useCallback((dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toISOString().split('T')[0];
+  }, []);
+
+  // Modify the handleFieldChange function
   const handleFieldChange = useCallback(
-    (key, value) => {
-      console.log('handleFieldChange called', key, value);
-      console.log(`Updating field: ${key} with value: ${value}`);
-      const newItem = { ...item, [key]: value };
-      updateItem(key, value);
+    (field, value) => {
+      let formattedValue = value;
+
+      // If the field is a date field, format the value
+      if (
+        field === 'purchaseDate' ||
+        field === 'listingDate' ||
+        field === 'soldDate'
+      ) {
+        formattedValue = formatDate(value);
+      }
+
+      const newItem = { ...item, [field]: formattedValue };
+      updateItem(itemId, newItem);
+      setUpdatedFields(new Set([...updatedFields, field]));
       debouncedSave(newItem);
-      setUpdatedFields((prev) => new Set(prev).add(key));
     },
-    [item, updateItem, debouncedSave]
+    [item, itemId, updateItem, updatedFields, debouncedSave, formatDate]
   );
 
-  const renderField = (key, label, type = 'text') => {
-    const value = item[key];
-    console.log(`Rendering field: ${key}, value: ${value}`);
-    if (value === null || value === undefined || value === '') {
-      console.log(`Skipping render for empty field: ${key}`);
-      return null;
-    }
+  // Memoize the renderField function
+  const renderField = useCallback(
+    (key, label, type = 'text') => {
+      const value = item[key];
+      if (value === null || value === undefined || value === '') {
+        return null;
+      }
 
-    return (
-      <StyledFormGroup key={key}>
-        <StyledLabel htmlFor={key}>{label}</StyledLabel>
-        {type === 'textarea' ? (
-          <StyledTextarea
-            id={key}
-            value={value}
-            onChange={(e) => handleFieldChange(key, e.target.value)}
-            rows="3"
-          />
-        ) : type === 'number' ? (
-          <StyledInput
-            type="number"
-            id={key}
-            value={value}
-            onChange={(e) => handleFieldChange(key, parseFloat(e.target.value))}
-          />
-        ) : type === 'date' ? (
-          <StyledInput
-            type="date"
-            id={key}
-            value={
-              value instanceof Date ? value.toISOString().split('T')[0] : value
-            }
-            onChange={(e) => handleFieldChange(key, e.target.value)}
-          />
-        ) : type === 'boolean' ? (
-          <StyledSelect
-            id={key}
-            value={value.toString()}
-            onChange={(e) => handleFieldChange(key, e.target.value === 'true')}
-          >
-            <option value="true">Yes</option>
-            <option value="false">No</option>
-          </StyledSelect>
-        ) : (
-          <StyledInput
-            type={type}
-            id={key}
-            value={value}
-            onChange={(e) => handleFieldChange(key, e.target.value)}
-          />
-        )}
-      </StyledFormGroup>
-    );
-  };
+      let inputElement;
+      switch (type) {
+        case 'textarea':
+          inputElement = (
+            <StyledTextarea
+              id={key}
+              value={value}
+              onChange={(e) => handleFieldChange(key, e.target.value)}
+              rows="3"
+            />
+          );
+          break;
+        case 'number':
+          inputElement = (
+            <StyledInput
+              type="number"
+              id={key}
+              value={value}
+              onChange={(e) =>
+                handleFieldChange(key, parseFloat(e.target.value))
+              }
+            />
+          );
+          break;
+        case 'date':
+          inputElement = (
+            <StyledInput
+              type="date"
+              id={key}
+              value={
+                value instanceof Date
+                  ? value.toISOString().split('T')[0]
+                  : value
+              }
+              onChange={(e) => handleFieldChange(key, e.target.value)}
+            />
+          );
+          break;
+        case 'boolean':
+          inputElement = (
+            <StyledSelect
+              id={key}
+              value={value.toString()}
+              onChange={(e) =>
+                handleFieldChange(key, e.target.value === 'true')
+              }
+            >
+              <option value="true">Yes</option>
+              <option value="false">No</option>
+            </StyledSelect>
+          );
+          break;
+        default:
+          inputElement = (
+            <StyledInput
+              type={type}
+              id={key}
+              value={value}
+              onChange={(e) => handleFieldChange(key, e.target.value)}
+            />
+          );
+      }
 
+      return (
+        <StyledFormGroup key={key}>
+          <StyledLabel htmlFor={key}>{label}</StyledLabel>
+          {inputElement}
+        </StyledFormGroup>
+      );
+    },
+    [item, handleFieldChange]
+  );
+
+  // Memoize the renderFieldGroup function
   const renderFieldGroup = useCallback(
     (title, fields) => {
       const renderedFields = fields
@@ -167,15 +205,16 @@ function FormFields({
         .filter(Boolean);
       if (renderedFields.length === 0) return null;
       return (
-        <>
+        <React.Fragment key={title}>
           <StyledTitle>{title}</StyledTitle>
           {renderedFields}
-        </>
+        </React.Fragment>
       );
     },
     [updatedFields, item, renderField]
   );
 
+  // Memoize the fields
   const memoizedFields = useMemo(() => {
     const fieldGroups = [
       [
@@ -384,37 +423,13 @@ function FormFields({
     return fieldGroups
       .map(([title, fields]) => renderFieldGroup(title, fields))
       .filter(Boolean);
-  }, [renderFieldGroup]);
+  }, [renderFieldGroup, item]);
 
   useEffect(() => {
     setHasPopulatedFields(memoizedFields.length > 0);
   }, [memoizedFields.length]);
 
-  const renderPurchaseRecommendation = () => {
-    if (
-      !item.purchaseRecommendation ||
-      item.purchaseRecommendation === 'Unknown'
-    )
-      return null;
-    return (
-      <StyledFormGroup>
-        <StyledLabel htmlFor="purchaseRecommendation">
-          Purchase Recommendation
-        </StyledLabel>
-        <StyledSelect
-          id="purchaseRecommendation"
-          value={item.purchaseRecommendation}
-          onChange={(e) => handlePurchaseRecommendationChange(e.target.value)}
-        >
-          <option value="Yes">Yes</option>
-          <option value="No">No</option>
-          <option value="Unknown">Unknown</option>
-        </StyledSelect>
-      </StyledFormGroup>
-    );
-  };
-
-  const renderSampleListing = () => {
+  const renderSampleListing = useCallback(() => {
     if (!item.sampleForSaleListing) return null;
     return (
       <StyledFormGroup>
@@ -429,25 +444,28 @@ function FormFields({
         />
       </StyledFormGroup>
     );
-  };
+  }, [item.sampleForSaleListing, handleFieldChange]);
 
-  const onSubmit = (e) => {
-    e.preventDefault();
-    handleSubmit(itemId);
-  };
-
-  console.log('FormFields render end');
+  const onSubmit = useCallback(
+    (e) => {
+      e.preventDefault();
+      handleSubmit(itemId);
+    },
+    [handleSubmit, itemId]
+  );
 
   return (
     <>
       <StyledForm onSubmit={onSubmit}>
         {memoizedFields}
-        {renderPurchaseRecommendation()}
-        {renderSampleListing()} {/* Add this line */}
+        {renderSampleListing()}
         {hasPopulatedFields && (
           <>
             <StyledButton type="submit">Purchase Item</StyledButton>
-            <StyledButton onClick={() => handleSaveDraft(itemId, item)}>
+            <StyledButton
+              onClick={() => handleSaveDraft(itemId, item)}
+              type="button"
+            >
               Save Draft
             </StyledButton>
           </>
@@ -457,20 +475,9 @@ function FormFields({
         <StyledLabel>Item ID</StyledLabel>
         <div>{itemId || 'Not assigned yet'}</div>
       </StyledFormGroup>
-      <div>
-        <label>AI Recommendation:</label>
-        <p>
-          {aiRecommendation?.purchaseRecommendation !== undefined
-            ? `Purchase Recommendation: ${aiRecommendation.purchaseRecommendation ? 'Yes' : 'No'}`
-            : 'No recommendation available'}
-        </p>
-        {aiRecommendation?.explanation && (
-          <p>Explanation: {aiRecommendation.explanation}</p>
-        )}
-      </div>
     </>
   );
-}
+});
 
 FormFields.propTypes = {
   item: PropTypes.object.isRequired,
@@ -480,7 +487,6 @@ FormFields.propTypes = {
   handlePurchaseRecommendationChange: PropTypes.func.isRequired,
   itemId: PropTypes.string.isRequired,
   analysisResult: PropTypes.object,
-  aiRecommendation: PropTypes.object,
 };
 
 export default FormFields;

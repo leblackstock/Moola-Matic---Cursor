@@ -117,7 +117,8 @@ Provide the output strictly in the following JSON format with each field filled 
   "inventoryDetailsAcquisitionLocation": "string",
   "inventoryDetailsSupplierInformation": "string",
   "purchaseRecommendation": "string",
-  "detailedBreakdown": "string"
+  "detailedBreakdown": "string",
+  "sampleForSaleListing": "string"
 }
 
 Additional Information:
@@ -227,7 +228,8 @@ Provide the output strictly in the following JSON format, ensuring each field is
   "inventoryDetailsAcquisitionLocation": "string",
   "inventoryDetailsSupplierInformation": "string",
   "purchaseRecommendation": "string",
-  "detailedBreakdown": "string"
+  "detailedBreakdown": "string",
+  "sampleForSaleListing": "string"
 }
 
 # Important Notes

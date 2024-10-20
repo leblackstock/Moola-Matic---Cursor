@@ -1,15 +1,18 @@
 // frontend/src/App.js
 
 import React, { useState, useEffect } from 'react';
-import PropTypes from 'prop-types'; // Import PropTypes
+import PropTypes from 'prop-types';
 import { Route, Routes, useNavigate, Link, Navigate } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import moolaMaticLogo from './Images/Moola-Matic Logo 01.jpeg';
 import NewItemPage from './NewItemPage.js';
 import ViewItemsPage from './ViewItemsPage.js';
-import { handleLocalSave } from './components/compSave.js';
-import { saveToLocalStorage } from './components/compSave.js';
+import { handleLocalSave, saveToLocalStorage } from './components/compSave.js';
+import { resetItemGeneration, createNewItem } from './helpers/itemGen.js';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import './App.css';
 import {
   PageContainer,
   StyledButton,
@@ -26,19 +29,14 @@ import {
   WarningBoxOverlay,
   WarningBox,
   WarningBoxButtons,
-  WarningButton, // Add this line
+  WarningButton,
   LogoContainer,
   Logo,
   MainContent,
   ButtonContainer,
+  StyledToastContainer,
 } from './components/compStyles.js';
-
-// Add this import near the top of the file
-import { resetItemGeneration, createNewItem } from './helpers/itemGen.js';
-
-// At the top of the file, add this import
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import GlobalStyles from './GlobalStyles.js';
 
 /**
  * Sidebar Component
@@ -279,6 +277,7 @@ function NotFound() {
 function App() {
   const [currentItemId, setCurrentItemId] = useState(null);
   const [currentItem, setCurrentItem] = useState(null);
+  const navigate = useNavigate(); // Add this line to define navigate
 
   const updateCurrentItemId = async (newItemId) => {
     setCurrentItemId(newItemId);
@@ -288,12 +287,6 @@ function App() {
   const handleLogout = () => {
     setCurrentItemId(null);
     localStorage.removeItem('currentItemId');
-    navigate('/');
-  };
-
-  const checkItemInLocalStorage = (itemId) => {
-    const item = localStorage.getItem(`item_${itemId}`);
-    return item !== null;
   };
 
   const handleChangeItem = () => {
@@ -314,10 +307,12 @@ function App() {
     } else {
       setCurrentItem(null);
     }
+    navigate(`/new-item/${newItemId}`); // Add this line to navigate after setting the item ID
   };
 
   return (
     <div className="App">
+      <GlobalStyles />
       <ErrorBoundary>
         <PageContainer>
           <Sidebar
@@ -365,7 +360,7 @@ function App() {
           </MainContent>
         </PageContainer>
       </ErrorBoundary>
-      <ToastContainer
+      <StyledToastContainer
         position="top-right"
         autoClose={5000}
         hideProgressBar={false}

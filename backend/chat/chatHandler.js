@@ -16,7 +16,7 @@ import {
   generateCombineAndSummarizeAnalysisPrompt,
 } from './analysisAssistant.js';
 import { processImages } from '../utils/imageProcessor.js';
-import { combineAnalyses } from './chatCombineAnalysis.js';
+import { combineAnalyses, parseAnalysis } from './chatCombineAnalysis.js';
 import { DraftItem } from '../models/draftItem.js';
 import {
   calculateMessageTokens,
@@ -24,6 +24,23 @@ import {
 } from '../utils/tokenCalculator.js';
 //import { uploadLocalImage } from './chatAssistant.js';
 //import { uploadBase64Image } from './chatAssistant.js';
+import { toast } from 'react-toastify';
+import winston from 'winston';
+import logger from '../utils/logger.js';
+
+// Create a logger instance
+const loggerInstance = winston.createLogger({
+  level: 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+  ),
+  transports: [
+    // Remove or comment out the following line:
+    // new winston.transports.Console(),
+    new winston.transports.File({ filename: 'logs/api-errors.log' }),
+  ],
+});
 
 // ... rest of the file
 
@@ -84,14 +101,14 @@ router.post('/analyze-images', async (req, res) => {
   try {
     const { imageUrls, description, itemId, sellerNotes, context } = req.body;
 
-    // Add more detailed logging
-    console.log('Received request body:', {
-      imageUrlsCount: imageUrls ? imageUrls.length : 0,
-      description,
-      itemId,
-      sellerNotes,
-      context,
-    });
+    // // Add more detailed logging
+    // console.log('Received request body:', {
+    //   imageUrlsCount: imageUrls ? imageUrls.length : 0,
+    //   description,
+    //   itemId,
+    //   sellerNotes,
+    //   context,
+    // });
 
     // Validate image input
     if (!imageUrls || !Array.isArray(imageUrls) || imageUrls.length === 0) {
@@ -119,34 +136,66 @@ router.post('/analyze-images', async (req, res) => {
           analysisPrompt,
           base64Image
         );
-        console.log(
-          `Analysis result for ${filename}:`,
-          JSON.stringify(analysis, null, 2)
-        );
         analyses.push(analysis);
       } catch (error) {
         console.error(`Failed to analyze image: ${filename}`, error);
+        loggerInstance.error(`Failed to analyze image: ${filename}`, { error });
       }
     }
 
-    console.log('All analyses:', JSON.stringify(analyses, null, 2));
-
-    // Combine all analyses
-    const combinedAnalysis = combineAnalyses(analyses);
-    console.log(
-      'Combined analysis:',
-      JSON.stringify(combinedAnalysis, null, 2)
+    loggerInstance.info(
+      `Completed analyses for ${analyses.length} out of ${processedImages.length} images`
     );
 
-    // Summarize the combined analysis
-    const summary = await summarizeAnalyses(
-      combinedAnalysis,
-      combineAndSummarizeAnalysisPrompt
-    );
+    // Use the updated combineAnalyses function
+    const { combined, data: combinedOrParsedAnalyses } =
+      combineAnalyses(analyses);
 
-    res.json({ analyses, combinedAnalysis, summary });
+    if (combined) {
+      console.log('Analyses were successfully combined');
+      // Proceed with summarization of combined analysis
+      const summary = await summarizeAnalyses(
+        combinedOrParsedAnalyses,
+        combineAndSummarizeAnalysisPrompt
+      );
+      res.json({ combinedAnalysis: combinedOrParsedAnalyses, summary });
+    } else {
+      //console.log(
+      // 'Analyses could not be combined, returning individual parsed results'
+      //);
+      // Handle individual parsed results
+      const successfulAnalyses = combinedOrParsedAnalyses.filter(
+        (analysis) => analysis.parsed
+      );
+      const failedAnalyses = combinedOrParsedAnalyses.filter(
+        (analysis) => !analysis.parsed
+      );
+
+      loggerInstance.info(
+        `Successfully parsed ${successfulAnalyses.length} analyses, ${failedAnalyses.length} failed`
+      );
+
+      // You might want to handle failed analyses differently or just ignore them
+      const parsedData = successfulAnalyses.map((analysis) => analysis.data);
+
+      // Summarize the parsed data if needed
+      const summary =
+        parsedData.length > 0
+          ? await summarizeAnalyses(
+              parsedData,
+              combineAndSummarizeAnalysisPrompt
+            )
+          : 'No successful analyses to summarize';
+
+      res.json({
+        analyses: parsedData,
+        summary,
+        failedAnalysesCount: failedAnalyses.length,
+      });
+    }
   } catch (error) {
     console.error('Error in /analyze-images:', error);
+    loggerInstance.error('Error in /analyze-images', { error });
     res
       .status(500)
       .json({ error: 'An unexpected error occurred', details: error.message });
@@ -158,7 +207,7 @@ router.post('/analyze-images', async (req, res) => {
  * POST /chat
  */
 router.post('/chat', async (req, res) => {
-  console.log('Received chat request:', req.body);
+  //console.log('Received chat request:', req.body);
   const { message, itemId } = req.body;
 
   // Validate input
@@ -196,7 +245,7 @@ router.post('/chat', async (req, res) => {
 
     // Get assistant's response
     const assistantResponse = await createAssistantMessage(fullContext);
-    console.log('Assistant response:', assistantResponse);
+    //console.log('Assistant response:', assistantResponse);
 
     // Calculate and log assistant response tokens
     const responseTokens = calculateMessageTokens([

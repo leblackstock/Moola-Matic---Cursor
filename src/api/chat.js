@@ -1,6 +1,7 @@
 // frontend/src/api/chat.js
 
 import axios from 'axios';
+import { toast } from 'react-toastify';
 
 // Determine the API URL based on the environment
 const BACKEND_PORT = process.env.REACT_APP_BACKEND_PORT || 3001;
@@ -88,15 +89,12 @@ export const handleAnalyzeImages = async ({
   contextData,
   setItem,
   setMessages,
-  setNotificationMessage,
-  setShowNotification,
 }) => {
   console.log('handleAnalyzeImages called with:', { itemId, contextData });
 
   if (!itemId) {
     console.error('No itemId provided for image analysis');
-    setNotificationMessage('Error: No item ID provided for analysis.');
-    setShowNotification(true);
+    toast.error('Error: No item ID provided for analysis.');
     return;
   }
 
@@ -106,8 +104,7 @@ export const handleAnalyzeImages = async ({
     const item = response.data;
 
     if (!item || !item.images || item.images.length === 0) {
-      setNotificationMessage('No images found for this item.');
-      setShowNotification(true);
+      toast.warning('No images found for this item.');
       return;
     }
 
@@ -133,8 +130,7 @@ export const handleAnalyzeImages = async ({
     console.log('Image URLs for analysis:', imageUrls);
 
     if (imageUrls.length === 0) {
-      setNotificationMessage('No valid image URLs found for analysis.');
-      setShowNotification(true);
+      toast.warning('No valid image URLs found for analysis.');
       return;
     }
 
@@ -151,32 +147,32 @@ export const handleAnalyzeImages = async ({
 
     console.log('Received analysis results:', { analyses, summary, metadata });
 
-    // Instead of mapping the results here, we'll pass them to setItem
-    setItem((prevItem) => ({
-      ...prevItem,
-      analysisResult: { analyses, summary, metadata },
-    }));
+    // Update item state if setItem function is provided
+    if (typeof setItem === 'function') {
+      setItem((prevItem) => ({
+        ...prevItem,
+        analysisResult: { analyses, summary, metadata },
+      }));
+    }
 
-    // Update messages with the analysis advice
-    setMessages((prevMessages) => [
-      ...prevMessages,
-      createAssistantMessage(
-        `Analysis complete. ${summary.finalRecommendation?.detailedBreakdown || 'No detailed breakdown available.'}`
-      ),
-    ]);
+    // Update messages if setMessages function is provided
+    if (typeof setMessages === 'function') {
+      setMessages((prevMessages) => [
+        ...prevMessages,
+        createAssistantMessage(
+          `Analysis complete. ${summary.finalRecommendation?.detailedBreakdown || 'No detailed breakdown available.'}`
+        ),
+      ]);
+    }
 
-    setNotificationMessage(
-      'Image analysis complete. Form fields have been updated.'
-    );
-    setShowNotification(true);
+    toast.success('Image analysis complete. Form fields have been updated.');
 
     return { analyses, summary, metadata };
   } catch (error) {
     console.error('Error in handleAnalyzeImages:', error);
-    setNotificationMessage(
+    toast.error(
       'An error occurred while analyzing the images. Please try again.'
     );
-    setShowNotification(true);
     throw error;
   }
 };

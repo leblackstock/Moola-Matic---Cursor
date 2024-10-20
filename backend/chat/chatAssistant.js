@@ -5,6 +5,12 @@ import axios from 'axios';
 import fs from 'fs';
 import OpenAI from 'openai';
 import { combineAnalyses } from './chatCombineAnalysis.js';
+import winston from 'winston';
+import {
+  rateLimitedRequest,
+  rateLimitedRequestWithTokens,
+  rateLimitedTokens,
+} from '../utils/rateLimiter.js';
 
 dotenv.config();
 
@@ -12,6 +18,28 @@ dotenv.config();
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+// Initialize Winston logger for OpenAI API errors
+const logger = winston.createLogger({
+  level: 'error',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+  ),
+  transports: [
+    new winston.transports.File({ filename: 'openai_errors.log' }),
+    new winston.transports.Console(),
+  ],
+});
+
+// Helper function to log OpenAI API errors
+const logOpenAIError = (functionName, error) => {
+  logger.error('OpenAI API Error', {
+    function: functionName,
+    message: error.message,
+    stack: error.stack,
+  });
+};
 
 // ============================== Function Definitions ==============================
 
@@ -90,27 +118,29 @@ const analyzeImagesWithVision = async (analysisPrompt, base64Image) => {
 
     const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
 
-    const buffer = Buffer.from(base64Data, 'base64');
-
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4-turbo',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: analysisPrompt },
+    const response = await rateLimitedRequestWithTokens(
+      () =>
+        openai.chat.completions.create({
+          model: 'gpt-4-turbo',
+          messages: [
             {
-              type: 'image_url',
-              image_url: {
-                url: `data:image/jpeg;base64,${base64Data}`,
-              },
+              role: 'user',
+              content: [
+                { type: 'text', text: analysisPrompt },
+                {
+                  type: 'image_url',
+                  image_url: {
+                    url: `data:image/jpeg;base64,${base64Data}`,
+                  },
+                },
+              ],
             },
           ],
-        },
-      ],
-      max_tokens: 4000,
-      temperature: 0.7,
-    });
+          max_tokens: 4000,
+          temperature: 0.7,
+        }),
+      4000 // Estimated token count for the request
+    );
 
     const analysis = response.choices[0].message.content;
 
@@ -142,24 +172,28 @@ const summarizeAnalyses = async (combinedAnalysis, summarizePrompt) => {
     const analysisString = JSON.stringify(combinedAnalysis, null, 2);
     const fullPrompt = `${summarizePrompt}\n\nCombined Analysis:\n${analysisString}`;
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4-turbo',
-      messages: [
-        {
-          role: 'user',
-          content: fullPrompt,
-        },
-      ],
-      temperature: 0.7,
-      max_tokens: 2048,
-    });
+    const response = await rateLimitedRequestWithTokens(
+      () =>
+        openai.chat.completions.create({
+          model: 'gpt-4-turbo',
+          messages: [
+            {
+              role: 'user',
+              content: fullPrompt,
+            },
+          ],
+          temperature: 0.7,
+          max_tokens: 2048,
+        }),
+      2048 // Estimated token count for the request
+    );
 
     const summary = response.choices[0].message.content;
-    console.log('Analysis summary:', summary);
+    logger.info('Received summary from OpenAI', { summary });
 
     return summary;
   } catch (error) {
-    console.error('Error in summarizeAnalyses:', error);
+    logOpenAIError('summarizeAnalyses', error);
     throw error;
   }
 };
@@ -171,23 +205,28 @@ const summarizeAnalyses = async (combinedAnalysis, summarizePrompt) => {
  */
 const createAssistantMessage = async (userMessage) => {
   try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4-turbo',
-      messages: [
-        {
-          role: 'user',
-          content: userMessage,
-        },
-      ],
-      temperature: 0.7,
-      max_tokens: 2048,
-      top_p: 1,
-      frequency_penalty: 0,
-      presence_penalty: 0,
-      response_format: { type: 'text' },
-    });
+    const response = await rateLimitedRequestWithTokens(
+      () =>
+        openai.chat.completions.create({
+          model: 'gpt-4-turbo',
+          messages: [
+            {
+              role: 'user',
+              content: userMessage,
+            },
+          ],
+          temperature: 0.7,
+          max_tokens: 2048,
+          top_p: 1,
+          frequency_penalty: 0,
+          presence_penalty: 0,
+          response_format: { type: 'text' },
+        }),
+      2048 // Estimated token count for the request
+    );
     return response.choices[0].message.content;
   } catch (error) {
+    logOpenAIError('createAssistantMessage', error);
     throw error;
   }
 };

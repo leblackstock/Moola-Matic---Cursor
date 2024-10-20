@@ -1,6 +1,12 @@
 // frontend/src/NewItemPage.js
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
@@ -58,6 +64,7 @@ import {
   WarningButton,
 } from './components/compStyles.js';
 import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 export const API_BASE_URL =
   process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001';
@@ -67,7 +74,7 @@ const loadItemData = (itemId) => {
 };
 
 function NewItemPage({ setItem: setParentItem }) {
-  console.log('NewItemPage render start');
+  // Remove the console.log at the start of the function
 
   const { itemId } = useParams();
   const navigate = useNavigate();
@@ -96,14 +103,9 @@ function NewItemPage({ setItem: setParentItem }) {
   const [imageInput, setImageInput] = useState('');
   const [imageAnalysis, setImageAnalysis] = useState(null);
   const [imageAnalyzed, setImageAnalyzed] = useState(false);
-  const [showNotification, setShowNotification] = useState(false);
-  const [notificationMessage, setNotificationMessage] = useState('');
-  const [imageURL, setImageURL] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [galleryKey, setGalleryKey] = useState(0);
-
-  // Add this state for AI recommendation
-  const [aiRecommendation, setAiRecommendation] = useState(null);
+  const [analysisTimeLeft, setAnalysisTimeLeft] = useState(0);
 
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
@@ -123,9 +125,9 @@ function NewItemPage({ setItem: setParentItem }) {
 
   // Effect for autosave
   useEffect(() => {
-    console.log('Autosave effect triggered');
+    // console.log('Autosave effect triggered');
     if (item && itemId) {
-      console.log('Preparing autosave data');
+      // console.log('Preparing autosave data');
       const autosaveData = {
         ...item,
         images: uploadedImages,
@@ -136,11 +138,40 @@ function NewItemPage({ setItem: setParentItem }) {
     }
   }, [item, itemId, uploadedImages, messages, contextData, updateAutosaveData]);
 
+  // Memoize complex objects or functions
+  const memoizedContextData = useMemo(() => contextData, [contextData]);
+  const memoizedMessages = useMemo(() => messages, [messages]);
+
+  // Use useCallback for functions passed as props
+  const memoizedUpdateItem = useCallback((field, value) => {
+    // console.log('updateItem called', field, value);
+    setItem((prevItem) => {
+      const newItem = { ...prevItem };
+      if (typeof field === 'string') {
+        const fields = field.split('.');
+        let current = newItem;
+        for (let i = 0; i < fields.length - 1; i++) {
+          if (!current[fields[i]]) {
+            current[fields[i]] = {};
+          }
+          current = current[fields[i]];
+        }
+        current[fields[fields.length - 1]] = value;
+      } else if (typeof field === 'object') {
+        return { ...newItem, ...field };
+      } else {
+        newItem[field] = value;
+      }
+      return newItem;
+    });
+    setHasUnsavedChanges(true);
+  }, []);
+
   // ---------------------------------
   // useEffect Hook: Load or Create Item
   // ---------------------------------
   useEffect(() => {
-    console.log('Load or Create Item effect triggered');
+    // console.log('Load or Create Item effect triggered');
     const loadData = async () => {
       if (!itemId || !location.pathname.includes(`/new-item/${itemId}`)) {
         console.error('No valid itemId in URL');
@@ -160,7 +191,9 @@ function NewItemPage({ setItem: setParentItem }) {
           );
           setContextData(localData.contextData || {});
           setMessages(localData.messages || []);
-          setAiRecommendation(localData.finalRecommendation || null);
+
+          // Check if analysis was in progress
+          setIsAnalyzing(localData.isAnalyzing || false);
 
           // Now check the database for updates
           try {
@@ -178,7 +211,9 @@ function NewItemPage({ setItem: setParentItem }) {
               );
               setContextData(dbItem.contextData || {});
               setMessages(dbItem.messages || []);
-              setAiRecommendation(dbItem.finalRecommendation || null);
+
+              // Update analysis status from DB
+              setIsAnalyzing(dbItem.isAnalyzing || false);
 
               // Update local storage with the newer data
               handleLocalSave(
@@ -207,7 +242,10 @@ function NewItemPage({ setItem: setParentItem }) {
               );
               setContextData(dbItem.contextData || {});
               setMessages(dbItem.messages || []);
-              setAiRecommendation(dbItem.finalRecommendation || null);
+
+              // Set analysis status from DB
+              setIsAnalyzing(dbItem.isAnalyzing || false);
+
               // Save to local storage
               handleLocalSave(
                 dbItem,
@@ -236,20 +274,20 @@ function NewItemPage({ setItem: setParentItem }) {
     };
 
     loadData();
-  }, [itemId, navigate, setParentItem, location]);
+  }, [itemId, navigate, setParentItem, location.pathname]);
 
   // Update item in parent component when local item changes
   useEffect(() => {
-    console.log('Update parent item effect triggered');
+    // console.log('Update parent item effect triggered');
     if (item) {
-      console.log('Updating parent item');
+      // console.log('Updating parent item');
       setParentItem(item);
     }
   }, [item, setParentItem]);
 
   // Log item changes
   useEffect(() => {
-    console.log('Item changed:', item);
+    // console.log('Item changed:', item);
   }, [item]);
 
   // Optimize the loadDraft function
@@ -271,9 +309,9 @@ function NewItemPage({ setItem: setParentItem }) {
   // useEffect Hook: Save to localStorage
   // ----------------------------
   useEffect(() => {
-    console.log('Save to localStorage effect triggered');
+    // console.log('Save to localStorage effect triggered');
     if (item && itemId) {
-      console.log('Saving to localStorage');
+      // console.log('Saving to localStorage');
       handleLocalSave(item, contextData, messages, itemId);
     }
   }, [item, contextData, messages, itemId]);
@@ -293,23 +331,23 @@ function NewItemPage({ setItem: setParentItem }) {
   // useEffect Hook: Set Selected Image if Needed
   // ----------------------------
   useEffect(() => {
-    console.log('Set Selected Image effect triggered');
+    // console.log('Set Selected Image effect triggered');
     if (uploadedImages.length > 0 && !selectedImage) {
-      console.log('Setting selected image');
+      // console.log('Setting selected image');
       setSelectedImage(uploadedImages[uploadedImages.length - 1]);
     }
   }, [uploadedImages, selectedImage]);
 
   // Log uploaded images changes
   useEffect(() => {
-    console.log('uploadedImages state updated:', uploadedImages);
+    // console.log('uploadedImages state updated:', uploadedImages);
   }, [uploadedImages]);
 
   // Event handlers with added logging
   const handleSubmit = async (e) => {
-    console.log('handleSubmit called');
+    // console.log('handleSubmit called');
     e.preventDefault();
-    console.log('Submitting item:', item);
+    // console.log('Submitting item:', item);
     // Add your submission logic here
   };
 
@@ -420,7 +458,7 @@ function NewItemPage({ setItem: setParentItem }) {
   };
 
   const handleFileChangeWrapper = async (event) => {
-    console.log('handleFileChangeWrapper called');
+    // console.log('handleFileChangeWrapper called');
     setIsUploading(true);
     try {
       const result = await handleFileChange(
@@ -436,7 +474,6 @@ function NewItemPage({ setItem: setParentItem }) {
       if (Array.isArray(result)) {
         setUploadedImages((prevImages) => [...prevImages, ...result]);
 
-        // Trigger manual save after images are uploaded
         await handleManualSave(
           item,
           [...uploadedImages, ...result],
@@ -453,8 +490,7 @@ function NewItemPage({ setItem: setParentItem }) {
       }
     } catch (error) {
       console.error('Error in handleFileChangeWrapper:', error);
-      setNotificationMessage('Error uploading images. Please try again.');
-      setShowNotification(true);
+      toast.error('Error uploading images. Please try again.');
     } finally {
       setIsUploading(false);
     }
@@ -526,13 +562,13 @@ function NewItemPage({ setItem: setParentItem }) {
 
   // Replace it with this simplified version that uses the existing handleFileChange function
   const handleImageSelect = (event) => {
-    console.log('handleImageSelect called');
-    console.log('Selected files:', event.target.files);
+    // console.log('handleImageSelect called');
+    // console.log('Selected files:', event.target.files);
     handleFileChangeWrapper(event);
   };
 
   const handleImageButtonClick = () => {
-    console.log('handleImageButtonClick called');
+    // console.log('handleImageButtonClick called');
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
@@ -560,13 +596,13 @@ function NewItemPage({ setItem: setParentItem }) {
   };
 
   const handleDeleteImageWrapper = (imageToDelete) => {
-    console.log('handleDeleteImageWrapper called', imageToDelete);
+    // console.log('handleDeleteImageWrapper called', imageToDelete);
     handleImageDelete(imageToDelete, itemId, setUploadedImages, setItem);
   };
 
   // Update the updateItem function to handle nested properties safely
   const updateItem = (field, value) => {
-    console.log('updateItem called', field, value);
+    // console.log('updateItem called', field, value);
     setItem((prevItem) => {
       const newItem = { ...prevItem };
       if (typeof field === 'string') {
@@ -593,61 +629,94 @@ function NewItemPage({ setItem: setParentItem }) {
 
   // Update handlePurchaseRecommendationChange to use the updateItem function
   const handlePurchaseRecommendationChange = (value) => {
-    console.log('handlePurchaseRecommendationChange called', value);
+    // console.log('handlePurchaseRecommendationChange called', value);
     updateItem(
       'finalRecommendation.purchaseRecommendation',
       value === 'true' ? true : value === 'false' ? false : null
     );
   };
 
-  // Add this useEffect to update aiRecommendation when item changes
-  useEffect(() => {
-    console.log('Update aiRecommendation effect triggered');
-    if (item && item.finalRecommendation) {
-      console.log('Updating aiRecommendation');
-      setAiRecommendation(item.finalRecommendation);
-    }
-  }, [item]);
-
   // Add this state to track if an analysis has been performed
   const [analysisPerformed, setAnalysisPerformed] = useState(false);
 
   // Modify the handleAnalyzeImagesWrapper function
   const handleAnalyzeImagesWrapper = async () => {
-    console.log('handleAnalyzeImagesWrapper called');
+    if (uploadedImages.length === 0) {
+      toast.error('Please upload images before analyzing.');
+      return;
+    }
+
+    const estimatedTimePerImage = 20; // 20 seconds per image
+    const totalEstimatedTime = uploadedImages.length * estimatedTimePerImage;
+
     setIsAnalyzing(true);
+    setAnalysisTimeLeft(totalEstimatedTime);
+
     try {
-      console.log('Starting image analysis...');
+      // Update the local storage and database to reflect that analysis is in progress
+      const updatedItem = { ...item, isAnalyzing: true };
+      await handleLocalSave(updatedItem, contextData, messages, itemId);
+      await axios.put(`${API_BASE_URL}/api/items/${itemId}`, updatedItem);
+
       const result = await handleAnalyzeImages({
-        itemId,
-        contextData,
-        setItem,
-        setMessages,
-        setNotificationMessage,
-        setShowNotification,
+        imageUrls: uploadedImages.map((img) => img.url),
+        description: item.description || '',
+        itemId: itemId,
+        sellerNotes: item.sellerNotes || '',
+        context: contextData,
       });
 
       if (result && typeof result === 'object') {
-        setItem((prevItem) => ({
-          ...prevItem,
+        const finalUpdatedItem = {
+          ...updatedItem,
           analysisResult: result,
-        }));
-        setAnalysisPerformed(true); // Set this to true after successful analysis
-        setNotificationMessage('Image analysis completed successfully!');
-        setShowNotification(true);
+          isAnalyzing: false,
+        };
+        setItem(finalUpdatedItem);
+        setAnalysisPerformed(true);
+
+        // Update local storage and database with the final result
+        await handleLocalSave(finalUpdatedItem, contextData, messages, itemId);
+        await axios.put(
+          `${API_BASE_URL}/api/items/${itemId}`,
+          finalUpdatedItem
+        );
+
+        toast.success('Image analysis completed successfully!');
       } else {
         console.error('Invalid analysis result:', result);
-        setNotificationMessage('Error: Invalid analysis result');
-        setShowNotification(true);
+        toast.error('Error: Invalid analysis result');
       }
     } catch (error) {
       console.error('Error in handleAnalyzeImagesWrapper:', error);
-      setNotificationMessage('Error analyzing images. Please try again.');
-      setShowNotification(true);
+      if (error.response && error.response.status === 429) {
+        toast.error(
+          'OpenAI API quota exceeded. Please check your OpenAI billing and usage details.',
+          { autoClose: 10000 }
+        );
+      } else {
+        toast.error('Error analyzing images. Please try again.');
+      }
     } finally {
       setIsAnalyzing(false);
+      setAnalysisTimeLeft(0);
+
+      // Ensure isAnalyzing is set to false in local storage and database
+      const finalItem = { ...item, isAnalyzing: false };
+      await handleLocalSave(finalItem, contextData, messages, itemId);
+      await axios.put(`${API_BASE_URL}/api/items/${itemId}`, finalItem);
     }
   };
+
+  useEffect(() => {
+    let timer;
+    if (isAnalyzing && analysisTimeLeft > 0) {
+      timer = setInterval(() => {
+        setAnalysisTimeLeft((prevTime) => prevTime - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [isAnalyzing, analysisTimeLeft]);
 
   const handleImageUpload = async (event) => {
     const file = event.target.files[0];
@@ -674,17 +743,15 @@ function NewItemPage({ setItem: setParentItem }) {
   };
 
   const handleSaveDraft = async () => {
-    console.log('handleSaveDraft called');
+    // console.log('handleSaveDraft called');
     if (!item || !itemId) {
       console.error('No item to save or missing itemId');
-      setNotificationMessage('Error: Unable to save draft');
-      setShowNotification(true);
-      setTimeout(() => setShowNotification(false), 3000);
+      toast.error('Error: Unable to save draft');
       return;
     }
 
     try {
-      console.log('Saving draft:', item);
+      // console.log('Saving draft:', item);
       const savedDraft = await handleManualSave(
         item,
         uploadedImages,
@@ -695,17 +762,19 @@ function NewItemPage({ setItem: setParentItem }) {
         setHasUnsavedChanges,
         setLastAutoSave
       );
-      console.log('Draft saved successfully:', savedDraft);
+      // console.log('Draft saved successfully:', savedDraft);
 
-      setNotificationMessage('Draft saved successfully!');
-      setShowNotification(true);
-      setTimeout(() => setShowNotification(false), 3000);
+      toast.success('Draft saved successfully!');
     } catch (error) {
       console.error('Error saving draft:', error);
-      setNotificationMessage(`Error saving draft: ${error.message}`);
-      setShowNotification(true);
-      setTimeout(() => setShowNotification(false), 3000);
+      toast.error(`Error saving draft: ${error.message}`);
     }
+  };
+
+  // Add this function to your component
+  const handleCameraClick = () => {
+    // Implement your camera click logic here
+    // console.log('Camera clicked');
   };
 
   // Render a loading state if item is not yet loaded
@@ -718,19 +787,12 @@ function NewItemPage({ setItem: setParentItem }) {
     return null;
   }
 
-  //console.log('Current itemId:', itemId);
+  // console.log('Current itemId:', itemId);
 
-  console.log('NewItemPage render end');
+  // Remove the console.log at the end of the function
 
   return (
     <PageContainer>
-      {showNotification && (
-        <StyledNotification>
-          {notificationMessage}
-          <button onClick={() => setShowNotification(false)}>Close</button>
-        </StyledNotification>
-      )}
-
       <StyledHeader>
         <LogoContainer>
           <StaticLogo src={treasureSpecs} alt="Treasure Specs" />
@@ -745,8 +807,8 @@ function NewItemPage({ setItem: setParentItem }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <ChatComp
             item={item}
-            updateItem={updateItem}
-            messages={messages}
+            updateItem={memoizedUpdateItem}
+            messages={memoizedMessages}
             setMessages={setMessages}
             itemId={itemId}
             onFileChange={handleFileChangeWrapper}
@@ -786,6 +848,10 @@ function NewItemPage({ setItem: setParentItem }) {
               <p>
                 Image analysis in progress... You can continue to interact with
                 other parts of the page.
+              </p>
+              <p>
+                Estimated time left: {Math.floor(analysisTimeLeft / 60)}:
+                {(analysisTimeLeft % 60).toString().padStart(2, '0')}
               </p>
             </div>
           )}
@@ -838,7 +904,7 @@ function NewItemPage({ setItem: setParentItem }) {
           {/* Update FormFields component to include all relevant fields from the DraftItem schema */}
           <FormFields
             item={item}
-            updateItem={updateItem}
+            updateItem={memoizedUpdateItem}
             handleSubmit={handleSubmit}
             handleSaveDraft={handleSaveDraft}
             handlePurchaseRecommendationChange={
@@ -846,7 +912,6 @@ function NewItemPage({ setItem: setParentItem }) {
             }
             itemId={itemId}
             analysisResult={analysisPerformed ? item.analysisResult : null}
-            aiRecommendation={aiRecommendation}
           />
         </div>
       </MainContentArea>
@@ -858,4 +923,4 @@ NewItemPage.propTypes = {
   setItem: PropTypes.func.isRequired,
 };
 
-export default NewItemPage;
+export default React.memo(NewItemPage);
