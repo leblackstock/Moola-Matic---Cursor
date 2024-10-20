@@ -121,7 +121,7 @@ router.post('/upload', upload.single('image'), async (req, res) => {
               id: uuidv4(),
               url: url,
               filename: filename,
-              isNew: true,
+              isNewItem: true,
             },
           },
           lastUpdated: new Date(),

@@ -116,7 +116,7 @@ const DraftItemSchema = new mongoose.Schema(
         id: String,
         url: String,
         filename: String,
-        isNew: Boolean,
+        isNewItem: Boolean,
       },
     ],
 
