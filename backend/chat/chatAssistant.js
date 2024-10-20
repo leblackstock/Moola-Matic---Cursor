@@ -19,16 +19,18 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Initialize Winston logger for OpenAI API errors
+// Initialize Winston logger
 const logger = winston.createLogger({
-  level: 'error',
+  level: 'info',
   format: winston.format.combine(
     winston.format.timestamp(),
     winston.format.json()
   ),
   transports: [
-    new winston.transports.File({ filename: 'openai_errors.log' }),
-    new winston.transports.Console(),
+    new winston.transports.File({ filename: 'logs/chat_assistant.log' }),
+    new winston.transports.Console({
+      format: winston.format.simple(),
+    }),
   ],
 });
 
@@ -71,6 +73,7 @@ const logOpenAIError = (functionName, error) => {
  */
 const uploadBase64Image = async (base64Image, originalFileName) => {
   if (!base64Image || typeof base64Image !== 'string') {
+    logger.error('Invalid base64Image input');
     throw new Error('Invalid base64Image input');
   }
 
@@ -144,14 +147,14 @@ const analyzeImagesWithVision = async (analysisPrompt, base64Image) => {
 
     const analysis = response.choices[0].message.content;
 
-    // Log the analysis result for this image
-    console.log('Image analysis result:', analysis);
+    logger.info('Image analysis completed');
 
     // Use combineAnalyses to parse and combine the analysis
     const combinedAnalysis = combineAnalyses([analysis]);
 
     return { analysis, combinedAnalysis };
   } catch (error) {
+    logger.error('Error in analyzeImagesWithVision', { error: error.message });
     throw error;
   }
 };
@@ -165,7 +168,7 @@ const analyzeImagesWithVision = async (analysisPrompt, base64Image) => {
 const summarizeAnalyses = async (combinedAnalysis, summarizePrompt) => {
   try {
     if (!combinedAnalysis) {
-      console.warn('No combined analysis to summarize');
+      logger.warn('No combined analysis to summarize');
       return null;
     }
 
@@ -189,6 +192,7 @@ const summarizeAnalyses = async (combinedAnalysis, summarizePrompt) => {
     );
 
     const summary = response.choices[0].message.content;
+    logger.info('Analysis summarization completed');
     logger.info('Received summary from OpenAI', { summary });
 
     return summary;
@@ -224,6 +228,7 @@ const createAssistantMessage = async (userMessage) => {
         }),
       2048 // Estimated token count for the request
     );
+    logger.info('Assistant message created');
     return response.choices[0].message.content;
   } catch (error) {
     logOpenAIError('createAssistantMessage', error);

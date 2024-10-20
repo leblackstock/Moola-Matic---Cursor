@@ -1,7 +1,7 @@
 // backend/chat/chatCombineAnalysis.js
 
 import winston from 'winston';
-import { DraftItem } from '../models/draftItem';
+import { DraftItem } from '../models/draftItem.js';
 
 const logger = winston.createLogger({
   level: 'debug',
