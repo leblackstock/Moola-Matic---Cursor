@@ -1,120 +1,182 @@
-import OpenAI from 'openai';
+// frontend/src/api/chat.js
 
-const openai = new OpenAI({
-  apiKey: process.env.REACT_APP_OPENAI_API_KEY,
-  dangerouslyAllowBrowser: true
+import axios from 'axios';
+
+// Determine the API URL based on the environment
+const BACKEND_PORT = process.env.REACT_APP_BACKEND_PORT || 3001;
+const API_URL =
+  process.env.NODE_ENV === 'production'
+    ? '/api'
+    : `http://localhost:${BACKEND_PORT}/api`;
+
+export const API_BASE_URL =
+  process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001';
+
+// Add this at the top of the file
+let contextData = null;
+
+/**
+ * Creates a user message object.
+ * @param {string} content - The content of the message.
+ * @returns {Object} - Message object with role 'user'.
+ */
+export const createUserMessage = (content) => ({
+  role: 'user',
+  content,
 });
 
-const ASSISTANT_ID = 'asst_4nMAXSwdqUcvfzfiYlBdzfYO';
+/**
+ * Creates an assistant message object.
+ * @param {string} content - The content of the message.
+ * @returns {Object} - Message object with role 'assistant'.
+ */
+export const createAssistantMessage = (content) => ({
+  role: 'assistant',
+  content,
+});
 
-const handleImageUpload = async (imageFile) => {
-  if (!(imageFile instanceof File)) {
-    throw new Error('Invalid image file');
-  }
-
-  // Check file type
-  const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-  if (!allowedTypes.includes(imageFile.type)) {
-    throw new Error('Unsupported image format. Please use JPEG, PNG, GIF, or WEBP.');
-  }
-
-  // Check file size (max 20MB)
-  const maxSize = 20 * 1024 * 1024; // 20MB in bytes
-  if (imageFile.size > maxSize) {
-    throw new Error('Image file is too large. Maximum size is 20MB.');
-  }
-
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      resolve(event.target.result);
-    };
-    reader.onerror = (error) => {
-      reject(error);
-    };
-    reader.readAsDataURL(imageFile);
-  });
-};
-
-const handleImageUploadAndChat = async (imageFile, messages, onDataCallback) => {
+/**
+ * Function to handle chat with the Moola-Matic Assistant
+ * @param {string} message - The message to send to the assistant
+ * @param {string} itemId - The ID of the item associated with this chat
+ * @returns {Promise<Object>} - Assistant's response content, updated context, and status
+ */
+export const handleChatWithAssistant = async (message, itemId) => {
   try {
-    const imageUrl = await handleImageUpload(imageFile);
-    console.log("Image encoded successfully, URL:", imageUrl);
-    
-    const promptText = "Please provide a detailed analysis of the item in the image by:\n" +
-      "1. Identifying what it is and its primary function\n" +
-      "2. Noting any historical or cultural significance, including makers, brands, or artists\n" +
-      "3. Describing its materials, dimensions, and distinguishing features like markings or signatures\n" +
-      "4. Assessing its condition, including damage, wear, restoration, and signs of authenticity such as patina or provenance\n" +
-      "5. Evaluating the craftsmanship quality and design features like patterns or styles\n" +
-      "6. Estimating its market value based on current trends and its condition\n" +
-      "7. If the image contains mathematical content, please analyze or solve it\n" +
-      "8. Provide feedback on how this item relates to case interviews, management consulting assessments, or problem-solving scenarios based on the conversation context\n\n" +
-      "Ensure your analysis is comprehensive and covers all these aspects.";
+    console.log('Sending message to Moola-Matic:', message);
 
-    const updatedMessages = [
-      ...messages,
-      { 
-        role: 'user', 
-        content: [
-          { type: 'text', text: 'Here is the image I uploaded:' },
-          { 
-            type: 'image_url', 
-            image_url: { 
-              url: imageUrl,
-              detail: "high"
-            } 
-          }
-        ]
+    const response = await fetch(`${API_URL}/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
       },
-      { role: 'user', content: promptText }
-    ];
-
-    console.log("Sending updated messages to handleChatRequest:", JSON.stringify(updatedMessages, null, 2));
-    return await handleChatRequest(updatedMessages, onDataCallback);
-  } catch (error) {
-    console.error('Error in handleImageUploadAndChat:', error);
-    onDataCallback(`Sorry, an error occurred: ${error.message}`, true);
-  }
-};
-
-async function handleChatRequest(messages, onDataCallback) {
-  console.log("handleChatRequest function called");
-  console.log("Messages:", JSON.stringify(messages, null, 2));
-
-  const safeCallback = typeof onDataCallback === 'function' 
-    ? onDataCallback 
-    : (content, isComplete) => console.log('Received content:', content, 'Is complete:', isComplete);
-
-    
-
-  let accumulatedContent = '';
-
-  try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-4-turbo",
-      messages: messages,
-      max_tokens: 300,
-      stream: true
+      body: JSON.stringify({ message, itemId }),
+      credentials: 'include',
     });
 
-    for await (const chunk of response) {
-      if (chunk.choices[0]?.delta?.content) {
-        const content = chunk.choices[0].delta.content;
-        accumulatedContent += content;
-        safeCallback(content, false);
-      }
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(
+        errorData.error || `HTTP error! status: ${response.status}`
+      );
     }
 
-    console.log("Chat completion finished");
-    safeCallback(accumulatedContent, true);
-    return accumulatedContent;
+    const data = await response.json();
+    console.log('Received response from server:', data);
+
+    return {
+      content: data.message,
+      context: data.context,
+      itemId: data.itemId,
+      status: 'success',
+    };
   } catch (error) {
-    console.error('OpenAI API error:', error);
-    safeCallback(`Sorry, an error occurred: ${error.message}`, true);
+    console.error('Error in handleChatWithAssistant:', error);
+    return {
+      content:
+        'I apologize, but I encountered an error while processing your request. Please try again or contact support if the issue persists.',
+      context: null,
+      itemId: null,
+      status: 'error',
+    };
+  }
+};
+
+// Add this function to chat.js
+export const handleAnalyzeImages = async ({
+  itemId,
+  contextData,
+  setItem,
+  setMessages,
+  setNotificationMessage,
+  setShowNotification,
+}) => {
+  console.log('handleAnalyzeImages called with:', { itemId, contextData });
+
+  if (!itemId) {
+    console.error('No itemId provided for image analysis');
+    setNotificationMessage('Error: No item ID provided for analysis.');
+    setShowNotification(true);
+    return;
+  }
+
+  try {
+    // Step 1: Fetch the item and its image URLs from the database
+    const response = await axios.get(`${API_URL}/items/${itemId}`);
+    const item = response.data;
+
+    if (!item || !item.images || item.images.length === 0) {
+      setNotificationMessage('No images found for this item.');
+      setShowNotification(true);
+      return;
+    }
+
+    console.log('Fetched item:', item);
+
+    // Step 2: Process the image URLs
+    const baseUrl = `http://localhost:${process.env.REACT_APP_BACKEND_PORT}`;
+    const imageUrls = item.images
+      .map((image) => {
+        if (image.url) {
+          return image.url.startsWith('http')
+            ? image.url
+            : `${baseUrl}${image.url}`;
+        } else if (image.filename) {
+          // Construct the URL based on the provided path structure
+          return `${baseUrl}/uploads/drafts/${itemId}/${image.filename}`;
+        }
+        console.error('No URL or filename for image:', image);
+        return null;
+      })
+      .filter(Boolean);
+
+    console.log('Image URLs for analysis:', imageUrls);
+
+    if (imageUrls.length === 0) {
+      setNotificationMessage('No valid image URLs found for analysis.');
+      setShowNotification(true);
+      return;
+    }
+
+    // Step 3: Send the image URLs for analysis
+    const analysisResponse = await axios.post(`${API_URL}/analyze-images`, {
+      imageUrls,
+      description: item.description || '',
+      itemId,
+      sellerNotes: item.sellerNotes || '',
+      context: contextData,
+    });
+
+    const { analyses, summary, metadata } = analysisResponse.data;
+
+    console.log('Received analysis results:', { analyses, summary, metadata });
+
+    // Instead of mapping the results here, we'll pass them to setItem
+    setItem((prevItem) => ({
+      ...prevItem,
+      analysisResult: { analyses, summary, metadata },
+    }));
+
+    // Update messages with the analysis advice
+    setMessages((prevMessages) => [
+      ...prevMessages,
+      createAssistantMessage(
+        `Analysis complete. ${summary.finalRecommendation?.detailedBreakdown || 'No detailed breakdown available.'}`
+      ),
+    ]);
+
+    setNotificationMessage(
+      'Image analysis complete. Form fields have been updated.'
+    );
+    setShowNotification(true);
+
+    return { analyses, summary, metadata };
+  } catch (error) {
+    console.error('Error in handleAnalyzeImages:', error);
+    setNotificationMessage(
+      'An error occurred while analyzing the images. Please try again.'
+    );
+    setShowNotification(true);
     throw error;
   }
-}
-
-// Export all functions in a single export statement
-export { handleChatRequest, handleImageUpload, handleImageUploadAndChat };
+};

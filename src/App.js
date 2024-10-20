@@ -1,146 +1,382 @@
+// frontend/src/App.js
+
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, NavLink, useNavigate } from 'react-router-dom';
+import PropTypes from 'prop-types'; // Import PropTypes
+import { Route, Routes, useNavigate, Link, Navigate } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import './App.css';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import moolaMaticLogo from './Images/Moola-Matic Logo 01.jpeg';
-import NewItemPage from './NewItemPage';
-import ViewItemsPage from './ViewItemsPage';
+import NewItemPage from './NewItemPage.js';
+import ViewItemsPage from './ViewItemsPage.js';
+import { handleLocalSave } from './components/compSave.js';
+import { saveToLocalStorage } from './components/compSave.js';
+import {
+  PageContainer,
+  StyledButton,
+  StyledLogo,
+  StyledTitle,
+  StyledSubtitle,
+  GlowingButton,
+  StyledContainer,
+  ModalOverlay,
+  ModalContent,
+  ModalButton,
+  Sidebar as StyledSidebar,
+  NavLink,
+  WarningBoxOverlay,
+  WarningBox,
+  WarningBoxButtons,
+  WarningButton, // Add this line
+  LogoContainer,
+  Logo,
+  MainContent,
+  ButtonContainer,
+} from './components/compStyles.js';
 
-function Sidebar() {
+// Add this import near the top of the file
+import { resetItemGeneration, createNewItem } from './helpers/itemGen.js';
+
+// At the top of the file, add this import
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+
+/**
+ * Sidebar Component
+ * Renders the navigation sidebar with links to different routes.
+ */
+function Sidebar({ handleLogout, handleChangeItem }) {
   return (
-    <nav className="sidebar">
-      <ul className="nav flex-column">
-        <li className="nav-item">
-          <NavLink to="/" end className="nav-link" title="Home">
-            <i className="fas fa-home icon-cyan"></i>
-            <span className="ms-2">Home</span>
-          </NavLink>
-        </li>
-        <li className="nav-item">
-          <NavLink to="/new-item" className="nav-link" title="Change Item">
-            <i className="fas fa-plus-circle icon-cyan"></i>
-            <span className="ms-2">Change Item</span>
-          </NavLink>
-        </li>
-        <li className="nav-item">
-          <NavLink to="/view-items" className="nav-link" title="View Items">
-            <i className="fas fa-list icon-cyan"></i>
-            <span className="ms-2">View Items</span>
-          </NavLink>
-        </li>
-      </ul>
-    </nav>
+    <StyledSidebar>
+      <NavLink as={Link} to="/" end="true" title="Home">
+        <i className="fas fa-home"></i>
+        <span>Home</span>
+      </NavLink>
+      <NavLink as="button" onClick={handleChangeItem} title="Change Item">
+        <i className="fas fa-plus-circle"></i>
+        <span>Change Item</span>
+      </NavLink>
+      <NavLink as={Link} to="/view-items" title="View Items">
+        <i className="fas fa-list"></i>
+        <span>View Items</span>
+      </NavLink>
+      <NavLink as="button" onClick={handleLogout} title="Logout">
+        <i className="fas fa-sign-out-alt"></i>
+        <span>Logout</span>
+      </NavLink>
+    </StyledSidebar>
   );
 }
 
-function WarningBox({ onProceed, onGoBack }) {
+// Define PropTypes for Sidebar
+Sidebar.propTypes = {
+  handleLogout: PropTypes.func.isRequired,
+  handleChangeItem: PropTypes.func.isRequired,
+};
+
+/**
+ * WarningBoxModal Component
+ * Displays a modal overlay with a warning message before proceeding.
+ *
+ * @param {Function} onProceed - Callback when user chooses to proceed.
+ * @param {Function} onGoBack - Callback when user chooses to go back.
+ */
+function WarningBoxModal({ onProceed, onGoBack }) {
   return (
-    <div className="warning-box-overlay">
-      <div className="warning-box">
-        <h2>Whoa there, bargain hunter!</h2>
-        <p>Are you sure you want to embark on a new treasure hunt? Any unsaved progress on your current item will vanish faster than a yard sale deal!</p>
-        <div className="warning-box-buttons">
-          <button className="warning-box-button proceed-button" onClick={onProceed}>Let's do this!</button>
-          <button className="warning-box-button go-back-button" onClick={onGoBack}>Oops, nevermind!</button>
-        </div>
-      </div>
-    </div>
+    <WarningBoxOverlay>
+      <WarningBox>
+        <StyledTitle>Whoa there, bargain hunter!</StyledTitle>
+        <StyledSubtitle>
+          Are you sure you want to embark on a new treasure hunt? Any unsaved
+          progress on your current item will vanish faster than a yard sale
+          deal!
+        </StyledSubtitle>
+        <WarningBoxButtons>
+          <WarningButton className="proceed" onClick={onProceed}>
+            Let's do this!
+          </WarningButton>
+          <WarningButton onClick={onGoBack}>Oops, nevermind!</WarningButton>
+        </WarningBoxButtons>
+      </WarningBox>
+    </WarningBoxOverlay>
   );
 }
 
-function LandingPage({ setNewItemCreated, setItemId }) {
-  const [showWarning, setShowWarning] = useState(false);
+// Define PropTypes for WarningBoxModal
+WarningBoxModal.propTypes = {
+  onProceed: PropTypes.func.isRequired,
+  onGoBack: PropTypes.func.isRequired,
+};
+
+/**
+ * LandingPage Component
+ * The home page of the application where users can start adding new items or view existing ones.
+ */
+function LandingPage({ setItemId }) {
   const navigate = useNavigate();
+  const [showWarning, setShowWarning] = useState(false);
 
-  const handleNewItemClick = (e) => {
-    e.preventDefault();
-    setShowWarning(true);  // This just shows the warning box
-  };
-
-  const handleProceed = () => {
-    setShowWarning(false);
-    setNewItemCreated(true);
-    const newItemId = Math.floor(Math.random() * 1000000).toString();
-    setItemId(newItemId);
-    navigate('/new-item');
+  const handleNewItemClick = () => {
+    setShowWarning(true);
   };
 
   const handleGoBack = () => {
     setShowWarning(false);
   };
 
+  // Add this function to check if an item exists in localStorage
+  const checkItemInLocalStorage = (itemId) => {
+    const item = localStorage.getItem(`item_${itemId}`);
+    return item !== null;
+  };
+
+  const handleProceed = async () => {
+    console.log('handleProceed: User confirmed, creating new item');
+    setShowWarning(false);
+
+    // Clear all unsaved variables
+    setItemId(null);
+    localStorage.clear();
+    sessionStorage.clear();
+
+    // Reset the item generation state
+    resetItemGeneration();
+
+    try {
+      // Create a new item using the centralized function
+      const newItemId = await createNewItem();
+      console.log('handleProceed: New item created with ID:', newItemId);
+
+      // Set the new ItemId
+      setItemId(newItemId);
+
+      // Check if the item exists in localStorage
+      const itemExists = checkItemInLocalStorage(newItemId);
+      if (itemExists) {
+        console.log('Item found in localStorage. Proceeding with navigation.');
+        console.log('About to navigate...');
+        // Navigate to the new item page
+        navigate(`/new-item/${newItemId}`);
+        console.log('Navigation called');
+      } else {
+        console.error('Item not found in localStorage. Navigation aborted.');
+        // Handle the error appropriately, maybe show an error message to the user
+      }
+    } catch (error) {
+      console.error('Error creating new item:', error);
+      // Handle the error appropriately
+    }
+  };
+
   return (
-    <div className="landing-page container">
-      <div className="row justify-content-center">
-        <div className="col-md-8 text-center">
-          <img 
-            src={moolaMaticLogo} 
-            alt="Moola-Matic Logo" 
-            className="img-fluid mb-4 square-to-circle" 
-          />
-          <h1 className="display-4">Moola-Matic</h1>
-          <p className="lead mb-4">Turn your thrifty finds into a treasure trove of cold, hard cash!</p>
-          <div className="mb-4">
-            <button onClick={handleNewItemClick} className="btn btn-primary-theme me-2 dark-red-glow">New Item</button>
-            <NavLink to="/view-items" className="btn btn-secondary-theme cyan-glow">View Items</NavLink>
-          </div>
-          {showWarning && <WarningBox onProceed={handleProceed} onGoBack={handleGoBack} />}
-          <div className="info-box">
-            <p>Are you sitting on a goldmine of garage sale goodies? Let Moola-Matic help you squeeze every last penny out of your dusty discoveries!</p>
-            <p className="fst-italic">We're like a money-making time machine for your junk drawer!</p>
-          </div>
+    <StyledContainer>
+      <div>
+        <LogoContainer>
+          <Logo src={moolaMaticLogo} alt="Moola-Matic Logo" />
+        </LogoContainer>
+        <StyledTitle>Moola-Matic</StyledTitle>
+        <StyledSubtitle>
+          Turn your thrifty finds into a treasure trove of cold, hard cash!
+        </StyledSubtitle>
+        <ButtonContainer>
+          <GlowingButton onClick={handleNewItemClick}>New Item</GlowingButton>
+          <GlowingButton as={Link} to="/view-items">
+            View Items
+          </GlowingButton>
+        </ButtonContainer>
+        {showWarning && (
+          <WarningBoxModal onProceed={handleProceed} onGoBack={handleGoBack} />
+        )}
+        <div>
+          <p>
+            Are you sitting on a goldmine of garage sale goodies? Let
+            Moola-Matic help you squeeze every last penny out of your dusty
+            discoveries!
+          </p>
+          <p>We're like a money-making time machine for your junk drawer!</p>
         </div>
       </div>
-    </div>
+    </StyledContainer>
   );
 }
 
+// Update PropTypes
+LandingPage.propTypes = {
+  setItemId: PropTypes.func.isRequired,
+};
+
+/**
+ * ErrorBoundary Component
+ * Catches JavaScript errors anywhere in their child component tree, logs those errors, and displays a fallback UI.
+ */
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null, errorInfo: null };
+  }
+
+  /**
+   * Update state so the next render shows the fallback UI.
+   */
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  /**
+   * You can also log the error to an error reporting service.
+   */
+  componentDidCatch(error, errorInfo) {
+    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    this.setState({ errorInfo });
+    // Here you can also send the error to a logging service
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="error-boundary">
+          <h2>Something went wrong.</h2>
+          <details style={{ whiteSpace: 'pre-wrap' }}>
+            {this.state.error && this.state.error.toString()}
+            <br />
+            {this.state.errorInfo && this.state.errorInfo.componentStack}
+          </details>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+// Define PropTypes for ErrorBoundary
+ErrorBoundary.propTypes = {
+  children: PropTypes.node.isRequired,
+};
+
+/**
+ * NotFound Component
+ * Displays a 404 error page when a route is not found.
+ */
+function NotFound() {
+  return (
+    <StyledContainer>
+      <StyledTitle>404 - Page Not Found</StyledTitle>
+      <StyledSubtitle>
+        Oops! It looks like this page has vanished like a yard sale bargain.
+      </StyledSubtitle>
+      <p>Don't worry, there are still plenty of treasures to be found!</p>
+      <GlowingButton as={Link} to="/">
+        Return to Home
+      </GlowingButton>
+    </StyledContainer>
+  );
+}
+
+/**
+ * App Component
+ * The root component of the application that sets up routing, state management, and context persistence.
+ */
 function App() {
-  const [newItemCreated, setNewItemCreated] = useState(() => {
-    // Initialize from localStorage, default to false if not set
-    return JSON.parse(localStorage.getItem('newItemCreated')) || false;
-  });
+  const [currentItemId, setCurrentItemId] = useState(null);
+  const [currentItem, setCurrentItem] = useState(null);
 
-  const [itemId, setItemId] = useState(() => {
-    // Initialize from localStorage, default to '0' if not set
-    return localStorage.getItem('itemId') || '0';
-  });
+  const updateCurrentItemId = async (newItemId) => {
+    setCurrentItemId(newItemId);
+    // You might want to add logic here to update the itemId in itemGen as well
+  };
 
-  useEffect(() => {
-    // Update localStorage whenever newItemCreated changes
-    localStorage.setItem('newItemCreated', JSON.stringify(newItemCreated));
-  }, [newItemCreated]);
+  const handleLogout = () => {
+    setCurrentItemId(null);
+    localStorage.removeItem('currentItemId');
+    navigate('/');
+  };
 
-  useEffect(() => {
-    // Update localStorage whenever itemId changes
-    localStorage.setItem('itemId', itemId);
-  }, [itemId]);
+  const checkItemInLocalStorage = (itemId) => {
+    const item = localStorage.getItem(`item_${itemId}`);
+    return item !== null;
+  };
 
-  useEffect(() => {
-    console.log('Styles loaded:', {
-      bootstrap: typeof document !== 'undefined' && document.querySelector('style[data-href*="bootstrap"]'),
-      fontawesome: typeof document !== 'undefined' && document.querySelector('style[data-href*="fontawesome"]'),
-      appCss: typeof document !== 'undefined' && document.querySelector('style[data-href*="App.css"]')
-    });
-  }, []);
+  const handleChangeItem = () => {
+    if (currentItemId) {
+      navigate(`/new-item/${currentItemId}`);
+    } else {
+      navigate('/');
+    }
+  };
 
-  console.log('App component is rendering');
+  const handleSetItemId = (newItemId) => {
+    console.log('Setting new ItemId:', newItemId);
+    setCurrentItemId(newItemId);
+    // Load the item data from localStorage
+    const itemData = localStorage.getItem(`item_${newItemId}`);
+    if (itemData) {
+      setCurrentItem(JSON.parse(itemData));
+    } else {
+      setCurrentItem(null);
+    }
+  };
 
   return (
-    <Router>
-      <div className="app d-flex">
-        <Sidebar />
-        <main className="flex-grow-1 p-3">
-          <Routes>
-            <Route path="/" element={<LandingPage setNewItemCreated={setNewItemCreated} setItemId={setItemId} />} />
-            <Route path="/new-item" element={<NewItemPage setNewItemCreated={setNewItemCreated} itemId={itemId} />} />
-            <Route path="/view-items" element={<ViewItemsPage newItemCreated={newItemCreated} setNewItemCreated={setNewItemCreated} />} />
-            <Route path="*" element={<LandingPage setNewItemCreated={setNewItemCreated} setItemId={setItemId} />} />
-          </Routes>
-        </main>
-      </div>
-    </Router>
+    <div className="App">
+      <ErrorBoundary>
+        <PageContainer>
+          <Sidebar
+            handleLogout={handleLogout}
+            handleChangeItem={handleChangeItem}
+          />
+          <MainContent>
+            <Routes>
+              <Route
+                path="/"
+                element={<LandingPage setItemId={handleSetItemId} />}
+              />
+              <Route
+                path="/new-item"
+                element={
+                  currentItemId ? (
+                    <NewItemPage
+                      itemId={currentItemId}
+                      setItemId={handleSetItemId}
+                      item={currentItem}
+                      setItem={setCurrentItem}
+                    />
+                  ) : (
+                    <Navigate to="/" replace />
+                  )
+                }
+              />
+              <Route
+                path="/new-item/:itemId"
+                element={
+                  <NewItemPage
+                    itemId={currentItemId || ''}
+                    setItemId={handleSetItemId}
+                    item={currentItem}
+                    setItem={setCurrentItem}
+                  />
+                }
+              />
+              <Route
+                path="/view-items"
+                element={<ViewItemsPage currentItemId={currentItemId || ''} />}
+              />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </MainContent>
+        </PageContainer>
+      </ErrorBoundary>
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+      />
+    </div>
   );
 }
 

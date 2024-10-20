@@ -1,5 +1,58 @@
 node backend\server.js
 
+git checkout main
 git add .
 git commit -m "GPT-4-Turbo Image Integration Works"
 git push origin main
+
+
+git checkout unstable
+git add .
+git commit -m "unstable"
+git push origin unstable
+
+git stash
+git checkout branch-name
+git stash pop  # to reapply your changes after switching branches
+
+
+# List all local branches
+git branch
+
+# List all branches (local and remote)
+git branch -a
+
+# Switch to an existing local branch
+git checkout branch-name
+
+# Create a new branch and switch to it
+git checkout -b new-branch-name
+
+# Switch to a remote branch
+git checkout -b branch-name origin/branch-name
+
+# Stash changes, switch branches, and reapply changes
+git stash
+git checkout branch-name
+git stash pop  # Reapply stashed changes
+
+# Create a new branch without switching to it
+git branch new-branch-name
+
+# Delete a local branch
+git branch -d branch-name
+
+# Force delete a local branch (even if not merged)
+git branch -D branch-name
+
+# Rename the current branch
+git branch -m new-branch-name
+
+# Push a new local branch to remote
+git push -u origin branch-name
+
+# Delete a remote branch
+git push origin --delete branch-name
+
+# Update local list of remote branches
+git
