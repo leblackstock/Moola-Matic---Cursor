@@ -691,7 +691,7 @@ function NewItemPage({ setItem: setParentItem }) {
       if (result && typeof result === 'object') {
         const finalUpdatedItem = {
           ...updatedItem,
-          analysisResults: result, // Store the entire result as analysisResults
+          analysisResults: result,
           isAnalyzing: false,
         };
         setItem(finalUpdatedItem);
@@ -722,11 +722,6 @@ function NewItemPage({ setItem: setParentItem }) {
     } finally {
       setIsAnalyzing(false);
       setAnalysisTimeLeft(0);
-
-      // Ensure isAnalyzing is set to false in local storage and database
-      const finalItem = { ...item, isAnalyzing: false };
-      await handleLocalSave(finalItem, contextData, messages, itemId);
-      await axios.put(`${API_BASE_URL}/api/items/${itemId}`, finalItem);
     }
   };
 
@@ -923,7 +918,7 @@ function NewItemPage({ setItem: setParentItem }) {
 
           {hasUnsavedChanges && <span>Unsaved changes</span>}
 
-          {/* Update FormFields component to include all relevant fields from the DraftItem schema */}
+          {/* Always render FormFields */}
           <FormFields
             item={item}
             updateItem={memoizedUpdateItem}
@@ -933,18 +928,12 @@ function NewItemPage({ setItem: setParentItem }) {
               handlePurchaseRecommendationChange
             }
             itemId={itemId}
-            analysisResult={analysisPerformed ? item.analysisResult : null}
+            analysisResult={item.analysisResults}
           />
 
-          {/* Add the RawAnalysisSummary component here */}
+          {/* Render RawAnalysisSummary only if analysis is performed */}
           {analysisPerformed && item && item.analysisResults && (
-            <>
-              {console.log(
-                'Rendering RawAnalysisSummary with:',
-                item.analysisResults
-              )}
-              <RawAnalysisSummary rawAnalysis={item.analysisResults} />
-            </>
+            <RawAnalysisSummary rawAnalysis={item.analysisResults.summary} />
           )}
         </div>
       </MainContentArea>

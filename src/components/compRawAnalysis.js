@@ -5,7 +5,10 @@ import PropTypes from 'prop-types';
 import { SummaryContainer, SummaryTitle, SummaryText } from './compStyles.js';
 
 const RawAnalysisSummary = ({ rawAnalysis }) => {
+  console.log('RawAnalysisSummary rendering, rawAnalysis:', rawAnalysis);
+
   if (!rawAnalysis) {
+    console.log('No rawAnalysis provided, not rendering RawAnalysisSummary');
     return null;
   }
 
