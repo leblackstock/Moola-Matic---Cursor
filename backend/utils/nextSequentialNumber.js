@@ -7,6 +7,7 @@ import path from 'path';
 
 const MAX_RETRIES = 10;
 const RETRY_DELAY = 1000; // 1 second
+const UPLOAD_DELAY = 500; // 500 milliseconds delay between uploads
 
 export const generateDraftFilename = async (itemId, file, uploadPath) => {
   let retries = 0;
@@ -23,6 +24,8 @@ export const generateDraftFilename = async (itemId, file, uploadPath) => {
 
         const newFilename = `Draft-${shortId}-${paddedNumber}.${fileExtension}`;
         const newPath = path.join(uploadPath, newFilename);
+
+        console.log(`Preparing to upload file: ${newFilename}`);
 
         await fs.mkdir(uploadPath, { recursive: true });
         await fs.rename(file.path, newPath);
@@ -50,6 +53,11 @@ export const generateDraftFilename = async (itemId, file, uploadPath) => {
         }
 
         console.log(`DraftItem updated for itemId ${itemId}:`, updatedDraft);
+
+        // Add a delay before returning
+        await new Promise((resolve) => setTimeout(resolve, UPLOAD_DELAY));
+
+        console.log(`Upload completed for file: ${newFilename}`);
 
         return {
           filename: newFilename,
