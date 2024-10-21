@@ -4,9 +4,9 @@ import { DraftItem } from '../models/draftItem.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { promises as fs } from 'fs';
-//import { performance } from 'perf_hooks';
 import { generateDraftFilename } from '../utils/nextSequentialNumber.js';
 import { withLock } from '../utils/lockUtils.js';
+import logger from '../utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -55,7 +55,7 @@ router.post('/draft-images/upload', upload, async (req, res) => {
       );
 
       await fs.mkdir(uploadPath, { recursive: true });
-      // console.log(`Created upload directory: ${uploadPath}`);
+      logger.info(`Created upload directory: ${uploadPath}`);
 
       const results = [];
       for (const file of req.files) {
@@ -82,7 +82,10 @@ router.post('/draft-images/upload', upload, async (req, res) => {
 
     res.json(results);
   } catch (error) {
-    // console.error('Error in file upload:', error);
+    logger.error('Error in file upload:', {
+      error: error.message,
+      stack: error.stack,
+    });
     res.status(500).json({
       error: 'An error occurred during file upload',
       details: error.message,
@@ -96,7 +99,10 @@ router.get('/draft-item-schema', async (req, res) => {
     const schema = DraftItem.schema.obj;
     res.json(schema);
   } catch (error) {
-    // console.error('Error fetching draft item schema:', error);
+    logger.error('Error fetching draft item schema:', {
+      error: error.message,
+      stack: error.stack,
+    });
     res
       .status(500)
       .json({ error: 'Internal server error', details: error.message });
@@ -115,7 +121,10 @@ router.get('/:id', async (req, res) => {
 
     res.json(item);
   } catch (error) {
-    // console.error('Error fetching item:', error);
+    logger.error('Error fetching item:', {
+      error: error.message,
+      stack: error.stack,
+    });
     res.status(500).json({ error: 'Internal server error.' });
   }
 });
@@ -124,7 +133,7 @@ router.get('/:id', async (req, res) => {
 router.delete('/draft-images/delete/:itemId/:filename', async (req, res) => {
   try {
     const { itemId, filename } = req.params;
-    // console.log(`Attempting to delete image: ${filename} for item: ${itemId}`);
+    logger.info(`Attempting to delete image: ${filename} for item: ${itemId}`);
 
     const imagePath = path.join(
       __dirname,
@@ -138,18 +147,18 @@ router.delete('/draft-images/delete/:itemId/:filename', async (req, res) => {
     // Check if the file exists
     try {
       await fs.access(imagePath);
-      // console.log(`File found: ${imagePath}`);
+      logger.info(`File found: ${imagePath}`);
     } catch (error) {
-      // console.log(`File not found: ${imagePath}`);
+      logger.warn(`File not found: ${imagePath}`);
       return res.status(404).json({ error: 'Image file not found' });
     }
 
     // Delete the image file
     try {
       await fs.unlink(imagePath);
-      // console.log(`Successfully deleted image file: ${imagePath}`);
+      logger.info(`Successfully deleted image file: ${imagePath}`);
     } catch (error) {
-      // console.error(`Error deleting file: ${error.message}`);
+      logger.error(`Error deleting file: ${error.message}`);
       return res.status(500).json({ error: 'Failed to delete image file' });
     }
 
@@ -157,10 +166,9 @@ router.delete('/draft-images/delete/:itemId/:filename', async (req, res) => {
     const itemDir = path.dirname(imagePath);
     try {
       await fs.rmdir(itemDir);
-      // console.log(`Successfully removed empty directory: ${itemDir}`);
+      logger.info(`Successfully removed empty directory: ${itemDir}`);
     } catch (error) {
-      // Ignore error if directory is not empty or doesn't exist
-      // console.log(`Could not remove directory ${itemDir}: ${error.message}`);
+      logger.warn(`Could not remove directory ${itemDir}: ${error.message}`);
     }
 
     // Remove the image reference from the DraftItem document
@@ -171,14 +179,17 @@ router.delete('/draft-images/delete/:itemId/:filename', async (req, res) => {
     );
 
     if (!updatedDraft) {
-      // console.log(`No draft found for itemId: ${itemId}`);
+      logger.warn(`No draft found for itemId: ${itemId}`);
       return res.status(404).json({ error: 'Draft not found' });
     }
 
-    // console.log(`Successfully updated draft for item: ${itemId}`);
+    logger.info(`Successfully updated draft for item: ${itemId}`);
     res.json({ message: 'Image deleted successfully', updatedDraft });
   } catch (error) {
-    // console.error('Error deleting image:', error);
+    logger.error('Error deleting image:', {
+      error: error.message,
+      stack: error.stack,
+    });
     res.status(500).json({
       error: 'An error occurred while deleting the image',
       details: error.message,
@@ -193,7 +204,10 @@ router.get('/', async (req, res) => {
     const items = await DraftItem.find();
     res.json(items);
   } catch (error) {
-    // console.error('Error fetching items:', error);
+    logger.error('Error fetching items:', {
+      error: error.message,
+      stack: error.stack,
+    });
     res.status(500).json({ error: 'Failed to fetch items' });
   }
 });
@@ -215,12 +229,12 @@ router.get('/draft-images/:itemId/:filename', async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*'); // Allow CORS for this route
     res.sendFile(imagePath, (err) => {
       if (err) {
-        // console.error(`Error sending file: ${err}`);
+        logger.error(`Error sending file: ${err}`);
         res.status(err.status || 500).end();
       }
     });
   } catch (error) {
-    // console.error(`Error serving image: ${error}`);
+    logger.error(`Error serving image: ${error}`);
     res.status(404).json({ error: 'Image not found', details: error.message });
   }
 });
@@ -244,10 +258,13 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Item not found' });
     }
 
-    // console.log('Item updated:', updatedItem);
+    logger.info('Item updated:', updatedItem);
     res.json(updatedItem);
   } catch (error) {
-    // console.error('Error updating item:', error);
+    logger.error('Error updating item:', {
+      error: error.message,
+      stack: error.stack,
+    });
     res
       .status(500)
       .json({ error: 'Failed to update item', details: error.message });
@@ -274,10 +291,13 @@ router.post('/save-draft', async (req, res) => {
       }
     );
 
-    // console.log('Draft saved:', draft);
+    logger.info('Draft saved:', draft);
     res.status(200).json({ item: draft });
   } catch (error) {
-    // console.error('Error saving draft:', error);
+    logger.error('Error saving draft:', {
+      error: error.message,
+      stack: error.stack,
+    });
     res
       .status(500)
       .json({ error: 'Failed to save draft', details: error.message });
@@ -324,10 +344,13 @@ router.post('/autosave-draft', async (req, res) => {
       }
     );
 
-    // console.log('Draft autosaved with contextData and messages');
+    logger.info('Draft autosaved with contextData and messages');
     res.status(200).json({ item: draft });
   } catch (error) {
-    // console.error('Error autosaving draft:', error);
+    logger.error('Error autosaving draft:', {
+      error: error.message,
+      stack: error.stack,
+    });
     res
       .status(500)
       .json({ error: 'Failed to autosave draft', details: error.message });
@@ -339,7 +362,7 @@ router.delete('/drafts/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const deleteImages = req.query.deleteImages === 'true';
-    // console.log('Attempting to delete draft with ID:', id);
+    logger.info('Attempting to delete draft with ID:', id);
 
     let result;
     if (id.match(/^[0-9a-fA-F]{24}$/)) {
@@ -351,7 +374,7 @@ router.delete('/drafts/:id', async (req, res) => {
     }
 
     if (!result) {
-      // console.log('Draft not found for deletion');
+      logger.warn('Draft not found for deletion');
       return res.status(404).json({ error: 'Draft not found' });
     }
 
@@ -371,14 +394,17 @@ router.delete('/drafts/:id', async (req, res) => {
           .catch(() => false)
       ) {
         await fs.rm(imageFolderPath, { recursive: true, force: true });
-        // console.log(`Deleted image folder: ${imageFolderPath}`);
+        logger.info(`Deleted image folder: ${imageFolderPath}`);
       }
     }
 
-    // console.log('Draft deleted successfully:', result);
+    logger.info('Draft deleted successfully:', result);
     res.json({ message: 'Draft deleted successfully', deletedDraft: result });
   } catch (error) {
-    // console.error('Error deleting draft:', error);
+    logger.error('Error deleting draft:', {
+      error: error.message,
+      stack: error.stack,
+    });
     res
       .status(500)
       .json({ error: 'Failed to delete draft', details: error.message });
@@ -404,14 +430,17 @@ router.delete('/drafts', async (req, res) => {
             .catch(() => false)
         ) {
           await fs.rm(imageFolderPath, { recursive: true, force: true });
-          // console.log(`Deleted image folder: ${imageFolderPath}`);
+          logger.info(`Deleted image folder: ${imageFolderPath}`);
         }
       }
     }
 
     res.json({ message: 'All drafts deleted successfully' });
   } catch (error) {
-    // console.error('Error deleting all drafts:', error);
+    logger.error('Error deleting all drafts:', {
+      error: error.message,
+      stack: error.stack,
+    });
     res
       .status(500)
       .json({ error: 'Failed to delete all drafts', details: error.message });
