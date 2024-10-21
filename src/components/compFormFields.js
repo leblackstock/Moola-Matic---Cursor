@@ -50,39 +50,21 @@ const FormFields = React.memo(function FormFields({
     ) {
       previousAnalysisResultRef.current = analysisResult;
 
-      if (analysisResult.summary) {
-        let summaryObject;
-        try {
-          // Remove markdown formatting if present
-          const cleanedSummary = analysisResult.summary
-            .replace(/```json\n/, '') // Remove opening ```json
-            .replace(/\n```$/, '') // Remove closing ```
-            .trim(); // Remove any leading/trailing whitespace
+      // Create a new item object with updated fields
+      const updatedItem = { ...item };
 
-          // Attempt to parse the cleaned summary
-          summaryObject = JSON.parse(cleanedSummary);
-        } catch (error) {
-          console.error('Error parsing summary:', error);
-          // If parsing fails, treat the entire summary as detailedBreakdown
-          summaryObject = { detailedBreakdown: analysisResult.summary };
+      // Update form fields based on the analysis result
+      Object.entries(analysisResult).forEach(([key, value]) => {
+        if (value !== undefined) {
+          console.log(`Updating ${key} to ${value}`);
+          updatedItem[key] = value;
         }
+      });
 
-        // Create a new item object with updated fields
-        const updatedItem = { ...item };
+      // Update the item state with all the changes at once
+      updateItem(updatedItem);
 
-        // Update form fields based on the analysis result
-        Object.entries(summaryObject).forEach(([key, value]) => {
-          if (value !== undefined) {
-            console.log(`Updating ${key} to ${value}`);
-            updatedItem[key] = value;
-          }
-        });
-
-        // Update the item state with all the changes at once
-        updateItem(updatedItem);
-
-        setHasPopulatedFields(true);
-      }
+      setHasPopulatedFields(true);
     }
   }, [analysisResult, updateItem, item]);
 
