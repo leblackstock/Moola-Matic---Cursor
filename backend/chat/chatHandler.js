@@ -131,27 +131,27 @@ router.post('/analyze-images', async (req, res) => {
     // Extract rawAnalysis from the first valid analysis (assuming it's the same for all)
     const rawAnalysis = validAnalyses[0]?.rawAnalysis || null;
 
-    // Update DraftItem with the analysis results, including rawAnalysis
+    // Update DraftItem with the analysis results, excluding rawAnalysis
     await DraftItem.findOneAndUpdate(
       { itemId: itemId },
       {
         $set: {
           analysisResults: combinedAnalysis,
           analysisSummary: parsedSummary,
-          rawAnalysis: rawAnalysis, // Add this line to include rawAnalysis
+          // rawAnalysis field removed from here
         },
       },
       { new: true, upsert: true }
     );
 
     console.log(
-      `DraftItem updated with analysis summary and raw analysis for itemId: ${itemId}`
+      `DraftItem updated with analysis summary for itemId: ${itemId}`
     );
 
     res.json({
       combinedAnalysis,
       summary: parsedSummary,
-      rawAnalysis, // Include rawAnalysis in the response
+      rawAnalysis, // Still include rawAnalysis in the response
     });
   } catch (error) {
     logger.error('Error in /analyze-images:', { error });

@@ -192,9 +192,16 @@ function NewItemPage({ setItem: setParentItem }) {
           );
           setContextData(localData.contextData || {});
           setMessages(localData.messages || []);
-
-          // Check if analysis was in progress
           setIsAnalyzing(localData.isAnalyzing || false);
+
+          // Set analysis results if available
+          if (localData.analysisResults) {
+            console.log(
+              'Loading analysis results from local storage:',
+              localData.analysisResults
+            );
+            setAnalysisPerformed(true);
+          }
 
           // Now check the database for updates
           try {
@@ -212,9 +219,16 @@ function NewItemPage({ setItem: setParentItem }) {
               );
               setContextData(dbItem.contextData || {});
               setMessages(dbItem.messages || []);
-
-              // Update analysis status from DB
               setIsAnalyzing(dbItem.isAnalyzing || false);
+
+              // Set analysis results if available in DB
+              if (dbItem.analysisResults) {
+                console.log(
+                  'Loading analysis results from database:',
+                  dbItem.analysisResults
+                );
+                setAnalysisPerformed(true);
+              }
 
               // Update local storage with the newer data
               handleLocalSave(
@@ -243,9 +257,16 @@ function NewItemPage({ setItem: setParentItem }) {
               );
               setContextData(dbItem.contextData || {});
               setMessages(dbItem.messages || []);
-
-              // Set analysis status from DB
               setIsAnalyzing(dbItem.isAnalyzing || false);
+
+              // Set analysis results if available in DB
+              if (dbItem.analysisResults) {
+                console.log(
+                  'Loading analysis results from database:',
+                  dbItem.analysisResults
+                );
+                setAnalysisPerformed(true);
+              }
 
               // Save to local storage
               handleLocalSave(
@@ -640,9 +661,6 @@ function NewItemPage({ setItem: setParentItem }) {
   // Add this state to track if an analysis has been performed
   const [analysisPerformed, setAnalysisPerformed] = useState(false);
 
-  // Add this new state for rawAnalysis
-  const [rawAnalysis, setRawAnalysis] = useState(null);
-
   // Modify the handleAnalyzeImagesWrapper function
   const handleAnalyzeImagesWrapper = async () => {
     if (uploadedImages.length === 0) {
@@ -673,26 +691,11 @@ function NewItemPage({ setItem: setParentItem }) {
       if (result && typeof result === 'object') {
         const finalUpdatedItem = {
           ...updatedItem,
-          analysisResult: result,
+          analysisResults: result, // Store the entire result as analysisResults
           isAnalyzing: false,
         };
         setItem(finalUpdatedItem);
         setAnalysisPerformed(true);
-
-        // Log the entire result object
-        console.log('Analysis result:', result);
-
-        // Log the rawAnalysis before setting the state
-        console.log('Raw analysis before setting state:', result.rawAnalysis);
-
-        // Update rawAnalysis with the new result
-        setRawAnalysis(result.rawAnalysis || null);
-
-        // Log the rawAnalysis state after setting
-        console.log(
-          'Raw analysis after setting state:',
-          result.rawAnalysis || null
-        );
 
         // Update local storage and database with the final result
         await handleLocalSave(finalUpdatedItem, contextData, messages, itemId);
@@ -934,17 +937,14 @@ function NewItemPage({ setItem: setParentItem }) {
           />
 
           {/* Add the RawAnalysisSummary component here */}
-          {rawAnalysis ? (
+          {analysisPerformed && item && item.analysisResults && (
             <>
-              <p>Raw Analysis is available:</p>
-              <pre>{JSON.stringify(rawAnalysis, null, 2)}</pre>
-              <RawAnalysisSummary rawAnalysis={rawAnalysis} />
+              {console.log(
+                'Rendering RawAnalysisSummary with:',
+                item.analysisResults
+              )}
+              <RawAnalysisSummary rawAnalysis={item.analysisResults} />
             </>
-          ) : (
-            <p>
-              Raw Analysis is not available. Current value:{' '}
-              {JSON.stringify(rawAnalysis)}
-            </p>
           )}
         </div>
       </MainContentArea>

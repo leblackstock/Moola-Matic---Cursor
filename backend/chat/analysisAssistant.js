@@ -125,6 +125,12 @@ Additional Information:
 Description: ${description || 'N/A'}
 Item ID: ${itemId || 'N/A'}
 Seller Notes: ${sellerNotes || 'N/A'}
+
+For the "sampleForSaleListing" field, use the following prompt to generate a sample eBay listing:
+
+${listingPrompt}
+
+Ensure that the generated listing adheres to the requirements specified in the prompt and fits within the 1500 character limit.
 `;
 
 export const generateCombineAndSummarizeAnalysisPrompt = () => `
@@ -236,11 +242,51 @@ Provide the output strictly in the following JSON format, ensuring each field is
 
 1. The "detailedBreakdown" field should be a comprehensive summary that incorporates all additional notes from the individual analyses. This should include any observations, insights, or details that didn't fit into the other structured fields.
 
-2. If there are discrepancies between analyses, mention these in the "detailedBreakdown" and explain how you arrived at the final values in the JSON structure.
+2. Based on all available information, identify the specific item as accurately as possible. Once identified:
+   a) Add relevant details about this item to the appropriate fields in the JSON structure, including information that may not be directly observable in the images.
+   b) Ensure all confirmed information from the original analyses is retained.
+   c) Clearly distinguish between confirmed facts from the analyses and additional information you've inferred or added based on the item identification.
 
-3. Ensure that all relevant information from the individual analyses is captured in the final output, either in the structured fields or in the "detailedBreakdown".
+3. In the "detailedBreakdown", include:
+   a) A detailed description of the identified item, including its typical uses, history, or any other relevant information not directly observable from the images.
+   b) Any notable features, characteristics, or market trends related to this type of item.
+   c) A calculation of the maximum amount one should pay to acquire this item to ensure a good profit. Consider the following criteria:
+      - Minimum profit: $20
+      - Minimum profit margin: 20%
+      - Formula: Max Purchase Price = (Estimated Selling Price - Fees - Shipping Costs - $20) / 1.2
+   Explain this calculation and provide a recommendation on the maximum purchase price.
 
-4. If any analysis provided unique insights not covered by the standard fields, include this information in the "detailedBreakdown".
+4. If there are discrepancies between analyses, mention these in the "detailedBreakdown" and explain how you arrived at the final values in the JSON structure.
 
-5. The final output should represent a complete and nuanced understanding of the item, synthesizing all available information from the multiple analyses.
+5. Ensure that all relevant information from the individual analyses is captured in the final output, either in the structured fields or in the "detailedBreakdown".
+
+6. If any analysis provided unique insights not covered by the standard fields, include this information in the "detailedBreakdown".
+
+7. The final output should represent a complete and nuanced understanding of the item, synthesizing all available information from the multiple analyses and additional research. Clearly differentiate between confirmed facts and inferred or added details.
+
+8. For the "sampleForSaleListing" field, use the following prompt to generate a sample eBay listing:
+
+${listingPrompt}
+
+Ensure that the generated listing adheres to the requirements specified in the prompt and fits within the 1500 character limit.
 `;
+
+export const listingPrompt = `Task: Create an eBay listing for an item with the following components. Ensure each section meets the specified requirements. The entire message must not exceed 1500 characters, including spaces.
+
+eBay Listing Title: Craft a compelling title that maximizes character usage without exceeding 80 characters. Avoid using commas.
+
+Description Title: Write a title for the item description that attracts buyers.
+
+Description: Write a medium-length description to enhance the item's appeal. Include information about the brand and relevant details found online. Do not mention the condition here.
+
+Retail Price: State the current estimated retail price.
+
+Measurements: Convert mm, cm, and m to inches using the nearest 16th fraction. Convert inches and feet to mm, cm, and m using decimals. Convert g and kg to oz and lbs using decimals, and vice versa. Use fractions for metric-to-imperial and decimals for imperial-to-metric. Use standard conversions: 1 inch = 25.4 mm, 1 oz = 28.35 g, 1 lb = 0.4536 kg. Provide both metric and imperial units.
+
+Keywords and Tags: Create a comma-separated list of popular keywords and tags in order of popularity. Each tag must be no longer than 20 characters, including spaces.
+
+End with a call to action that encourages buyers to make a purchase.
+
+Condition: Rewrite the condition to sound appealing and informative. If there is no condition to rewrite, include a used-good condition and make it sound appealing and informative.
+
+Average Selling Price: List the average price this item is selling for on eBay, Etsy, or Poshmark at the end.`;
