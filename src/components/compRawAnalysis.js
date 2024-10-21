@@ -2,7 +2,7 @@
 
 import React from 'react';
 import PropTypes from 'prop-types';
-import { SummaryContainer, SummaryTitle, SummaryText } from './compStyles';
+import { SummaryContainer, SummaryTitle, SummaryText } from './compStyles.js';
 
 const RawAnalysisSummary = ({ rawAnalysis }) => {
   if (!rawAnalysis) {
