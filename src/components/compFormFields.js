@@ -42,8 +42,9 @@ const FormFields = React.memo(function FormFields({
   itemId,
   analysisResult,
 }) {
-  console.log('FormFields rendering, item:', item);
-  console.log('FormFields rendering, analysisResult:', analysisResult);
+  // Remove or comment out these console.log statements
+  // console.log('FormFields rendering, item:', item);
+  // console.log('FormFields rendering, analysisResult:', analysisResult);
 
   const [hasPopulatedFields, setHasPopulatedFields] = useState(false);
   const previousAnalysisResultRef = useRef();
