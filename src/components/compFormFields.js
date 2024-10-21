@@ -20,6 +20,13 @@ import {
   StyledTitle,
 } from './compStyles.js';
 
+// Add this function at the top of your component or in a utility file
+const formatDate = (dateString) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  return date.toISOString().split('T')[0];
+};
+
 const FormFields = React.memo(function FormFields({
   item,
   updateItem,
@@ -46,18 +53,57 @@ const FormFields = React.memo(function FormFields({
   useEffect(() => {
     if (
       analysisResult &&
+      analysisResult.summary &&
       analysisResult !== previousAnalysisResultRef.current
     ) {
+      console.log('Processing analysis result');
       previousAnalysisResultRef.current = analysisResult;
 
       // Create a new item object with updated fields
       const updatedItem = { ...item };
 
-      // Update form fields based on the analysis result
-      Object.entries(analysisResult).forEach(([key, value]) => {
-        if (value !== undefined) {
-          console.log(`Updating ${key} to ${value}`);
+      // Update form fields based on the analysis result summary
+      Object.entries(analysisResult.summary).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          console.log(`Updating ${key} to`, value);
           updatedItem[key] = value;
+        }
+      });
+
+      // Handle specific fields that might need special processing
+      if (analysisResult.summary.purchaseRecommendation) {
+        updatedItem.purchaseRecommendation =
+          analysisResult.summary.purchaseRecommendation;
+        handlePurchaseRecommendationChange(
+          analysisResult.summary.purchaseRecommendation
+        );
+      }
+
+      // Handle date fields
+      [
+        'purchaseDate',
+        'listingDate',
+        'inventoryDetailsAcquisitionDate',
+      ].forEach((dateField) => {
+        if (analysisResult.summary[dateField]) {
+          updatedItem[dateField] = formatDate(
+            analysisResult.summary[dateField]
+          );
+        }
+      });
+
+      // Handle numeric fields
+      [
+        'financialsEstimatedMarketValue',
+        'financialsPurchasePrice',
+        'financialsTotalRepairAndCleaningCosts',
+        'conditionEstimatedCleaningCosts',
+        'conditionEstimatedRepairCosts',
+        'marketAnalysisSuggestedListingPrice',
+        'marketAnalysisMinimumAcceptablePrice',
+      ].forEach((numField) => {
+        if (analysisResult.summary[numField]) {
+          updatedItem[numField] = parseFloat(analysisResult.summary[numField]);
         }
       });
 
@@ -66,14 +112,7 @@ const FormFields = React.memo(function FormFields({
 
       setHasPopulatedFields(true);
     }
-  }, [analysisResult, updateItem, item]);
-
-  // Add this function to format dates
-  const formatDate = useCallback((dateString) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return date.toISOString().split('T')[0];
-  }, []);
+  }, [analysisResult, updateItem, item, handlePurchaseRecommendationChange]);
 
   // Modify the handleFieldChange function
   const handleFieldChange = useCallback(
