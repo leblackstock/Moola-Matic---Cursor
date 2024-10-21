@@ -93,25 +93,35 @@ router.post('/analyze-images', async (req, res) => {
 
     const processedImages = await processImages(imageUrls);
 
-    const analyses = [];
-    for (const { base64Image, filename } of processedImages) {
-      try {
-        console.log(`Analyzing image: ${filename}`);
-        logger.info(`Analyzing image: ${filename}`);
-        const analysis = await analyzeImagesWithVision(
-          analysisPrompt,
-          base64Image
-        );
-        const parsedAnalysis = parseAnalysis(analysis);
-        analyses.push(parsedAnalysis);
-      } catch (error) {
-        logger.error(`Failed to analyze image: ${filename}`, { error });
+    const analysisPromises = processedImages.map(
+      async ({ base64Image, filename }) => {
+        try {
+          console.log(`Analyzing image: ${filename}`);
+          logger.info(`Analyzing image: ${filename}`);
+          const analysis = await analyzeImagesWithVision(
+            analysisPrompt,
+            base64Image
+          );
+          const parsedAnalysis = parseAnalysis(analysis);
+          console.log('Analysis parsed');
+          return parsedAnalysis;
+        } catch (error) {
+          logger.error(`Failed to analyze image: ${filename}`, { error });
+          return null; // Return null for failed analyses
+        }
       }
+    );
+
+    const analyses = await Promise.all(analysisPromises);
+    const validAnalyses = analyses.filter((analysis) => analysis !== null);
+
+    if (validAnalyses.length === 0) {
+      throw new Error('All image analyses failed');
     }
 
-    const combinedAnalysis = combineAnalyses(analyses);
+    const combinedAnalysis = combineAnalyses(validAnalyses);
     logger.info('Combined analysis:', combinedAnalysis);
-    console.log('Analyses combined');
+    console.log('Analyses combined, summarizing...');
     const summary = await summarizeAnalyses(
       combinedAnalysis,
       combineAndSummarizeAnalysisPrompt
