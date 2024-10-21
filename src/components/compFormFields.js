@@ -21,10 +21,16 @@ import {
 } from './compStyles.js';
 
 // Add this function at the top of your component or in a utility file
-const formatDate = (dateString) => {
-  if (!dateString) return '';
-  const date = new Date(dateString);
-  return date.toISOString().split('T')[0];
+const formatDate = (date) => {
+  if (date instanceof Date) {
+    return date.toISOString().split('T')[0];
+  }
+  return date;
+};
+
+const parseNumber = (value) => {
+  const parsed = parseFloat(value);
+  return isNaN(parsed) ? '' : parsed.toString();
 };
 
 const FormFields = React.memo(function FormFields({
@@ -64,11 +70,14 @@ const FormFields = React.memo(function FormFields({
       const updatedFieldsSet = new Set();
 
       // Helper function to check if a value is valid
-      const isValidValue = (value) =>
-        value !== null &&
-        value !== undefined &&
-        value !== '' &&
-        value.toLowerCase() !== 'unknown';
+      const isValidValue = (value) => {
+        if (typeof value === 'string') {
+          return value.trim() !== '';
+        } else if (typeof value === 'object' && value !== null) {
+          return Object.keys(value).length > 0;
+        }
+        return false;
+      };
 
       // Update form fields based on the analysis result summary
       Object.entries(analysisResult.summary).forEach(([key, value]) => {
@@ -80,7 +89,12 @@ const FormFields = React.memo(function FormFields({
       });
 
       // Handle specific fields that might need special processing
-      if (isValidValue(analysisResult.summary.purchaseRecommendation)) {
+      if (
+        isValidValue(
+          analysisResult.summary.purchaseRecommendation,
+          'purchaseRecommendation'
+        )
+      ) {
         updatedItem.purchaseRecommendation =
           analysisResult.summary.purchaseRecommendation;
         handlePurchaseRecommendationChange(
@@ -114,7 +128,7 @@ const FormFields = React.memo(function FormFields({
         'marketAnalysisMinimumAcceptablePrice',
       ].forEach((numField) => {
         if (isValidValue(analysisResult.summary[numField])) {
-          updatedItem[numField] = parseFloat(analysisResult.summary[numField]);
+          updatedItem[numField] = parseNumber(analysisResult.summary[numField]);
           updatedFieldsSet.add(numField);
         }
       });
@@ -139,6 +153,13 @@ const FormFields = React.memo(function FormFields({
         field === 'soldDate'
       ) {
         formattedValue = formatDate(value);
+      } else if (
+        Array.isArray(value) ||
+        (typeof value === 'object' && value !== null)
+      ) {
+        // Use handleComplexField for array or object values
+        handleComplexField(field, value);
+        return;
       }
 
       const newItem = { ...item, [field]: formattedValue };
@@ -487,6 +508,14 @@ const FormFields = React.memo(function FormFields({
     },
     [handleSubmit, itemId]
   );
+
+  const handleComplexField = (field, value) => {
+    if (Array.isArray(value)) {
+      updateItem(itemId, { ...item, [field]: value.join(', ') });
+    } else if (typeof value === 'object' && value !== null) {
+      updateItem(itemId, { ...item, [field]: JSON.stringify(value) });
+    }
+  };
 
   return (
     <>

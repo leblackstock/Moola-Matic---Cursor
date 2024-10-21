@@ -679,6 +679,21 @@ function NewItemPage({ setItem: setParentItem }) {
         setItem(finalUpdatedItem);
         setAnalysisPerformed(true);
 
+        // Log the entire result object
+        console.log('Analysis result:', result);
+
+        // Log the rawAnalysis before setting the state
+        console.log('Raw analysis before setting state:', result.rawAnalysis);
+
+        // Update rawAnalysis with the new result
+        setRawAnalysis(result.rawAnalysis || null);
+
+        // Log the rawAnalysis state after setting
+        console.log(
+          'Raw analysis after setting state:',
+          result.rawAnalysis || null
+        );
+
         // Update local storage and database with the final result
         await handleLocalSave(finalUpdatedItem, contextData, messages, itemId);
         await axios.put(
@@ -687,9 +702,6 @@ function NewItemPage({ setItem: setParentItem }) {
         );
 
         toast.success('Image analysis completed successfully!');
-
-        // Update rawAnalysis with the new result
-        setRawAnalysis(result.rawAnalysis || null);
       } else {
         console.error('Invalid analysis result:', result);
         toast.error('Error: Invalid analysis result');
@@ -922,7 +934,18 @@ function NewItemPage({ setItem: setParentItem }) {
           />
 
           {/* Add the RawAnalysisSummary component here */}
-          {rawAnalysis && <RawAnalysisSummary rawAnalysis={rawAnalysis} />}
+          {rawAnalysis ? (
+            <>
+              <p>Raw Analysis is available:</p>
+              <pre>{JSON.stringify(rawAnalysis, null, 2)}</pre>
+              <RawAnalysisSummary rawAnalysis={rawAnalysis} />
+            </>
+          ) : (
+            <p>
+              Raw Analysis is not available. Current value:{' '}
+              {JSON.stringify(rawAnalysis)}
+            </p>
+          )}
         </div>
       </MainContentArea>
     </PageContainer>

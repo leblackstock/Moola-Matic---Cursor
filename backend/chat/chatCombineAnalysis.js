@@ -29,10 +29,20 @@ const parseAnalysis = (analysis) => {
     } else {
       try {
         parsed = JSON.parse(analysis);
-      } catch (error) {
+      } catch {
         parsed = { rawAnalysis: analysis };
       }
     }
+
+    // Improved number parsing
+    Object.keys(parsed).forEach((key) => {
+      if (typeof parsed[key] === 'string') {
+        const numValue = parseFloat(parsed[key]);
+        if (!isNaN(numValue) && isFinite(parsed[key])) {
+          parsed[key] = numValue;
+        }
+      }
+    });
 
     // Ensure all fields from DraftItem schema are present
     Object.keys(DraftItem.schema.paths).forEach((field) => {
