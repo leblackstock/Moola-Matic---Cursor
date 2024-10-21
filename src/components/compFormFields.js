@@ -56,7 +56,7 @@ const FormFields = React.memo(function FormFields({
       analysisResult.summary &&
       analysisResult !== previousAnalysisResultRef.current
     ) {
-      console.log('Processing analysis result');
+      console.log('Processing analysis result:', analysisResult);
       previousAnalysisResultRef.current = analysisResult;
 
       // Create a new item object with updated fields
@@ -111,6 +111,7 @@ const FormFields = React.memo(function FormFields({
       updateItem(updatedItem);
 
       setHasPopulatedFields(true);
+      setUpdatedFields(new Set(Object.keys(updatedItem)));
     }
   }, [analysisResult, updateItem, item, handlePurchaseRecommendationChange]);
 
