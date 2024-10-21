@@ -61,22 +61,32 @@ const FormFields = React.memo(function FormFields({
 
       // Create a new item object with updated fields
       const updatedItem = { ...item };
+      const updatedFieldsSet = new Set();
+
+      // Helper function to check if a value is valid
+      const isValidValue = (value) =>
+        value !== null &&
+        value !== undefined &&
+        value !== '' &&
+        value.toLowerCase() !== 'unknown';
 
       // Update form fields based on the analysis result summary
       Object.entries(analysisResult.summary).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
+        if (isValidValue(value)) {
           console.log(`Updating ${key} to`, value);
           updatedItem[key] = value;
+          updatedFieldsSet.add(key);
         }
       });
 
       // Handle specific fields that might need special processing
-      if (analysisResult.summary.purchaseRecommendation) {
+      if (isValidValue(analysisResult.summary.purchaseRecommendation)) {
         updatedItem.purchaseRecommendation =
           analysisResult.summary.purchaseRecommendation;
         handlePurchaseRecommendationChange(
           analysisResult.summary.purchaseRecommendation
         );
+        updatedFieldsSet.add('purchaseRecommendation');
       }
 
       // Handle date fields
@@ -85,10 +95,11 @@ const FormFields = React.memo(function FormFields({
         'listingDate',
         'inventoryDetailsAcquisitionDate',
       ].forEach((dateField) => {
-        if (analysisResult.summary[dateField]) {
+        if (isValidValue(analysisResult.summary[dateField])) {
           updatedItem[dateField] = formatDate(
             analysisResult.summary[dateField]
           );
+          updatedFieldsSet.add(dateField);
         }
       });
 
@@ -102,16 +113,17 @@ const FormFields = React.memo(function FormFields({
         'marketAnalysisSuggestedListingPrice',
         'marketAnalysisMinimumAcceptablePrice',
       ].forEach((numField) => {
-        if (analysisResult.summary[numField]) {
+        if (isValidValue(analysisResult.summary[numField])) {
           updatedItem[numField] = parseFloat(analysisResult.summary[numField]);
+          updatedFieldsSet.add(numField);
         }
       });
 
       // Update the item state with all the changes at once
       updateItem(updatedItem);
 
-      setHasPopulatedFields(true);
-      setUpdatedFields(new Set(Object.keys(updatedItem)));
+      setHasPopulatedFields(updatedFieldsSet.size > 0);
+      setUpdatedFields(updatedFieldsSet);
     }
   }, [analysisResult, updateItem, item, handlePurchaseRecommendationChange]);
 

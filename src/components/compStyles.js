@@ -1282,3 +1282,60 @@ export const StyledToastContainer = styled(ToastContainer)`
     color: #00ffff;
   }
 `;
+
+// Add these new styled components at the end of the file
+
+export const SummaryContainer = styled.div`
+  margin-top: 2rem;
+  padding: 1rem;
+  background-color: rgba(13, 0, 26, 0.8);
+  border: 2px solid #4a0e4e;
+  border-radius: 15px;
+  max-height: 300px;
+  overflow-y: auto;
+  box-shadow: 0 0 30px rgba(138, 43, 226, 0.4);
+  transition: all 0.3s ease;
+
+  &:hover {
+    box-shadow: 0 0 40px rgba(138, 43, 226, 0.6);
+    transform: translateY(-2px);
+  }
+
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: rgba(13, 0, 26, 0.4);
+    border-radius: 10px;
+    margin: 5px 0;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(138, 43, 226, 0.5);
+    border-radius: 30px;
+    border: 3px solid rgba(13, 0, 26, 0.4);
+    transition: background 0.3s ease;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background: rgba(138, 43, 226, 0.7);
+  }
+
+  scrollbar-width: thin;
+  scrollbar-color: rgba(138, 43, 226, 0.5) rgba(13, 0, 26, 0.4);
+`;
+
+export const SummaryTitle = styled.h3`
+  color: #f5deb3;
+  text-align: center;
+  margin-bottom: 1rem;
+`;
+
+export const SummaryText = styled.pre`
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  color: #f5deb3;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.9em;
+`;

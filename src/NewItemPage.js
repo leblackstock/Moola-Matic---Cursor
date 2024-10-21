@@ -65,6 +65,7 @@ import {
 } from './components/compStyles.js';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import RawAnalysisSummary from './components/compRawAnalysis.js';
 
 export const API_BASE_URL =
   process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001';
@@ -639,6 +640,9 @@ function NewItemPage({ setItem: setParentItem }) {
   // Add this state to track if an analysis has been performed
   const [analysisPerformed, setAnalysisPerformed] = useState(false);
 
+  // Add this new state for rawAnalysis
+  const [rawAnalysis, setRawAnalysis] = useState(null);
+
   // Modify the handleAnalyzeImagesWrapper function
   const handleAnalyzeImagesWrapper = async () => {
     if (uploadedImages.length === 0) {
@@ -683,6 +687,9 @@ function NewItemPage({ setItem: setParentItem }) {
         );
 
         toast.success('Image analysis completed successfully!');
+
+        // Update rawAnalysis with the new result
+        setRawAnalysis(result.rawAnalysis || null);
       } else {
         console.error('Invalid analysis result:', result);
         toast.error('Error: Invalid analysis result');
@@ -913,6 +920,9 @@ function NewItemPage({ setItem: setParentItem }) {
             itemId={itemId}
             analysisResult={analysisPerformed ? item.analysisResult : null}
           />
+
+          {/* Add the RawAnalysisSummary component here */}
+          {rawAnalysis && <RawAnalysisSummary rawAnalysis={rawAnalysis} />}
         </div>
       </MainContentArea>
     </PageContainer>

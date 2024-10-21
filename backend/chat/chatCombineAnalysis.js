@@ -53,6 +53,12 @@ const parseAnalysis = (analysis) => {
   }
 };
 
+// New function to extract rawAnalysis
+const extractRawAnalysis = (parsedResults) => {
+  const rawAnalysisResult = parsedResults.find((result) => result.rawAnalysis);
+  return rawAnalysisResult ? rawAnalysisResult.rawAnalysis : null;
+};
+
 const combineAnalyses = (analysisResults) => {
   try {
     console.log('Combining Analyses');
@@ -132,4 +138,4 @@ const combineAnalyses = (analysisResults) => {
   }
 };
 
-export { combineAnalyses, parseAnalysis };
+export { combineAnalyses, parseAnalysis, extractRawAnalysis };
