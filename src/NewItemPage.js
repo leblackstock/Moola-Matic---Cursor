@@ -605,7 +605,15 @@ function NewItemPage({ onItemSaved }) {
   // Add this state to track if an analysis has been performed
   const [analysisPerformed, setAnalysisPerformed] = useState(false);
 
-  // Modify the handleAnalyzeImagesWrapper function
+  // Add new state for analysis progress
+  const [analysisProgress, setAnalysisProgress] = useState({
+    totalImages: 0,
+    completedImages: 0,
+    currentImageName: '',
+    intermediateResults: [],
+  });
+
+  // Modify handleAnalyzeImagesWrapper function
   const handleAnalyzeImagesWrapper = async () => {
     if (uploadedImages.length === 0) {
       toast.error('Please upload images before analyzing.');
@@ -617,10 +625,25 @@ function NewItemPage({ onItemSaved }) {
 
     setIsAnalyzing(true);
     setAnalysisTimeLeft(totalEstimatedTime);
+    setAnalysisProgress({
+      totalImages: uploadedImages.length,
+      completedImages: 0,
+      currentImageName: uploadedImages[0].filename,
+      intermediateResults: [],
+    });
 
     try {
       // Update the local storage and database to reflect that analysis is in progress
-      const updatedItem = { ...item, isAnalyzing: true };
+      const updatedItem = {
+        ...item,
+        isAnalyzing: true,
+        analysisProgress: {
+          totalImages: uploadedImages.length,
+          completedImages: 0,
+          currentImageName: uploadedImages[0].filename,
+          intermediateResults: [],
+        },
+      };
       await handleLocalSave(updatedItem, contextData, messages, itemId);
       await axios.put(`${API_BASE_URL}/api/items/${itemId}`, updatedItem);
 
@@ -630,6 +653,24 @@ function NewItemPage({ onItemSaved }) {
         itemId: itemId,
         sellerNotes: item.sellerNotes || '',
         context: contextData,
+        onProgress: async (completedImages, currentImage, intermediateResult) => {
+          const newProgress = {
+            totalImages: uploadedImages.length,
+            completedImages,
+            currentImageName: currentImage,
+            intermediateResults: [...analysisProgress.intermediateResults, intermediateResult],
+          };
+          setAnalysisProgress(newProgress);
+
+          // Save progress to backend and local storage
+          const progressItem = {
+            ...item,
+            isAnalyzing: true,
+            analysisProgress: newProgress,
+          };
+          await handleLocalSave(progressItem, contextData, messages, itemId);
+          await axios.put(`${API_BASE_URL}/api/items/${itemId}`, progressItem);
+        },
       });
 
       if (result && typeof result === 'object') {
@@ -637,9 +678,16 @@ function NewItemPage({ onItemSaved }) {
           ...updatedItem,
           analysisResults: result,
           isAnalyzing: false,
+          analysisProgress: null, // Clear progress after completion
         };
         setItem(finalUpdatedItem);
         setAnalysisPerformed(true);
+        setAnalysisProgress({
+          totalImages: 0,
+          completedImages: 0,
+          currentImageName: '',
+          intermediateResults: [],
+        });
 
         // Update local storage and database with the final result
         await handleLocalSave(finalUpdatedItem, contextData, messages, itemId);
@@ -658,13 +706,34 @@ function NewItemPage({ onItemSaved }) {
           { autoClose: 10000 }
         );
       } else {
-        toast.error('Error analyzing images. Please try again.');
+        toast.error('Error analyzing images. Progress has been saved.');
       }
     } finally {
       setIsAnalyzing(false);
       setAnalysisTimeLeft(0);
     }
   };
+
+  // Add effect to check for ongoing analysis on mount
+  useEffect(() => {
+    const checkOngoingAnalysis = async () => {
+      if (item?.isAnalyzing && item?.analysisProgress) {
+        setIsAnalyzing(true);
+        setAnalysisProgress(item.analysisProgress);
+
+        // Resume analysis from where it left off
+        if (item.analysisProgress.completedImages < uploadedImages.length) {
+          const remainingImages = uploadedImages.slice(item.analysisProgress.completedImages);
+          if (remainingImages.length > 0) {
+            toast.info('Resuming previous analysis...');
+            handleAnalyzeImagesWrapper();
+          }
+        }
+      }
+    };
+
+    checkOngoingAnalysis();
+  }, [item?.isAnalyzing]);
 
   useEffect(() => {
     let timer;
@@ -798,15 +867,42 @@ function NewItemPage({ onItemSaved }) {
           </ButtonContainer>
 
           {isAnalyzing && (
-            <div>
+            <div
+              style={{
+                margin: '1rem 0',
+                padding: '1rem',
+                backgroundColor: '#f8f9fa',
+                borderRadius: '8px',
+              }}
+            >
               <p>
-                Image analysis in progress... You can continue to interact with other parts of the
-                page.
+                <i className="fas fa-info-circle"></i> Image analysis in progress... You can safely
+                navigate away and return later. Progress will be saved.
               </p>
               <p>
-                Estimated time left: {Math.floor(analysisTimeLeft / 60)}:
+                <i className="fas fa-image"></i> Analyzing image{' '}
+                {analysisProgress.completedImages + 1} of {analysisProgress.totalImages}:{' '}
+                {analysisProgress.currentImageName}
+              </p>
+              <p>
+                <i className="fas fa-clock"></i> Estimated time left:{' '}
+                {Math.floor(analysisTimeLeft / 60)}:
                 {(analysisTimeLeft % 60).toString().padStart(2, '0')}
               </p>
+              {analysisProgress.intermediateResults.length > 0 && (
+                <div>
+                  <p>
+                    <i className="fas fa-check-circle"></i> Completed analyses:
+                  </p>
+                  <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
+                    {analysisProgress.intermediateResults.map((result, index) => (
+                      <div key={index} style={{ marginLeft: '1rem', color: '#28a745' }}>
+                        <i className="fas fa-check"></i> Image {index + 1}: {result.filename}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -849,8 +945,6 @@ function NewItemPage({ onItemSaved }) {
           {/* New Save Draft button */}
           <StyledButton onClick={handleSaveDraft}>Save Draft</StyledButton>
 
-          {lastAutoSave && <p>Last auto-save: {lastAutoSave.toLocaleTimeString()}</p>}
-
           {hasUnsavedChanges && <span>Unsaved changes</span>}
 
           {/* Always render FormFields */}
@@ -862,6 +956,7 @@ function NewItemPage({ onItemSaved }) {
             handlePurchaseRecommendationChange={handlePurchaseRecommendationChange}
             itemId={itemId}
             analysisResult={item.analysisResults}
+            lastAutoSave={lastAutoSave} // Add this prop
           />
 
           {/* Render RawAnalysisSummary only if analysis is performed */}

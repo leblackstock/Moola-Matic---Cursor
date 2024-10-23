@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import PropTypes from 'prop-types';
 import _ from 'lodash'; // Import the full lodash library
 import {
+  FormContainer,
   StyledForm,
   StyledFormGroup,
   StyledLabel,
@@ -12,6 +13,14 @@ import {
   StyledTextarea,
   StyledButton,
   StyledTitle,
+  RecommendationContainer,
+  RecommendationTextarea,
+  SampleListingTextarea,
+  RecommendationFormGroup,
+  ActionContainer,
+  ButtonGroup,
+  StatusContainer,
+  StatusGroup,
 } from './compStyles.js';
 
 // Add this function at the top of your component or in a utility file
@@ -35,6 +44,7 @@ const FormFields = React.memo(function FormFields({
   handlePurchaseRecommendationChange,
   itemId,
   analysisResult,
+  lastAutoSave, // Add this prop
 }) {
   // Remove or comment out these console.log statements
   // console.log('FormFields rendering, item:', item);
@@ -399,7 +409,6 @@ const FormFields = React.memo(function FormFields({
           ['contextData', 'Context Data', 'textarea'],
         ],
       ],
-      ['Final Recommendation', [['detailedBreakdown', 'Detailed Breakdown', 'textarea']]],
     ];
 
     return fieldGroups.map(([title, fields]) => renderFieldGroup(title, fields)).filter(Boolean);
@@ -409,20 +418,36 @@ const FormFields = React.memo(function FormFields({
     setHasPopulatedFields(memoizedFields.length > 0);
   }, [memoizedFields.length]);
 
-  const renderSampleListing = useCallback(() => {
-    if (!item.sampleForSaleListing) return null;
+  const renderRecommendation = useCallback(() => {
+    if (!item.detailedBreakdown && !item.sampleForSaleListing) return null;
     return (
-      <StyledFormGroup>
-        <StyledTitle>Sample For Sale Listing</StyledTitle>
-        <StyledTextarea
-          value={item.sampleForSaleListing}
-          onChange={e => handleFieldChange('sampleForSaleListing', e.target.value)}
-          rows="10"
-          readOnly
-        />
-      </StyledFormGroup>
+      <RecommendationContainer>
+        <StyledTitle>Final Recommendation</StyledTitle>
+        {item.detailedBreakdown && (
+          <RecommendationFormGroup>
+            <StyledLabel htmlFor="detailedBreakdown">Detailed Breakdown</StyledLabel>
+            <RecommendationTextarea
+              id="detailedBreakdown"
+              value={item.detailedBreakdown}
+              onChange={e => handleFieldChange('detailedBreakdown', e.target.value)}
+              readOnly
+            />
+          </RecommendationFormGroup>
+        )}
+        {item.sampleForSaleListing && (
+          <RecommendationFormGroup>
+            <StyledLabel htmlFor="sampleForSaleListing">Sample For Sale Listing</StyledLabel>
+            <SampleListingTextarea
+              id="sampleForSaleListing"
+              value={item.sampleForSaleListing}
+              onChange={e => handleFieldChange('sampleForSaleListing', e.target.value)}
+              readOnly
+            />
+          </RecommendationFormGroup>
+        )}
+      </RecommendationContainer>
     );
-  }, [item.sampleForSaleListing, handleFieldChange]);
+  }, [item.detailedBreakdown, item.sampleForSaleListing, handleFieldChange]);
 
   const onSubmit = useCallback(
     e => {
@@ -442,22 +467,37 @@ const FormFields = React.memo(function FormFields({
 
   return (
     <>
-      <StyledForm onSubmit={onSubmit}>
-        {memoizedFields}
-        {renderSampleListing()}
-        {hasPopulatedFields && (
-          <>
-            <StyledButton type="submit">Purchase Item</StyledButton>
-            <StyledButton onClick={() => handleSaveDraft(itemId, item)} type="button">
-              Save Draft
-            </StyledButton>
-          </>
-        )}
-      </StyledForm>
-      <StyledFormGroup>
-        <StyledLabel>Item ID</StyledLabel>
-        <div>{itemId || 'Not assigned yet'}</div>
-      </StyledFormGroup>
+      <FormContainer>
+        <StyledForm onSubmit={onSubmit}>{memoizedFields}</StyledForm>
+      </FormContainer>
+
+      {renderRecommendation()}
+
+      <ActionContainer>
+        <ButtonGroup>
+          {hasPopulatedFields && (
+            <>
+              <StyledButton type="submit" onClick={onSubmit}>
+                Purchase Item
+              </StyledButton>
+              <StyledButton onClick={() => handleSaveDraft(itemId, item)} type="button">
+                Save Draft
+              </StyledButton>
+            </>
+          )}
+        </ButtonGroup>
+      </ActionContainer>
+
+      <StatusContainer>
+        <StatusGroup>
+          <label>Item ID:</label>
+          <div>{itemId || 'Not assigned yet'}</div>
+        </StatusGroup>
+        <StatusGroup>
+          <label>Last Autosaved:</label>
+          <div>{lastAutoSave ? lastAutoSave.toLocaleTimeString() : 'Not saved yet'}</div>
+        </StatusGroup>
+      </StatusContainer>
     </>
   );
 });
@@ -470,6 +510,7 @@ FormFields.propTypes = {
   handlePurchaseRecommendationChange: PropTypes.func.isRequired,
   itemId: PropTypes.string.isRequired,
   analysisResult: PropTypes.object,
+  lastAutoSave: PropTypes.instanceOf(Date), // Add this prop type
 };
 
 export default FormFields;

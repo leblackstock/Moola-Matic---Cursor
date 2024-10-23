@@ -68,7 +68,6 @@ router.use(express.json({ limit: '20mb' }));
  * POST /api/analyze-images
  */
 router.post('/analyze-images', async (req, res) => {
-  console.log('Analyzing images');
   try {
     const { imageUrls, description, itemId, sellerNotes, context } = req.body;
 
@@ -82,22 +81,49 @@ router.post('/analyze-images', async (req, res) => {
 
     const processedImages = await processImages(imageUrls);
 
-    const analysisPromises = processedImages.map(async ({ base64Image, filename }) => {
+    // Check for existing progress
+    const existingDraft = await DraftItem.findOne({ itemId });
+    const startIndex = existingDraft?.analysisProgress?.completedImages || 0;
+    const remainingImages = processedImages.slice(startIndex);
+
+    const analysisPromises = remainingImages.map(async ({ base64Image, filename }, index) => {
       try {
-        console.log(`Analyzing image: ${filename}`);
-        logger.info(`Analyzing image: ${filename}`);
+        const currentIndex = startIndex + index;
+        console.log(
+          `Analyzing image ${currentIndex + 1} of ${processedImages.length}: ${filename}`
+        );
+
         const analysis = await analyzeImagesWithVision(analysisPrompt, base64Image);
         const parsedAnalysis = parseAnalysis(analysis);
-        console.log('Analysis parsed');
+
+        // Save intermediate results
+        await DraftItem.findOneAndUpdate(
+          { itemId },
+          {
+            $set: {
+              [`intermediateAnalysis.${currentIndex}`]: parsedAnalysis,
+              analysisProgress: {
+                totalImages: processedImages.length,
+                completedImages: currentIndex + 1,
+                currentImageName: filename,
+              },
+            },
+          },
+          { new: true, upsert: true }
+        );
+
         return parsedAnalysis;
       } catch (error) {
         logger.error(`Failed to analyze image: ${filename}`, { error });
-        return null; // Return null for failed analyses
+        return null;
       }
     });
 
     const analyses = await Promise.all(analysisPromises);
-    const validAnalyses = analyses.filter(analysis => analysis !== null);
+    const validAnalyses = [
+      ...(existingDraft?.intermediateAnalysis || []).slice(0, startIndex),
+      ...analyses.filter(analysis => analysis !== null),
+    ];
 
     if (validAnalyses.length === 0) {
       throw new Error('All image analyses failed');

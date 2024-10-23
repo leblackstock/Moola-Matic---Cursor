@@ -347,12 +347,47 @@ export const HoverDeleteButton = styled.button`
 export const StyledForm = styled.form`
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.5rem;
+  max-width: 800px;
+  margin: 0 auto;
 `;
 
 export const StyledFormGroup = styled.div`
   display: flex;
   flex-direction: column;
+  gap: 0.5rem;
+  padding: 15px;
+  background: rgba(13, 0, 26, 0.6);
+  border-radius: 10px;
+  transition: all 0.3s ease;
+  max-height: 300px;
+  overflow-y: auto;
+
+  /* Scrollbar styling remains the same */
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: rgba(13, 0, 26, 0.4);
+    border-radius: 10px;
+    margin: 5px 0;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(138, 43, 226, 0.5);
+    border-radius: 30px;
+    border: 3px solid rgba(13, 0, 26, 0.4);
+    transition: background 0.3s ease;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background: rgba(138, 43, 226, 0.7);
+  }
+
+  /* Firefox scrollbar */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(138, 43, 226, 0.5) rgba(13, 0, 26, 0.4);
 `;
 
 export const StyledLabel = styled.label`
@@ -363,30 +398,94 @@ export const StyledLabel = styled.label`
 
 export const StyledInput = styled.input`
   width: 100%;
-  padding: 10px;
-  border-radius: 5px;
+  padding: 12px;
+  border-radius: 8px;
   border: 1px solid #4a0e4e;
-  background: rgba(13, 0, 26, 0.6);
+  background: rgba(13, 0, 26, 0.4);
   color: #f5deb3;
+  font-size: 1em;
+  transition: all 0.3s ease;
+  min-height: 40px;
+  height: fit-content;
+
+  &:focus {
+    outline: none;
+    border-color: #8b0000;
+    box-shadow: 0 0 10px rgba(138, 43, 226, 0.3);
+  }
+
+  &:hover {
+    background: rgba(13, 0, 26, 0.6);
+  }
 `;
 
 export const StyledSelect = styled.select`
   width: 100%;
-  padding: 10px;
-  border-radius: 5px;
+  padding: 12px;
+  border-radius: 8px;
   border: 1px solid #4a0e4e;
-  background: rgba(13, 0, 26, 0.6);
-  color: #f5deb3;
-`;
-
-export const StyledTextarea = styled.textarea`
-  flex: 1;
-  border: none;
-  background: transparent;
+  background: rgba(13, 0, 26, 0.4);
   color: #f5deb3;
   font-size: 1em;
-  resize: none;
-  outline: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-height: auto;
+  height: fit-content;
+
+  &:focus {
+    outline: none;
+    border-color: #8b0000;
+    box-shadow: 0 0 10px rgba(138, 43, 226, 0.3);
+  }
+
+  &:hover {
+    background: rgba(13, 0, 26, 0.6);
+  }
+
+  option {
+    background: #2d0037;
+    color: #f5deb3;
+  }
+`;
+
+// Update StyledTextarea to better calculate height
+export const StyledTextarea = styled.textarea`
+  width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #4a0e4e;
+  background: rgba(13, 0, 26, 0.4);
+  color: #f5deb3;
+  font-size: 1em;
+  resize: vertical;
+  transition: all 0.3s ease;
+  overflow: hidden;
+  min-height: ${props => {
+    // Create a hidden div to measure actual text height
+    const el = document.createElement('div');
+    el.style.width = `${document.querySelector('textarea')?.offsetWidth - 24}px`; // Account for padding
+    el.style.position = 'absolute';
+    el.style.visibility = 'hidden';
+    el.style.whiteSpace = 'pre-wrap';
+    el.style.wordBreak = 'break-word';
+    el.style.fontSize = '1em';
+    el.style.padding = '12px';
+    el.innerText = props.value || '';
+    document.body.appendChild(el);
+    const height = el.offsetHeight;
+    document.body.removeChild(el);
+    return `${height}px`;
+  }};
+
+  &:focus {
+    outline: none;
+    border-color: #8b0000;
+    box-shadow: 0 0 10px rgba(138, 43, 226, 0.3);
+  }
+
+  &:hover {
+    background: rgba(13, 0, 26, 0.6);
+  }
 `;
 
 // Notification Components
@@ -582,9 +681,11 @@ export const InputContainer = styled.div`
   background: rgba(13, 0, 26, 0.6);
   border: 1px solid #4a0e4e;
   border-radius: 25px;
-  padding: 5px 10px;
+  padding: 5px 15px;
   margin-bottom: 10px;
-  height: 50px;
+  min-height: 50px;
+  height: auto; // Change from fixed height to auto
+  max-height: 120px; // Add maximum height
   box-shadow: 0 0 20px rgba(65, 105, 225, 0.5);
   transition:
     box-shadow 0.3s ease,
@@ -605,6 +706,35 @@ export const ChatInput = styled.textarea`
   font-size: 1em;
   resize: none;
   outline: none;
+  padding: 10px;
+  min-height: 20px; // Add minimum height
+  max-height: 100px; // Add maximum height
+  line-height: 1.5; // Add line height for better text readability
+  width: 100%; // Ensure full width
+  overflow-y: auto; // Add vertical scroll when needed
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: rgba(13, 0, 26, 0.4);
+    border-radius: 10px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(138, 43, 226, 0.5);
+    border-radius: 30px;
+    border: 2px solid rgba(13, 0, 26, 0.4);
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background: rgba(138, 43, 226, 0.7);
+  }
+
+  &::placeholder {
+    color: rgba(245, 222, 179, 0.5);
+  }
 `;
 
 export const ImageInputContainer = styled(InputContainer)`
@@ -1033,15 +1163,6 @@ export const MainContentArea = styled.div`
   margin: 0 auto;
 `;
 
-// Add this near the other styled components
-export const ButtonContainer = styled.div`
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap; // Allow buttons to wrap on smaller screens
-  gap: 10px; // Reduce the gap between buttons
-  margin: 20px 0;
-`;
-
 // Add a new component for form buttons
 export const FormButton = styled(StyledButton)`
   width: 100%; // Make form buttons full width
@@ -1328,4 +1449,122 @@ export const SummaryText = styled.pre`
   color: #f5deb3;
   font-family: 'Courier New', Courier, monospace;
   font-size: 0.9em;
+`;
+
+// Add these new styled components
+export const FormContainer = styled.div`
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: 20px;
+  margin: 20px 0;
+  border-radius: 15px;
+  background: rgba(13, 0, 26, 0.4);
+  box-shadow: 0 0 30px rgba(138, 43, 226, 0.3);
+
+  /* Styled scrollbar */
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: rgba(13, 0, 26, 0.4);
+    border-radius: 10px;
+    margin: 5px 0;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(138, 43, 226, 0.5);
+    border-radius: 30px;
+    border: 3px solid rgba(13, 0, 26, 0.4);
+    transition: background 0.3s ease;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background: rgba(138, 43, 226, 0.7);
+  }
+
+  /* Firefox scrollbar */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(138, 43, 226, 0.5) rgba(13, 0, 26, 0.4);
+`;
+
+// Add these new styled components
+export const RecommendationContainer = styled.div`
+  margin-top: 20px;
+  padding: 20px;
+  border-radius: 15px;
+  background: rgba(13, 0, 26, 0.4);
+  box-shadow: 0 0 30px rgba(138, 43, 226, 0.3);
+`;
+
+export const RecommendationTextarea = styled(StyledTextarea)`
+  max-height: 400px;
+`;
+
+export const SampleListingTextarea = styled(StyledTextarea)`
+  max-height: 500px;
+`;
+
+// Add new RecommendationFormGroup for the recommendation sections
+export const RecommendationFormGroup = styled(StyledFormGroup)`
+  max-height: unset;
+  height: auto;
+  overflow-y: visible;
+`;
+
+export const ActionContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 20px;
+  padding: 15px;
+  background: rgba(13, 0, 26, 0.6);
+  border-radius: 10px;
+`;
+
+export const ButtonGroup = styled.div`
+  display: flex;
+  gap: 1rem;
+`;
+
+export const ItemIdContainer = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  color: #f5deb3;
+`;
+
+// Keep the original ButtonContainer
+export const ButtonContainer = styled.div`
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1rem;
+`;
+
+export const StatusContainer = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 20px;
+  padding: 12px 20px;
+  background: rgba(13, 0, 26, 0.6);
+  border-radius: 10px;
+  color: #f5deb3;
+  font-size: 0.9em;
+`;
+
+export const StatusGroup = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  & > label {
+    color: rgba(245, 222, 179, 0.7);
+    font-size: 0.9em;
+  }
+
+  & > div {
+    color: #f5deb3;
+  }
 `;
