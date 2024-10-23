@@ -44,16 +44,56 @@ import {
   ModalButton,
   MainContentArea,
   ButtonContainer,
+  WarningModalButton,
+  AnimatedText,
 } from './components/compStyles.js';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import RawAnalysisSummary from './components/compRawAnalysis.js';
+import AnalysisDetails from './components/compDetails.js';
 
 export const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001';
 
 // const loadItemData = itemId => {
 //   return loadLocalData(itemId);
 // };
+
+// Keep this version at the top level of the file, before the NewItemPage component
+const AnalysisWarningModal = ({ onConfirm, onCancel }) => {
+  return (
+    <ModalOverlay>
+      <ModalContent>
+        <h2>
+          <i className="fas fa-exclamation-triangle" style={{ color: '#ffd700' }}></i> Hold Up,
+          Treasure Hunter!
+        </h2>
+        <AnimatedText delay="0.2s">
+          <i className="fas fa-magic"></i>
+          You haven't added any details to help Moola-Matic understand your find. A few extra
+          details can help our AI treasure expert give you even better insights about your item's
+          potential value!
+        </AnimatedText>
+        <AnimatedText delay="0.4s">
+          <i className="fas fa-question-circle"></i>
+          Want to proceed without adding any extra details?
+        </AnimatedText>
+        <ButtonContainer>
+          <WarningModalButton onClick={onConfirm}>
+            <i className="fas fa-check"></i> Yes, let's analyze!
+          </WarningModalButton>
+          <WarningModalButton onClick={onCancel}>
+            <i className="fas fa-pen"></i> No, I'll add details
+          </WarningModalButton>
+        </ButtonContainer>
+      </ModalContent>
+    </ModalOverlay>
+  );
+};
+
+AnalysisWarningModal.propTypes = {
+  onConfirm: PropTypes.func.isRequired,
+  onCancel: PropTypes.func.isRequired,
+};
 
 function NewItemPage({ onItemSaved }) {
   // Remove the console.log at the start of the function
@@ -616,10 +656,21 @@ function NewItemPage({ onItemSaved }) {
     intermediateResults: [],
   });
 
+  // Add this state to track if the analysis warning modal should be shown
+  const [showAnalysisWarning, setShowAnalysisWarning] = useState(false);
+
+  // Add this state to track the analysis details
+  const [analysisDetails, setAnalysisDetails] = useState('');
+
   // Modify handleAnalyzeImagesWrapper function
   const handleAnalyzeImagesWrapper = async () => {
     if (uploadedImages.length === 0) {
-      toast.error('Please upload images before analyzing.');
+      toast.error('Please upload at least one image before analyzing.');
+      return;
+    }
+
+    if (!analysisDetails.trim()) {
+      setShowAnalysisWarning(true);
       return;
     }
 
@@ -646,6 +697,7 @@ function NewItemPage({ onItemSaved }) {
           currentImageName: uploadedImages[0].filename,
           intermediateResults: [],
         },
+        analysisDetails: analysisDetails, // Include the analysis details
       };
       await handleLocalSave(updatedItem, contextData, messages, itemId);
       await axios.put(`${API_BASE_URL}/api/items/${itemId}`, updatedItem);
@@ -656,6 +708,7 @@ function NewItemPage({ onItemSaved }) {
         itemId: itemId,
         sellerNotes: item.sellerNotes || '',
         context: contextData,
+        analysisDetails: analysisDetails, // Include the analysis details
         onProgress: async (completedImages, currentImage, intermediateResult) => {
           const newProgress = {
             totalImages: uploadedImages.length,
@@ -806,6 +859,24 @@ function NewItemPage({ onItemSaved }) {
     // console.log('Camera clicked');
   };
 
+  // Add these handlers for the warning modal
+  const handleAnalysisWarningConfirm = () => {
+    setShowAnalysisWarning(false);
+    // Continue with analysis even without details
+    handleAnalyzeImages({
+      imageUrls: uploadedImages.map(img => img.url),
+      description: item.description || '',
+      itemId: itemId,
+      sellerNotes: item.sellerNotes || '',
+      context: contextData,
+      analysisDetails: '',
+    });
+  };
+
+  const handleAnalysisWarningCancel = () => {
+    setShowAnalysisWarning(false);
+  };
+
   // Render a loading state if item is not yet loaded
   if (isLoading) {
     return <div>Loading...</div>;
@@ -917,6 +988,22 @@ function NewItemPage({ onItemSaved }) {
             onDelete={handleDeleteImageWrapper}
             itemId={itemId}
           />
+
+          {/* Only render AnalysisDetails if there are uploaded images */}
+          {uploadedImages.length > 0 && (
+            <>
+              <AnalysisDetails
+                analysisDetails={analysisDetails}
+                setAnalysisDetails={setAnalysisDetails}
+              />
+              {showAnalysisWarning && (
+                <AnalysisWarningModal
+                  onConfirm={handleAnalysisWarningConfirm}
+                  onCancel={handleAnalysisWarningCancel}
+                />
+              )}
+            </>
+          )}
 
           {/* Image Selection Modal */}
           {showImageModal && (

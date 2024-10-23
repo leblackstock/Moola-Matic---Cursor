@@ -619,18 +619,43 @@ export const ModalOverlay = styled.div`
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(0, 0, 0, 0.7);
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1000;
+  z-index: 9999;
 `;
 
 export const ModalContent = styled.div`
-  background: rgba(13, 0, 26, 0.9);
-  padding: 20px;
-  border-radius: 10px;
-  box-shadow: 0 0 20px rgba(138, 43, 226, 0.5);
+  background: rgba(13, 0, 26, 0.95);
+  padding: 2rem;
+  border-radius: 8px;
+  max-width: 500px;
+  width: 90%;
+  z-index: 10000;
+  border: 1px solid #4a0e4e;
+  box-shadow: 0 0 20px rgba(138, 43, 226, 0.3);
+  color: #f5deb3;
+`;
+
+export const WarningModalButton = styled.button`
+  background: linear-gradient(45deg, #2d0037, #4a0e4e);
+  color: #f5deb3;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  margin: 0 10px;
+  transition: all 0.3s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 15px rgba(138, 43, 226, 0.5);
+  }
+
+  i {
+    margin-right: 8px;
+  }
 `;
 
 // Chat Components
@@ -1074,7 +1099,7 @@ export const WarningBoxButtons = styled.div`
   margin-top: 20px;
 `;
 
-export const WarningButton = styled(ModalButton)`
+export const WarningButton = styled(WarningModalButton)`
   &.proceed {
     &:hover {
       box-shadow: 0 0 15px rgba(255, 0, 0, 0.7); // Red glow
