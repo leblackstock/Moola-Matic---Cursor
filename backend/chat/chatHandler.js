@@ -69,15 +69,26 @@ router.use(express.json({ limit: '20mb' }));
  */
 router.post('/analyze-images', async (req, res) => {
   try {
-    const { imageUrls, description, itemId, sellerNotes, context } = req.body;
+    const { imageUrls, description, itemId, sellerNotes, context, analysisDetails } = req.body;
 
     if (!imageUrls || !Array.isArray(imageUrls) || imageUrls.length === 0) {
       logger.warn('No valid image URLs provided');
       return res.status(400).json({ error: 'No valid image URLs provided' });
     }
 
-    const analysisPrompt = generateAnalysisPrompt(description, itemId, sellerNotes, context);
-    const combineAndSummarizeAnalysisPrompt = generateCombineAndSummarizeAnalysisPrompt();
+    // Ensure analysisDetails is a string
+    const cleanAnalysisDetails = (analysisDetails || '').trim();
+
+    // Include analysisDetails in the prompts
+    const analysisPrompt = generateAnalysisPrompt(
+      description,
+      itemId,
+      sellerNotes,
+      context,
+      cleanAnalysisDetails // Add this parameter
+    );
+    const combineAndSummarizeAnalysisPrompt =
+      generateCombineAndSummarizeAnalysisPrompt(cleanAnalysisDetails);
 
     const processedImages = await processImages(imageUrls);
 
@@ -138,25 +149,50 @@ router.post('/analyze-images', async (req, res) => {
     // Extract rawAnalysis from the first valid analysis (assuming it's the same for all)
     const rawAnalysis = validAnalyses[0]?.rawAnalysis || null;
 
-    // Update DraftItem with the analysis results, excluding rawAnalysis
+    // Update DraftItem with the analysis results and details
     await DraftItem.findOneAndUpdate(
       { itemId: itemId },
       {
         $set: {
-          analysisResults: combinedAnalysis,
-          analysisSummary: parsedSummary,
-          // rawAnalysis field removed from here
+          // Main analysis results containing summary and its components
+          analysisResults: {
+            summary: parsedSummary,
+            detailedBreakdown: parsedSummary.detailedBreakdown || '',
+            sampleForSaleListing: parsedSummary.sampleForSaleListing || '',
+          },
+          // Store raw and combined analysis separately
+          technicalAnalysis: {
+            raw: rawAnalysis,
+            combined: combinedAnalysis,
+          },
+          analysisDetails: cleanAnalysisDetails,
+          // Clear progress after completion
+          analysisProgress: null,
+          isAnalyzing: false,
         },
       },
       { new: true, upsert: true }
     );
 
+    // Log the update for debugging
+    logger.info('Updating DraftItem with analysis results:', {
+      itemId,
+      hasResults: Boolean(parsedSummary),
+      resultFields: Object.keys(parsedSummary || {}),
+    });
+
     console.log(`DraftItem updated with analysis summary for itemId: ${itemId}`);
 
     res.json({
-      combinedAnalysis,
-      summary: parsedSummary,
-      rawAnalysis, // Still include rawAnalysis in the response
+      analysisResults: {
+        summary: parsedSummary,
+        detailedBreakdown: parsedSummary.detailedBreakdown || '',
+        sampleForSaleListing: parsedSummary.sampleForSaleListing || '',
+      },
+      technicalAnalysis: {
+        raw: rawAnalysis,
+        combined: combinedAnalysis,
+      },
     });
   } catch (error) {
     logger.error('Error in /analyze-images:', { error });

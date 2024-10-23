@@ -17,15 +17,40 @@
  * @param {Object} [contextData] - Optional contextual data.
  * @returns {Promise<Object>} - The assistant's JSON response mapped to DraftItem structure.
  */
-export const generateAnalysisPrompt = (description, itemId, sellerNotes) => `
+export const generateAnalysisPrompt = (
+  description,
+  itemId,
+  sellerNotes,
+  context,
+  analysisDetails
+) => {
+  // Combine the context instructions with any provided analysis details
+  const combinedAnalysisDetails = `
+# Context Reliability Instructions
+Use the provided context to help identify and analyze images, treating it as highly reliable. Report any strong discrepancies between the provided context and the analysis in a detailed breakdown, focusing on the most relevant conflicts.
+
+- Use the given context to assist in the analysis of the images.
+- Treat the context as highly likely to be correct.
+- If the analysis reveals strong conflicts with the context:
+  - Provide a detailed breakdown of these discrepancies.
+  - Highlight the most relevant conflicts.
+
+# Seller's Analysis Details
+${analysisDetails || 'No additional details provided.'}
+`.trim();
+
+  return `
 Analyze the provided images to fill out the specified JSON structure with detailed information.
+
+# Additional Context
+${combinedAnalysisDetails}
 
 # Steps
 
 1. Review each image carefully to gather details about the item.
 2. For each attribute in the JSON structure, assess all images to determine the appropriate value.
 3. If an attribute cannot be determined or is not applicable, assign it a value of \`null\`.
-4. Use additional information such as the description, item ID, and seller notes if provided, to assist in filling out the JSON.
+4. Use additional information such as the description, item ID, seller notes, and analysis details if provided, to assist in filling out the JSON.
 
 # Output Format
 
@@ -125,6 +150,7 @@ Additional Information:
 Description: ${description || 'N/A'}
 Item ID: ${itemId || 'N/A'}
 Seller Notes: ${sellerNotes || 'N/A'}
+Context: ${context ? JSON.stringify(context) : 'N/A'}
 
 For the "sampleForSaleListing" field, use the following prompt to generate a sample eBay listing:
 
@@ -132,10 +158,20 @@ ${listingPrompt}
 
 Ensure that the generated listing adheres to the requirements specified in the prompt and fits within the 1500 character limit.
 `;
+};
 
-export const generateCombineAndSummarizeAnalysisPrompt = () => `
+export const generateCombineAndSummarizeAnalysisPrompt = analysisDetails => `
 Combine and summarize the provided analysis results into a single, comprehensive JSON structure.
 
+# Additional Context
+${
+  analysisDetails
+    ? `Seller's Analysis Details:
+${analysisDetails}
+
+`
+    : ''
+}
 # Steps
 
 1. Review all provided analysis results carefully.
@@ -240,7 +276,11 @@ Provide the output strictly in the following JSON format, ensuring each field is
 
 # Important Notes
 
-1. The "detailedBreakdown" field should be a comprehensive summary that incorporates all additional notes from the individual analyses. This should include any observations, insights, or details that didn't fit into the other structured fields.
+1. The "detailedBreakdown" field should be a comprehensive summary that incorporates:
+   - All additional notes from the individual analyses
+   - The seller's provided analysis details
+   - Any observations, insights, or details that didn't fit into the other structured fields
+   - Any discrepancies between the provided context and the analysis results
 
 2. Based on all available information, identify the specific item as accurately as possible. Once identified:
    a) Add relevant details about this item to the appropriate fields in the JSON structure, including information that may not be directly observable in the images.
@@ -264,7 +304,14 @@ Provide the output strictly in the following JSON format, ensuring each field is
 
 7. The final output should represent a complete and nuanced understanding of the item, synthesizing all available information from the multiple analyses and additional research. Clearly differentiate between confirmed facts and inferred or added details.
 
-8. For the "sampleForSaleListing" field, use the following prompt to generate a sample eBay listing:
+8. Consider the seller's analysis details when evaluating:
+   - Condition assessment
+   - Value estimation
+   - Market analysis
+   - Authentication markers
+   - Any specific details mentioned by the seller
+
+9. For the "sampleForSaleListing" field, use the following prompt to generate a sample eBay listing:
 
 ${listingPrompt}
 

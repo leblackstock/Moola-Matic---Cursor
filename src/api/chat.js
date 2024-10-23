@@ -75,37 +75,24 @@ export const handleChatWithAssistant = async (message, itemId) => {
   }
 };
 
-// Add this function to chat.js
-export const handleAnalyzeImages = async ({ itemId, contextData, setItem, setMessages }) => {
-  console.log('handleAnalyzeImages called with:', { itemId, contextData });
+// Update the function signature to match how it's being called
+export const handleAnalyzeImages = async (images, itemData, onProgressUpdate) => {
+  console.log('handleAnalyzeImages called with:', { images, itemData });
 
-  if (!itemId) {
+  if (!itemData?.itemId) {
     console.error('No itemId provided for image analysis');
     toast.error('Error: No item ID provided for analysis.');
     return;
   }
 
   try {
-    // Step 1: Fetch the item and its image URLs from the database
-    const response = await axios.get(`${API_URL}/items/${itemId}`);
-    const item = response.data;
-
-    if (!item || !item.images || item.images.length === 0) {
-      toast.warning('No images found for this item.');
-      return;
-    }
-
-    console.log('Fetched item:', item);
-
-    // Step 2: Process the image URLs
-    const baseUrl = `http://localhost:${process.env.REACT_APP_BACKEND_PORT}`;
-    const imageUrls = item.images
+    // Process the images array
+    const imageUrls = images
       .map(image => {
         if (image.url) {
-          return image.url.startsWith('http') ? image.url : `${baseUrl}${image.url}`;
+          return image.url.startsWith('http') ? image.url : `${API_BASE_URL}${image.url}`;
         } else if (image.filename) {
-          // Construct the URL based on the provided path structure
-          return `${baseUrl}/uploads/drafts/${itemId}/${image.filename}`;
+          return `${API_BASE_URL}/uploads/drafts/${itemData.itemId}/${image.filename}`;
         }
         console.error('No URL or filename for image:', image);
         return null;
@@ -119,40 +106,22 @@ export const handleAnalyzeImages = async ({ itemId, contextData, setItem, setMes
       return;
     }
 
-    // Step 3: Send the image URLs for analysis
+    // Send the analysis request
     const analysisResponse = await axios.post(`${API_URL}/analyze-images`, {
       imageUrls,
-      description: item.description || '',
-      itemId,
-      sellerNotes: item.sellerNotes || '',
-      context: contextData,
+      itemId: itemData.itemId,
+      description: itemData.description || '',
+      sellerNotes: itemData.sellerNotes || '',
+      contextData: itemData.contextData || {},
+      analysisDetails: itemData.analysisDetails || '',
     });
 
-    const { analyses, summary, metadata } = analysisResponse.data;
-
-    console.log('Received analysis results:', { analyses, summary, metadata });
-
-    // Update item state if setItem function is provided
-    if (typeof setItem === 'function') {
-      setItem(prevItem => ({
-        ...prevItem,
-        analysisResult: { analyses, summary, metadata },
-      }));
+    // Call progress callback if provided
+    if (onProgressUpdate) {
+      onProgressUpdate(imageUrls.length, '', analysisResponse.data);
     }
 
-    // Update messages if setMessages function is provided
-    if (typeof setMessages === 'function') {
-      setMessages(prevMessages => [
-        ...prevMessages,
-        createAssistantMessage(
-          `Analysis complete. ${summary.finalRecommendation?.detailedBreakdown || 'No detailed breakdown available.'}`
-        ),
-      ]);
-    }
-
-    toast.success('Image analysis complete. Form fields have been updated.');
-
-    return { analyses, summary, metadata };
+    return analysisResponse.data;
   } catch (error) {
     console.error('Error in handleAnalyzeImages:', error);
     toast.error('An error occurred while analyzing the images. Please try again.');

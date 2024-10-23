@@ -5,11 +5,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 import treasureSpecs from './Images/Treasure_Specs01.jpeg';
-import {
-  // handleChatWithAssistant,
-  // createUserMessage,
-  handleAnalyzeImages, // Add this line
-} from './api/chat.js';
+import { handleAnalyzeImages } from './api/chat.js';
 import axios from 'axios';
 import { UploadedImagesGallery } from './components/compGallery.js';
 import PropTypes from 'prop-types';
@@ -19,15 +15,10 @@ import FormFields from './components/compFormFields.js';
 import {
   handleLocalSave,
   loadLocalData,
-  // handleFileUpload,
   handleManualSave,
   useAutosave,
 } from './components/compSave.js';
-import {
-  handleFileChange,
-  // handleImageDeletion,
-  handleImageDelete, // Add this line
-} from './components/compUpload.js';
+import { handleFileChange, handleImageDelete } from './components/compUpload.js';
 
 // Import all styled components
 import {
@@ -54,11 +45,7 @@ import AnalysisDetails from './components/compDetails.js';
 
 export const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001';
 
-// const loadItemData = itemId => {
-//   return loadLocalData(itemId);
-// };
-
-// Keep this version at the top level of the file, before the NewItemPage component
+// Modal Component for Analysis Warning
 const AnalysisWarningModal = ({ onConfirm, onCancel }) => {
   return (
     <ModalOverlay>
@@ -96,18 +83,12 @@ AnalysisWarningModal.propTypes = {
 };
 
 function NewItemPage({ onItemSaved }) {
-  // Remove the console.log at the start of the function
-
   const { itemId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Add a state variable for item
-  const [item, setItem] = useState(null);
-
   // State declarations
-  // const [name, setName] = useState('');
-  // const [description, setDescription] = useState('');
+  const [item, setItem] = useState(null);
   const [contextData, setContextData] = useState({});
   const [messages, setMessages] = useState([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -115,27 +96,23 @@ function NewItemPage({ onItemSaved }) {
   const backendPort = process.env.REACT_APP_BACKEND_PORT || 3001;
   const [isLoading, setIsLoading] = useState(true);
   const [imageUploaded, setImageUploaded] = useState(false);
-  // const [imagePreview, setImagePreview] = useState('');
   const [uploadedImages, setUploadedImages] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
   const [showImageModal, setShowImageModal] = useState(false);
-  // const [isSubmitting, setIsSubmitting] = useState(false);
-  // const [message, setMessage] = useState('');
-  // const [imageFile, setImageFile] = useState(null);
-  // const [imageInput, setImageInput] = useState('');
-  // const [imageAnalysis, setImageAnalysis] = useState(null);
-  // const [imageAnalyzed, setImageAnalyzed] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  // const [galleryKey, setGalleryKey] = useState(0);
+  const [analysisPerformed, setAnalysisPerformed] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState({
+    totalImages: 0,
+    completedImages: 0,
+    currentImageName: '',
+    intermediateResults: [],
+  });
+  const [showAnalysisWarning, setShowAnalysisWarning] = useState(false);
+  const [analysisDetails, setAnalysisDetails] = useState('');
   const [analysisTimeLeft, setAnalysisTimeLeft] = useState(0);
 
   const fileInputRef = useRef(null);
-  // const cameraInputRef = useRef(null);
-  // const messagesContainerRef = useRef(null);
-
   const [isUploading, setIsUploading] = useState(false);
-
-  // Add a ref to track if this is an autosave update
   const isAutosaveUpdate = useRef(false);
 
   // Use the autosave hook with a 10-second interval
@@ -150,9 +127,7 @@ function NewItemPage({ onItemSaved }) {
 
   // Effect for autosave
   useEffect(() => {
-    // console.log('Autosave effect triggered');
     if (item && itemId) {
-      // console.log('Preparing autosave data');
       const autosaveData = {
         ...item,
         images: uploadedImages,
@@ -163,13 +138,11 @@ function NewItemPage({ onItemSaved }) {
     }
   }, [item, itemId, uploadedImages, messages, contextData, updateAutosaveData]);
 
-  // Memoize complex objects or functions
-  // const memoizedContextData = useMemo(() => contextData, [contextData]);
+  // Memoize messages
   const memoizedMessages = useMemo(() => messages, [messages]);
 
-  // Use useCallback for functions passed as props
+  // Memoize updateItem function
   const memoizedUpdateItem = useCallback((field, value) => {
-    // console.log('updateItem called', field, value);
     setItem(prevItem => {
       const newItem = { ...prevItem };
       if (typeof field === 'string') {
@@ -196,10 +169,10 @@ function NewItemPage({ onItemSaved }) {
   // useEffect Hook: Load or Create Item
   // ---------------------------------
   useEffect(() => {
-    // console.log('Load or Create Item effect triggered');
     const loadData = async () => {
       if (!itemId || !location.pathname.includes(`/new-item/${itemId}`)) {
         console.error('No valid itemId in URL');
+        toast.error('Error: Missing item ID');
         navigate('/');
         return;
       }
@@ -210,7 +183,6 @@ function NewItemPage({ onItemSaved }) {
         if (localData) {
           // Load local data first
           setItem(localData);
-          // Remove this line: onItemSaved(localData.itemId);
           setUploadedImages(Array.isArray(localData.images) ? localData.images : []);
           setContextData(localData.contextData || {});
           setMessages(localData.messages || []);
@@ -272,17 +244,20 @@ function NewItemPage({ onItemSaved }) {
               handleLocalSave(dbItem, dbItem.contextData, dbItem.messages, itemId);
             } else {
               console.error('No data found for itemId:', itemId);
+              toast.error('Error: No data found for this item.');
               navigate('/');
               return;
             }
           } catch (dbError) {
             console.error('Error fetching item from database:', dbError);
+            toast.error('Error fetching item from database.');
             navigate('/');
             return;
           }
         }
       } catch (error) {
         console.error('Error loading data:', error);
+        toast.error('Error loading data.');
         navigate('/');
         return;
       } finally {
@@ -293,48 +268,22 @@ function NewItemPage({ onItemSaved }) {
     loadData();
   }, [itemId, navigate, onItemSaved, location.pathname]);
 
-  // Update item in parent component when local item changes
+  // Effect to update parent component when local item changes
   useEffect(() => {
-    // console.log('Update parent item effect triggered');
     if (item && !isAutosaveUpdate.current) {
-      // console.log('Updating parent item');
       onItemSaved(item.itemId);
     }
     isAutosaveUpdate.current = false;
   }, [item, onItemSaved]);
 
-  // Log item changes
+  // Effect to save to localStorage
   useEffect(() => {
-    // console.log('Item changed:', item);
-  }, [item]);
-
-  // // Optimize the loadDraft function
-  // const loadDraft = draftData => {
-  //   if (draftData) {
-  //     const uniqueImages = [...new Map(draftData.images.map(img => [img.filename, img])).values()];
-  //     const updatedDraftData = {
-  //       ...draftData,
-  //       images: uniqueImages,
-  //     };
-  //     setItem(updatedDraftData);
-  //     setUploadedImages(uniqueImages);
-  //   }
-  // };
-
-  // ----------------------------
-  // useEffect Hook: Save to localStorage
-  // ----------------------------
-  useEffect(() => {
-    // console.log('Save to localStorage effect triggered');
     if (item && itemId) {
-      // console.log('Saving to localStorage');
       handleLocalSave(item, contextData, messages, itemId);
     }
   }, [item, contextData, messages, itemId]);
 
-  // ----------------------------
-  // useEffect Hook: Clear localStorage on unmount
-  // ----------------------------
+  // Effect to clear localStorage on unmount
   useEffect(() => {
     return () => {
       if (item && itemId) {
@@ -343,131 +292,22 @@ function NewItemPage({ onItemSaved }) {
     };
   }, [item, contextData, messages, itemId]);
 
-  // ----------------------------
-  // useEffect Hook: Set Selected Image if Needed
-  // ----------------------------
+  // Effect to set selected image
   useEffect(() => {
-    // console.log('Set Selected Image effect triggered');
     if (uploadedImages.length > 0 && !selectedImage) {
-      // console.log('Setting selected image');
       setSelectedImage(uploadedImages[uploadedImages.length - 1]);
     }
   }, [uploadedImages, selectedImage]);
 
-  // Log uploaded images changes
-  useEffect(() => {
-    // console.log('uploadedImages state updated:', uploadedImages);
-  }, [uploadedImages]);
-
-  // Event handlers with added logging
+  // Handle form submission
   const handleSubmit = async e => {
-    // console.log('handleSubmit called');
     e.preventDefault();
-    // console.log('Submitting item:', item);
-    // Add your submission logic here
+    // Implement your submission logic here
+    // For example, validate and send data to the server
   };
 
-  // Handle sending messages
-  // const sendMessage = async () => {
-  //   const generalInput = message.trim();
-  //   const imageSpecificInput = imageInput.trim();
-
-  //   if (!generalInput && !imageSpecificInput && !imageFile) return;
-
-  //   setMessage('');
-  //   setImageInput('');
-  //   setIsLoading(true);
-
-  //   try {
-  //     let response;
-
-  //     if (imageFile) {
-  //       // Handle image-based messages
-  //       const messageToSend = imageAnalyzed
-  //         ? imageSpecificInput
-  //         : imageAnalysisPrompt;
-  //       const result = await analyzeImageWithGPT4Turbo(
-  //         imageFile,
-  //         messageToSend,
-  //         item.itemId
-  //       );
-  //       response = {
-  //         content: result.assistantResponse,
-  //         status: 'completed',
-  //         contextData: result.contextData,
-  //       };
-
-  //       if (!imageAnalyzed) {
-  //         setImageAnalyzed(true);
-  //       }
-  //     } else {
-  //       // Handle text-only messages
-  //       response = await handleChatWithAssistant(
-  //         [...messages, { role: 'user', content: generalInput }],
-  //         item.itemId
-  //       );
-  //     }
-
-  //     console.log('Assistant response:', response);
-
-  //     // Update the UI with the new message and response
-  //     setMessages((prevMessages) => {
-  //       const newMessages = [
-  //         ...prevMessages,
-  //         {
-  //           role: 'user',
-  //           content: imageFile ? imageSpecificInput : generalInput,
-  //         },
-  //         {
-  //           role: 'assistant',
-  //           content: response.content,
-  //           source: 'moola-matic',
-  //           status: response.status,
-  //         },
-  //       ];
-  //       return newMessages;
-  //     });
-
-  //     // Update contextData
-  //     const updatedContextData = updateContextData(item.itemId, {
-  //       lastAssistantResponse: response.content,
-  //       lastUserMessage: imageFile ? imageSpecificInput : generalInput,
-  //       // ... any other context updates
-  //     });
-  //     setContextData(updatedContextData);
-  //   } catch (error) {
-  //     console.error('Error interacting with Moola-Matic assistant:', error);
-  //     setMessages((prevMessages) => [
-  //       ...prevMessages,
-  //       {
-  //         role: 'assistant',
-  //         content:
-  //           'I apologize, but I encountered an error while processing your request. Please try again or contact support if the issue persists.',
-  //       },
-  //     ]);
-  //   } finally {
-  //     setIsLoading(false);
-  //   }
-  // };
-
-  // New function to fetch the latest item data from the server
-  // const fetchLatestItemData = async () => {
-  //   try {
-  //     const response = await axios.get(`${API_BASE_URL}/api/items/${itemId}`);
-  //     const serverItem = response.data;
-  //     console.log('Fetched item data:', serverItem);
-  //     setItem(serverItem);
-  //     setCurrentItemId(serverItem.itemId);
-  //     setUploadedImages(Array.isArray(serverItem.images) ? serverItem.images : []);
-  //     handleLocalSave(serverItem, serverItem.contextData, serverItem.messages, itemId);
-  //     setGalleryKey(prevKey => prevKey + 1);
-  //   } catch (error) {
-  //     console.error('Error fetching latest item data:', error);
-  //   }
-  // };
-
+  // Handle file change (image uploads)
   const handleFileChangeWrapper = async event => {
-    // console.log('handleFileChangeWrapper called');
     setIsUploading(true);
     try {
       const result = await handleFileChange(
@@ -505,90 +345,14 @@ function NewItemPage({ onItemSaved }) {
     }
   };
 
-  // Send Image Message
-  // const sendImageMessage = async () => {
-  //   if (!imageFile || !imageInput.trim()) return;
-
-  //   const newMessage = {
-  //     content: imageInput.trim(),
-  //     role: 'user',
-  //     image: imagePreview,
-  //   };
-
-  //   setMessages((prevMessages) => [...prevMessages, newMessage]);
-  //   setIsLoading(true);
-
-  //   try {
-  //     const assistantResponse = await analyzeImageWithGPT4Turbo(
-  //       imageFile,
-  //       imageInput.trim(),
-  //       false
-  //     );
-
-  //     setMessages((prevMessages) => [
-  //       ...prevMessages,
-  //       { role: 'user', content: imageInput.trim(), image: imagePreview },
-  //       { role: 'assistant', content: assistantResponse },
-  //     ]);
-  //   } catch (error) {
-  //     console.error('Error in sendImageMessage:', error);
-  //     setMessages((prevMessages) => [
-  //       ...prevMessages,
-  //       {
-  //         role: 'assistant',
-  //         content: 'Sorry, an error occurred. Please try again.',
-  //       },
-  //     ]);
-  //   } finally {
-  //     setIsLoading(false);
-  //     setImageFile(null);
-  //     setImagePreview('');
-  //     setImageInput('');
-  //   }
-  // };
-
-  // Remove or comment out the existing handleImageSelect function
-  /*
-  const handleImageSelect = async (event) => {
-    const files = Array.from(event.target.files);
-    setSelectedFiles(files);
-
-    for (const file of files) {
-      try {
-        const uploadedImage = await handleFileUpload(file, item.itemId);
-        setUploadedImages((prevImages) => [...prevImages, uploadedImage]);
-        setItem((prevItem) => ({
-          ...prevItem,
-          images: [...(prevItem.images || []), uploadedImage],
-        }));
-      } catch (error) {
-        console.error('Error uploading image:', error);
-        alert(`Error uploading image: ${error.message}`);
-      }
-    }
-  };
-  */
-
-  // Replace it with this simplified version that uses the existing handleFileChange function
-  // const handleImageSelect = event => {
-  //   // console.log('handleImageSelect called');
-  //   // console.log('Selected files:', event.target.files);
-  //   handleFileChangeWrapper(event);
-  // };
-
+  // Handle image button click to trigger file input
   const handleImageButtonClick = () => {
-    // console.log('handleImageButtonClick called');
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
   };
 
-  // const handleCameraButtonClick = () => {
-  //   if (cameraInputRef.current) {
-  //     cameraInputRef.current.click();
-  //   }
-  // };
-
+  // Handle media click from modal
   const handleMediaClick = () => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
@@ -596,6 +360,7 @@ function NewItemPage({ onItemSaved }) {
     setShowImageModal(false);
   };
 
+  // Handle starting and ending loading states
   const handleStartLoading = () => {
     setIsLoading(true);
   };
@@ -604,14 +369,13 @@ function NewItemPage({ onItemSaved }) {
     setIsLoading(false);
   };
 
+  // Handle image deletion
   const handleDeleteImageWrapper = imageToDelete => {
-    // console.log('handleDeleteImageWrapper called', imageToDelete);
     handleImageDelete(imageToDelete, itemId, setUploadedImages, setItem);
   };
 
-  // Update the updateItem function to handle nested properties safely
+  // Update item with nested properties
   const updateItem = (field, value) => {
-    // console.log('updateItem called', field, value);
     setItem(prevItem => {
       const newItem = { ...prevItem };
       if (typeof field === 'string') {
@@ -625,10 +389,8 @@ function NewItemPage({ onItemSaved }) {
         }
         current[fields[fields.length - 1]] = value;
       } else if (typeof field === 'object') {
-        // If field is an object, assume it's a full item update
         return { ...newItem, ...field };
       } else {
-        // For simple key updates
         newItem[field] = value;
       }
       return newItem;
@@ -636,33 +398,15 @@ function NewItemPage({ onItemSaved }) {
     setHasUnsavedChanges(true);
   };
 
-  // Update handlePurchaseRecommendationChange to use the updateItem function
+  // Handle purchase recommendation change
   const handlePurchaseRecommendationChange = value => {
-    // console.log('handlePurchaseRecommendationChange called', value);
     updateItem(
       'finalRecommendation.purchaseRecommendation',
       value === 'true' ? true : value === 'false' ? false : null
     );
   };
 
-  // Add this state to track if an analysis has been performed
-  const [analysisPerformed, setAnalysisPerformed] = useState(false);
-
-  // Add new state for analysis progress
-  const [analysisProgress, setAnalysisProgress] = useState({
-    totalImages: 0,
-    completedImages: 0,
-    currentImageName: '',
-    intermediateResults: [],
-  });
-
-  // Add this state to track if the analysis warning modal should be shown
-  const [showAnalysisWarning, setShowAnalysisWarning] = useState(false);
-
-  // Add this state to track the analysis details
-  const [analysisDetails, setAnalysisDetails] = useState('');
-
-  // Modify handleAnalyzeImagesWrapper function
+  // Handle analyze images
   const handleAnalyzeImagesWrapper = async () => {
     if (uploadedImages.length === 0) {
       toast.error('Please upload at least one image before analyzing.');
@@ -770,7 +514,7 @@ function NewItemPage({ onItemSaved }) {
     }
   };
 
-  // Add effect to check for ongoing analysis on mount
+  // Effect to check for ongoing analysis on mount
   useEffect(() => {
     const checkOngoingAnalysis = async () => {
       if (item?.isAnalyzing && item?.analysisProgress) {
@@ -789,8 +533,9 @@ function NewItemPage({ onItemSaved }) {
     };
 
     checkOngoingAnalysis();
-  }, [item?.isAnalyzing]);
+  }, [item?.isAnalyzing, item?.analysisProgress, uploadedImages]);
 
+  // Timer for analysis time left
   useEffect(() => {
     let timer;
     if (isAnalyzing && analysisTimeLeft > 0) {
@@ -801,32 +546,8 @@ function NewItemPage({ onItemSaved }) {
     return () => clearInterval(timer);
   }, [isAnalyzing, analysisTimeLeft]);
 
-  // const handleImageUpload = async event => {
-  //   const file = event.target.files[0];
-  //   if (file) {
-  //     try {
-  //       const { newImage } = await handleFileUpload(
-  //         file,
-  //         backendPort,
-  //         itemId, // Use itemId here instead of item
-  //         setUploadedImages
-  //       );
-
-  //       setItem(prevItem => ({
-  //         ...prevItem,
-  //         images: [...prevItem.images, newImage],
-  //       }));
-
-  //       setImageUploaded(true);
-  //       setHasUnsavedChanges(true);
-  //     } catch (error) {
-  //       console.error('Error uploading image:', error);
-  //     }
-  //   }
-  // };
-
+  // Handle Save Draft
   const handleSaveDraft = async () => {
-    // console.log('handleSaveDraft called');
     if (!item || !itemId) {
       console.error('No item to save or missing itemId');
       toast.error('Error: Unable to save draft');
@@ -834,7 +555,6 @@ function NewItemPage({ onItemSaved }) {
     }
 
     try {
-      // console.log('Saving draft:', item);
       await handleManualSave(
         item,
         uploadedImages,
@@ -845,7 +565,7 @@ function NewItemPage({ onItemSaved }) {
         setHasUnsavedChanges,
         setLastAutoSave
       );
-      onItemSaved(itemId); // Update this line
+      onItemSaved(itemId);
       toast.success('Draft saved successfully!');
     } catch (error) {
       console.error('Error saving draft:', error);
@@ -853,24 +573,21 @@ function NewItemPage({ onItemSaved }) {
     }
   };
 
-  // Add this function to your component
+  // Camera Click Handler (Placeholder)
   const handleCameraClick = () => {
     // Implement your camera click logic here
-    // console.log('Camera clicked');
+    toast.info('Camera functionality is not implemented yet.');
   };
 
-  // Add these handlers for the warning modal
-  const handleAnalysisWarningConfirm = () => {
+  // Handlers for Analysis Warning Modal
+  const handleAnalysisWarningConfirm = async () => {
     setShowAnalysisWarning(false);
     // Continue with analysis even without details
-    handleAnalyzeImages({
-      imageUrls: uploadedImages.map(img => img.url),
-      description: item.description || '',
-      itemId: itemId,
-      sellerNotes: item.sellerNotes || '',
-      context: contextData,
-      analysisDetails: '',
-    });
+    try {
+      await handleAnalyzeImagesWrapper();
+    } catch (error) {
+      console.error('Error after confirming analysis without details:', error);
+    }
   };
 
   const handleAnalysisWarningCancel = () => {
@@ -886,10 +603,6 @@ function NewItemPage({ onItemSaved }) {
     navigate('/');
     return null;
   }
-
-  // console.log('Current itemId:', itemId);
-
-  // Remove the console.log at the end of the function
 
   return (
     <PageContainer>
@@ -917,7 +630,6 @@ function NewItemPage({ onItemSaved }) {
             onEndLoading={handleEndLoading}
             imageUploaded={imageUploaded}
             setImageUploaded={setImageUploaded}
-            // imagePreview={imagePreview} // Remove or comment out this line
             selectedImage={selectedImage}
             setSelectedImage={setSelectedImage}
           />
@@ -981,7 +693,6 @@ function NewItemPage({ onItemSaved }) {
           )}
 
           <UploadedImagesGallery
-            // key={galleryKey}
             images={uploadedImages}
             onSelect={image => setSelectedImage(image)}
             selectedImage={selectedImage}
@@ -1032,12 +743,12 @@ function NewItemPage({ onItemSaved }) {
             disabled={isUploading}
           />
 
-          {/* New Save Draft button */}
+          {/* Save Draft Button */}
           <StyledButton onClick={handleSaveDraft}>Save Draft</StyledButton>
 
           {hasUnsavedChanges && <span>Unsaved changes</span>}
 
-          {/* Always render FormFields */}
+          {/* Form Fields */}
           <FormFields
             item={item}
             updateItem={memoizedUpdateItem}
@@ -1045,8 +756,8 @@ function NewItemPage({ onItemSaved }) {
             handleSaveDraft={handleSaveDraft}
             handlePurchaseRecommendationChange={handlePurchaseRecommendationChange}
             itemId={itemId}
-            analysisResult={item.analysisResults}
-            lastAutoSave={lastAutoSave} // Add this prop
+            analysisResult={analysisPerformed ? item?.analysisResults?.summary : null}
+            lastAutoSave={lastAutoSave}
           />
 
           {/* Render RawAnalysisSummary only if analysis is performed */}

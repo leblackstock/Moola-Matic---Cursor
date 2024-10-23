@@ -1737,7 +1737,7 @@ export const AnimatedText = styled.p`
   margin: 1em 0;
   opacity: 0;
   animation: ${fadeSlideIn} 0.8s ease-out forwards;
-  animation-delay: ${props => props.delay || '0s'};
+  animation-delay: ${props => props.$delay || '0s'};
 
   i {
     margin-right: 10px;

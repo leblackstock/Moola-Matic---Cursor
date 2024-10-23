@@ -97,7 +97,7 @@ const FormFields = React.memo(function FormFields({
       });
 
       // Handle specific fields that might need special processing
-      if (isValidValue(analysisResult.summary.purchaseRecommendation, 'purchaseRecommendation')) {
+      if (isValidValue(analysisResult.summary.purchaseRecommendation)) {
         updatedItem.purchaseRecommendation = analysisResult.summary.purchaseRecommendation;
         handlePurchaseRecommendationChange(analysisResult.summary.purchaseRecommendation);
         updatedFieldsSet.add('purchaseRecommendation');
@@ -150,11 +150,11 @@ const FormFields = React.memo(function FormFields({
       }
 
       const newItem = { ...item, [field]: formattedValue };
-      updateItem(itemId, newItem);
-      setUpdatedFields(new Set([...updatedFields, field]));
+      updateItem(newItem);
+      setUpdatedFields(prev => new Set([...prev, field]));
       debouncedSave(newItem);
     },
-    [item, itemId, updateItem, updatedFields, debouncedSave, formatDate]
+    [item, updateItem, debouncedSave]
   );
 
   // Memoize the renderField function
@@ -459,9 +459,9 @@ const FormFields = React.memo(function FormFields({
 
   const handleComplexField = (field, value) => {
     if (Array.isArray(value)) {
-      updateItem(itemId, { ...item, [field]: value.join(', ') });
+      updateItem({ ...item, [field]: value.join(', ') });
     } else if (typeof value === 'object' && value !== null) {
-      updateItem(itemId, { ...item, [field]: JSON.stringify(value) });
+      updateItem({ ...item, [field]: JSON.stringify(value) });
     }
   };
 
@@ -511,7 +511,7 @@ FormFields.propTypes = {
   handlePurchaseRecommendationChange: PropTypes.func.isRequired,
   itemId: PropTypes.string.isRequired,
   analysisResult: PropTypes.object,
-  lastAutoSave: PropTypes.instanceOf(Date), // Add this prop type
+  lastAutoSave: PropTypes.instanceOf(Date), // Ensure this is a Date object
 };
 
 export default FormFields;

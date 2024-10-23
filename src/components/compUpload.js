@@ -8,16 +8,12 @@ import { processMultipleImages } from '../helpers/resizeImage.js';
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 console.log('API_BASE_URL:', API_BASE_URL);
 
-// Updated handleFileUpload function
-const handleFileUpload = async (files, itemId) => {
-  console.log(`Starting upload for ${files.length} files, itemId: ${itemId}`);
-  const formData = new FormData();
-  files.forEach(file => formData.append('images', file));
-  formData.append('itemId', itemId);
-
+/**
+ * Attempts to upload files to the server
+ */
+const attemptUpload = async formData => {
   try {
-    console.log(`Sending POST request to: ${API_BASE_URL}/api/items/draft-images/upload`);
-    const response = await axios.post(`${API_BASE_URL}/api/items/draft-images/upload`, formData, {
+    return await axios.post(`${API_BASE_URL}/api/items/draft-images/upload`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -27,15 +23,6 @@ const handleFileUpload = async (files, itemId) => {
       },
       timeout: 60000, // 60 seconds timeout for multiple files
     });
-
-    console.log(`Upload response:`, response);
-
-    if (response.status === 200) {
-      console.log(`Files uploaded successfully:`, response.data);
-      return response.data;
-    } else {
-      throw new Error(`Unexpected response status: ${response.status}`);
-    }
   } catch (error) {
     console.error(`Error uploading files:`, error);
     if (error.response) {
@@ -49,23 +36,9 @@ const handleFileUpload = async (files, itemId) => {
   }
 };
 
-// New function to check if a file already exists
-// const checkFileExists = async (itemId, filename) => {
-//   console.log('checkFileExists called with:', { itemId, filename });
-//   try {
-//     const url = `${API_BASE_URL}/api/items/draft-images/check/${itemId}/${encodeURIComponent(filename)}`;
-//     console.log('Sending GET request to:', url);
-//     const response = await axios.get(url);
-//     console.log('File exists response:', response.data);
-//     return response.data.exists;
-//   } catch (error) {
-//     console.error('Error checking file existence:', error);
-//     console.error('Error response:', error.response?.data);
-//     return false;
-//   }
-// };
-
-// Updated handleFileChange function
+/**
+ * Handles file upload with retry and optimization
+ */
 export const handleFileChange = async (
   event,
   itemId,
@@ -119,7 +92,9 @@ export const handleFileChange = async (
   }
 };
 
-// Function to process frontend image deletion
+/**
+ * Processes frontend image deletion
+ */
 export const processFrontendImageDeletion = image => {
   console.log('processFrontendImageDeletion called with:', image);
   try {
@@ -132,22 +107,9 @@ export const processFrontendImageDeletion = image => {
   }
 };
 
-// Combined function to handle image deletion from UI
-export const handleImageDeletion = async (item, itemId) => {
-  if (!item || !itemId) {
-    console.error('Item or itemId is missing');
-    throw new Error('Item and itemId are required to delete an image');
-  }
-
-  try {
-    // ... rest of the function
-  } catch (error) {
-    console.error('Error deleting image:', error);
-    throw error;
-  }
-};
-
-// Updated function to delete image from server
+/**
+ * Deletes an image from the server
+ */
 export const deleteImageFromServer = async (image, itemId) => {
   console.log('deleteImageFromServer called with:', { image, itemId });
   try {
@@ -169,7 +131,9 @@ export const deleteImageFromServer = async (image, itemId) => {
   }
 };
 
-// Function to handle multiple file uploads
+/**
+ * Handles multiple file uploads
+ */
 export const handleMultipleFileUploads = async (files, itemId) => {
   console.log('handleMultipleFileUploads called with:', {
     files: files.map(f => f.name),
@@ -183,6 +147,9 @@ export const handleMultipleFileUploads = async (files, itemId) => {
     .map(result => result.value);
 };
 
+/**
+ * Handles image deletion with state updates
+ */
 export const handleImageDelete = async (image, itemId, setUploadedImages, setItem) => {
   console.log('handleImageDelete called with:', { image, itemId });
   try {
@@ -214,41 +181,25 @@ export const handleImageDelete = async (image, itemId, setUploadedImages, setIte
   }
 };
 
-// ... rest of the component ...
+// Export the handleFileUpload function for direct use if needed
+export const handleFileUpload = async (files, itemId) => {
+  console.log(`Starting upload for ${files.length} files, itemId: ${itemId}`);
+  const formData = new FormData();
+  files.forEach(file => formData.append('images', file));
+  formData.append('itemId', itemId);
 
-// export const FileUpload = ({ onFileChange, itemId }) => {
-//   const handleChange = async event => {
-//     const files = Array.from(event.target.files);
-//     console.log('Files selected:', files);
+  try {
+    console.log(`Sending POST request to: ${API_BASE_URL}/api/items/draft-images/upload`);
+    const response = await attemptUpload(formData);
 
-//     if (!itemId) {
-//       console.error('ItemId is missing in FileUpload component');
-//       return;
-//     }
-
-//     try {
-//       console.log('Starting file upload process');
-//       const uploadPromises = files.map(file => handleFileUpload(file, itemId));
-//       await Promise.all(uploadPromises);
-//       onFileChange(files);
-//     } catch (error) {
-//       console.error('Error handling file change:', error);
-//     }
-//   };
-
-//   // ... rest of the component ...
-// };
-
-// Add this helper function at the top with other constants
-const attemptUpload = async formData => {
-  return await axios.post(`${API_BASE_URL}/api/items/draft-images/upload`, formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-    onUploadProgress: progressEvent => {
-      const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-      console.log(`Upload progress: ${percentCompleted}%`);
-    },
-    timeout: 60000,
-  });
+    if (response.status === 200) {
+      console.log(`Files uploaded successfully:`, response.data);
+      return response.data;
+    } else {
+      throw new Error(`Unexpected response status: ${response.status}`);
+    }
+  } catch (error) {
+    console.error(`Error uploading files:`, error);
+    throw error;
+  }
 };
