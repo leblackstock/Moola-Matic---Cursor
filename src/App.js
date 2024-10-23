@@ -50,6 +50,7 @@ import {
   faImage,
   faInfoCircle,
 } from '@fortawesome/free-solid-svg-icons';
+import { toast } from 'react-toastify';
 
 library.add(
   faCamera,
@@ -140,7 +141,7 @@ WarningBoxModal.propTypes = {
  * LandingPage Component
  * The home page of the application where users can start adding new items or view existing ones.
  */
-function LandingPage({ setItemId }) {
+function LandingPage({ setCurrentItemId, handleSetItemId }) {
   const navigate = useNavigate();
   const [showWarning, setShowWarning] = useState(false);
 
@@ -163,7 +164,7 @@ function LandingPage({ setItemId }) {
     setShowWarning(false);
 
     // Clear all unsaved variables
-    setItemId(null);
+    setCurrentItemId(null);
     localStorage.clear();
     sessionStorage.clear();
 
@@ -175,24 +176,28 @@ function LandingPage({ setItemId }) {
       const newItemId = await createNewItem();
       console.log('handleProceed: New item created with ID:', newItemId);
 
+      if (!newItemId) {
+        throw new Error('No item ID returned from createNewItem');
+      }
+
       // Set the new ItemId
-      setItemId(newItemId);
+      handleSetItemId(newItemId); // Changed from setItemId to handleSetItemId
 
       // Check if the item exists in localStorage
       const itemExists = checkItemInLocalStorage(newItemId);
       if (itemExists) {
         console.log('Item found in localStorage. Proceeding with navigation.');
         console.log('About to navigate...');
-        // Navigate to the new item page
+        // Navigate to the new item page with the correct ID
         navigate(`/new-item/${newItemId}`);
         console.log('Navigation called');
       } else {
         console.error('Item not found in localStorage. Navigation aborted.');
-        // Handle the error appropriately, maybe show an error message to the user
+        toast.error('Error: Item creation failed');
       }
     } catch (error) {
       console.error('Error creating new item:', error);
-      // Handle the error appropriately
+      toast.error('Error creating new item. Please try again.');
     }
   };
 
@@ -227,7 +232,8 @@ function LandingPage({ setItemId }) {
 
 // Update PropTypes
 LandingPage.propTypes = {
-  setItemId: PropTypes.func.isRequired,
+  setCurrentItemId: PropTypes.func.isRequired,
+  handleSetItemId: PropTypes.func.isRequired,
 };
 
 /**
@@ -307,10 +313,12 @@ function App() {
   const [currentItem, setCurrentItem] = useState(null);
   const navigate = useNavigate();
 
-  // Add this new function to handle setting currentItemId when saving items
+  // Add back the handleItemSaved function
   const handleItemSaved = itemId => {
-    console.log('Item saved, setting currentItemId:', itemId);
-    setCurrentItemId(itemId);
+    if (currentItemId !== itemId) {
+      console.log('Item saved, updating currentItemId:', itemId);
+      setCurrentItemId(itemId);
+    }
   };
 
   const handleLogout = () => {
@@ -336,7 +344,7 @@ function App() {
     } else {
       setCurrentItem(null);
     }
-    navigate(`/new-item/${newItemId}`); // Add this line to navigate after setting the item ID
+    navigate(`/new-item/${newItemId}`); // Add back navigation
   };
 
   return (
@@ -347,7 +355,15 @@ function App() {
           <Sidebar handleLogout={handleLogout} handleChangeItem={handleChangeItem} />
           <MainContent>
             <Routes>
-              <Route path="/" element={<LandingPage setItemId={handleSetItemId} />} />
+              <Route
+                path="/"
+                element={
+                  <LandingPage
+                    setCurrentItemId={setCurrentItemId}
+                    handleSetItemId={handleSetItemId}
+                  />
+                }
+              />
               <Route
                 path="/new-item"
                 element={
@@ -367,7 +383,7 @@ function App() {
                 path="/new-item/:itemId"
                 element={
                   <NewItemPage
-                    itemId={currentItemId || ''}
+                    itemId={currentItemId}
                     item={currentItem}
                     setItem={setCurrentItem}
                     onItemSaved={handleItemSaved}

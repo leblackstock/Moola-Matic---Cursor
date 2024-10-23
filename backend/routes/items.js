@@ -7,6 +7,7 @@ import { promises as fs } from 'fs';
 import { generateDraftFilename } from '../utils/nextSequentialNumber.js';
 import { withLock } from '../utils/lockUtils.js';
 import logger from '../utils/logger.js';
+import { cleanupDuplicateDrafts } from '../utils/nextSequentialNumber.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -132,7 +133,7 @@ router.delete('/draft-images/delete/:itemId/:filename', async (req, res) => {
       await fs.access(imagePath);
       logger.info(`File found: ${imagePath}`);
     } catch (error) {
-      logger.warn(`File not found: ${imagePath}`);
+      logger.warn(`File not found: ${imagePath}`, { error: error.message });
       return res.status(404).json({ error: 'Image file not found' });
     }
 
@@ -397,6 +398,25 @@ router.delete('/drafts', async (req, res) => {
       stack: error.stack,
     });
     res.status(500).json({ error: 'Failed to delete all drafts', details: error.message });
+  }
+});
+
+// Add this new route to clean up duplicates
+router.delete('/cleanup-duplicates/:itemId', async (req, res) => {
+  try {
+    const { itemId } = req.params;
+    logger.info(`Cleaning up duplicate drafts for itemId: ${itemId}`);
+
+    await cleanupDuplicateDrafts(itemId);
+
+    res.json({ message: 'Duplicate drafts cleaned up successfully' });
+  } catch (error) {
+    logger.error('Error cleaning up duplicate drafts:', {
+      error: error.message,
+      stack: error.stack,
+      itemId: req.params.itemId,
+    });
+    res.status(500).json({ error: 'Failed to clean up duplicate drafts', details: error.message });
   }
 });
 

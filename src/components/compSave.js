@@ -597,18 +597,20 @@ export const useAutosave = (
   setLastSaved,
   debounceDelay = 10000,
   forceSaveInterval = 60000,
-  isPaused = false // Add this parameter
+  isPaused = false
 ) => {
   const savedDataRef = useRef(null);
   const lastSavedRef = useRef(null);
   const timeoutRef = useRef(null);
+  const isProcessingRef = useRef(false); // Add this ref
 
   const saveData = useCallback(async () => {
-    if (!itemId || !savedDataRef.current) {
+    if (!itemId || !savedDataRef.current || isProcessingRef.current) {
       return;
     }
 
     try {
+      isProcessingRef.current = true; // Set processing flag
       const requestBody = {
         draftData: savedDataRef.current,
         contextData: savedDataRef.current.contextData,
@@ -616,22 +618,18 @@ export const useAutosave = (
         itemId: itemId,
       };
 
-      const response = await axios.post(`${API_URL}/api/items/autosave-draft`, requestBody, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await axios.post(`${API_URL}/api/items/autosave-draft`, requestBody);
 
       if (response.data && response.data.item) {
         setItem(response.data.item);
         setLastSaved(new Date());
         lastSavedRef.current = Date.now();
         console.log('Autosave completed successfully');
-      } else {
-        throw new Error('Invalid response format from server');
       }
     } catch (error) {
       console.error('Error during autosave:', error);
+    } finally {
+      isProcessingRef.current = false; // Reset processing flag
     }
   }, [itemId, setItem, setLastSaved]);
 
@@ -639,26 +637,26 @@ export const useAutosave = (
 
   const updateSavedData = useCallback(
     data => {
-      if (isPaused) {
-        console.log('Autosave is paused');
+      if (isPaused || isProcessingRef.current) {
         return;
       }
 
       savedDataRef.current = data;
       debouncedSave();
 
-      // Clear existing timeout and set a new one
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      timeoutRef.current = setTimeout(() => {
-        const now = Date.now();
-        if (!lastSavedRef.current || now - lastSavedRef.current >= forceSaveInterval) {
-          saveData();
+      // Only set force save timeout if not already processing
+      if (!isProcessingRef.current) {
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
         }
-      }, forceSaveInterval);
+        timeoutRef.current = setTimeout(() => {
+          if (!lastSavedRef.current || Date.now() - lastSavedRef.current >= forceSaveInterval) {
+            saveData();
+          }
+        }, forceSaveInterval);
+      }
     },
-    [debouncedSave, saveData, forceSaveInterval, isPaused] // Add isPaused to the dependency array
+    [debouncedSave, saveData, forceSaveInterval, isPaused]
   );
 
   useEffect(() => {

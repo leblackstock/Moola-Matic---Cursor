@@ -95,6 +95,9 @@ function NewItemPage({ onItemSaved }) {
 
   const [isUploading, setIsUploading] = useState(false);
 
+  // Add a ref to track if this is an autosave update
+  const isAutosaveUpdate = useRef(false);
+
   // Use the autosave hook with a 10-second interval
   const updateAutosaveData = useAutosave(
     itemId,
@@ -157,7 +160,6 @@ function NewItemPage({ onItemSaved }) {
     const loadData = async () => {
       if (!itemId || !location.pathname.includes(`/new-item/${itemId}`)) {
         console.error('No valid itemId in URL');
-        onItemSaved(null); // Replace setCurrentItemId
         navigate('/');
         return;
       }
@@ -168,7 +170,7 @@ function NewItemPage({ onItemSaved }) {
         if (localData) {
           // Load local data first
           setItem(localData);
-          onItemSaved(localData.itemId);
+          // Remove this line: onItemSaved(localData.itemId);
           setUploadedImages(Array.isArray(localData.images) ? localData.images : []);
           setContextData(localData.contextData || {});
           setMessages(localData.messages || []);
@@ -254,10 +256,11 @@ function NewItemPage({ onItemSaved }) {
   // Update item in parent component when local item changes
   useEffect(() => {
     // console.log('Update parent item effect triggered');
-    if (item) {
+    if (item && !isAutosaveUpdate.current) {
       // console.log('Updating parent item');
       onItemSaved(item.itemId);
     }
+    isAutosaveUpdate.current = false;
   }, [item, onItemSaved]);
 
   // Log item changes

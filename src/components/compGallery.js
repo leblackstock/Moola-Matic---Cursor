@@ -9,6 +9,7 @@ import {
   StyledImage,
   HoverDeleteButton,
   ErrorImagePlaceholder,
+  ItemIdOverlay,
 } from './compStyles.js';
 import { getImageUrl } from '../helpers/itemGen.js';
 
@@ -110,6 +111,8 @@ export const DraftItemGallery = ({ items, onSelect, onDelete }) => {
           null;
 
         const uniqueKey = `${item.itemId || item._id || ''}-${index}`;
+        const itemIdSuffix = item.itemId ? item.itemId.slice(-6) : '';
+
         return (
           <ImageContainer key={uniqueKey} onClick={() => onSelect(item)} $noImage={!imageUrl}>
             {imageUrl ? (
@@ -134,6 +137,7 @@ export const DraftItemGallery = ({ items, onSelect, onDelete }) => {
             >
               ×
             </HoverDeleteButton>
+            <ItemIdOverlay>{itemIdSuffix}</ItemIdOverlay>
           </ImageContainer>
         );
       })}

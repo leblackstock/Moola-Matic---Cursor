@@ -1568,3 +1568,21 @@ export const StatusGroup = styled.div`
     color: #f5deb3;
   }
 `;
+
+export const ItemIdOverlay = styled.div`
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 4px;
+  font-size: 12px;
+  text-align: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+
+  ${ImageContainer}:hover & {
+    opacity: 1;
+  }
+`;

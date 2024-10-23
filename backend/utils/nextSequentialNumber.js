@@ -113,3 +113,29 @@ export const getNextSequentialNumber = async (itemId, shortId) => {
     }
   });
 };
+
+export const cleanupDuplicateDrafts = async itemId => {
+  const duplicates = await DraftItem.find({
+    $or: [{ itemId: `upload-${itemId}` }, { itemId: `sequential-number-${itemId}` }],
+  });
+
+  if (duplicates.length > 0) {
+    console.log(`Found ${duplicates.length} duplicate drafts to clean up`);
+
+    // Move any images to the main draft
+    const mainDraft = await DraftItem.findOne({ itemId: itemId });
+    if (mainDraft) {
+      for (const duplicate of duplicates) {
+        if (duplicate.images && duplicate.images.length > 0) {
+          mainDraft.images.push(...duplicate.images);
+        }
+      }
+      await mainDraft.save();
+    }
+
+    // Delete the duplicates
+    await DraftItem.deleteMany({
+      $or: [{ itemId: `upload-${itemId}` }, { itemId: `sequential-number-${itemId}` }],
+    });
+  }
+};

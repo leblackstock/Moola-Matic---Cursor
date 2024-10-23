@@ -31,23 +31,45 @@ function ViewItemsPage({ currentItemId }) {
   useEffect(() => {
     console.log('Fetching all items and drafts...');
 
-    // Fetch all items
     fetchAllItems()
       .then(fetchedItems => {
+        // Add this detailed logging
+        console.log(
+          'Detailed item analysis:',
+          fetchedItems.map(item => ({
+            itemId: item.itemId,
+            isDraft: item.isDraft,
+            _id: item._id,
+            name: item.name,
+          }))
+        );
+
         console.log('Fetched all items:', fetchedItems);
-        // Log the structure of the first item to understand its properties
-        if (fetchedItems.length > 0) {
-          console.log('First item structure:', JSON.stringify(fetchedItems[0], null, 2));
-        }
+
+        // Remove duplicates based on itemId
+        const uniqueItems = fetchedItems.reduce((acc, current) => {
+          const x = acc.find(item => item.itemId === current.itemId);
+          if (!x) {
+            return acc.concat([current]);
+          } else {
+            return acc;
+          }
+        }, []);
+
         // Filter out drafts and set as purchased items
-        const purchasedItems = fetchedItems.filter(item => !item.isDraft);
+        const purchasedItems = uniqueItems.filter(item => !item.isDraft);
         console.log('Filtered purchased items:', purchasedItems);
         setPurchasedItems(purchasedItems);
 
-        // Set drafts from the same fetchedItems array
-        const drafts = fetchedItems.filter(item => item.isDraft);
+        // Set drafts from the same uniqueItems array
+        const drafts = uniqueItems.filter(item => item.isDraft);
         console.log('Filtered drafts:', drafts);
         setDrafts(drafts);
+
+        // Add this detailed logging
+        console.log('First draft object:', JSON.stringify(fetchedItems[0], null, 2));
+        console.log('Second draft object:', JSON.stringify(fetchedItems[1], null, 2));
+        console.log('Third draft object:', JSON.stringify(fetchedItems[2], null, 2));
       })
       .catch(error => {
         console.error('Error fetching all items:', error);
