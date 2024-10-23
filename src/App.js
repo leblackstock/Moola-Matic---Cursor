@@ -1,29 +1,23 @@
 // frontend/src/App.js
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import { Route, Routes, useNavigate, Link, Navigate } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '@fortawesome/fontawesome-free/css/all.min.css';
+import './App.css';
 import moolaMaticLogo from './Images/Moola-Matic Logo 01.jpeg';
 import NewItemPage from './NewItemPage.js';
 import ViewItemsPage from './ViewItemsPage.js';
-import { handleLocalSave, saveToLocalStorage } from './components/compSave.js';
+//import { handleLocalSave, saveToLocalStorage } from './components/compSave.js';
 import { resetItemGeneration, createNewItem } from './helpers/itemGen.js';
-import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import './App.css';
 import {
   PageContainer,
-  StyledButton,
-  StyledLogo,
   StyledTitle,
   StyledSubtitle,
   GlowingButton,
   StyledContainer,
-  ModalOverlay,
-  ModalContent,
-  ModalButton,
   Sidebar as StyledSidebar,
   NavLink,
   WarningBoxOverlay,
@@ -37,6 +31,44 @@ import {
   StyledToastContainer,
 } from './components/compStyles.js';
 import GlobalStyles from './GlobalStyles.js';
+import { library } from '@fortawesome/fontawesome-svg-core';
+import {
+  faCamera,
+  faPlus,
+  faTrash,
+  faEdit,
+  faSave,
+  faUpload,
+  faSearch,
+  faSort,
+  faFilter,
+  faUser,
+  faSignIn,
+  faSignOut,
+  faDollarSign,
+  faTag,
+  faImage,
+  faInfoCircle,
+} from '@fortawesome/free-solid-svg-icons';
+
+library.add(
+  faCamera,
+  faPlus,
+  faTrash,
+  faEdit,
+  faSave,
+  faUpload,
+  faSearch,
+  faSort,
+  faFilter,
+  faUser,
+  faSignIn,
+  faSignOut,
+  faDollarSign,
+  faTag,
+  faImage,
+  faInfoCircle
+);
 
 /**
  * Sidebar Component
@@ -84,9 +116,8 @@ function WarningBoxModal({ onProceed, onGoBack }) {
       <WarningBox>
         <StyledTitle>Whoa there, bargain hunter!</StyledTitle>
         <StyledSubtitle>
-          Are you sure you want to embark on a new treasure hunt? Any unsaved
-          progress on your current item will vanish faster than a yard sale
-          deal!
+          Are you sure you want to embark on a new treasure hunt? Any unsaved progress on your
+          current item will vanish faster than a yard sale deal!
         </StyledSubtitle>
         <WarningBoxButtons>
           <WarningButton className="proceed" onClick={onProceed}>
@@ -122,7 +153,7 @@ function LandingPage({ setItemId }) {
   };
 
   // Add this function to check if an item exists in localStorage
-  const checkItemInLocalStorage = (itemId) => {
+  const checkItemInLocalStorage = itemId => {
     const item = localStorage.getItem(`item_${itemId}`);
     return item !== null;
   };
@@ -181,14 +212,11 @@ function LandingPage({ setItemId }) {
             View Items
           </GlowingButton>
         </ButtonContainer>
-        {showWarning && (
-          <WarningBoxModal onProceed={handleProceed} onGoBack={handleGoBack} />
-        )}
+        {showWarning && <WarningBoxModal onProceed={handleProceed} onGoBack={handleGoBack} />}
         <div>
           <p>
-            Are you sitting on a goldmine of garage sale goodies? Let
-            Moola-Matic help you squeeze every last penny out of your dusty
-            discoveries!
+            Are you sitting on a goldmine of garage sale goodies? Let Moola-Matic help you squeeze
+            every last penny out of your dusty discoveries!
           </p>
           <p>We're like a money-making time machine for your junk drawer!</p>
         </div>
@@ -277,11 +305,12 @@ function NotFound() {
 function App() {
   const [currentItemId, setCurrentItemId] = useState(null);
   const [currentItem, setCurrentItem] = useState(null);
-  const navigate = useNavigate(); // Add this line to define navigate
+  const navigate = useNavigate();
 
-  const updateCurrentItemId = async (newItemId) => {
-    setCurrentItemId(newItemId);
-    // You might want to add logic here to update the itemId in itemGen as well
+  // Add this new function to handle setting currentItemId when saving items
+  const handleItemSaved = itemId => {
+    console.log('Item saved, setting currentItemId:', itemId);
+    setCurrentItemId(itemId);
   };
 
   const handleLogout = () => {
@@ -297,7 +326,7 @@ function App() {
     }
   };
 
-  const handleSetItemId = (newItemId) => {
+  const handleSetItemId = newItemId => {
     console.log('Setting new ItemId:', newItemId);
     setCurrentItemId(newItemId);
     // Load the item data from localStorage
@@ -315,16 +344,10 @@ function App() {
       <GlobalStyles />
       <ErrorBoundary>
         <PageContainer>
-          <Sidebar
-            handleLogout={handleLogout}
-            handleChangeItem={handleChangeItem}
-          />
+          <Sidebar handleLogout={handleLogout} handleChangeItem={handleChangeItem} />
           <MainContent>
             <Routes>
-              <Route
-                path="/"
-                element={<LandingPage setItemId={handleSetItemId} />}
-              />
+              <Route path="/" element={<LandingPage setItemId={handleSetItemId} />} />
               <Route
                 path="/new-item"
                 element={
@@ -345,16 +368,13 @@ function App() {
                 element={
                   <NewItemPage
                     itemId={currentItemId || ''}
-                    setItemId={handleSetItemId}
                     item={currentItem}
                     setItem={setCurrentItem}
+                    onItemSaved={handleItemSaved}
                   />
                 }
               />
-              <Route
-                path="/view-items"
-                element={<ViewItemsPage currentItemId={currentItemId || ''} />}
-              />
+              <Route path="/view-items" element={<ViewItemsPage currentItemId={currentItemId} />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </MainContent>

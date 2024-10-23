@@ -142,5 +142,4 @@ const DraftItemSchema = new mongoose.Schema(
 );
 
 // Check if the model already exists before defining it
-export const DraftItem =
-  mongoose.models.DraftItem || mongoose.model('DraftItem', DraftItemSchema);
+export const DraftItem = mongoose.models.DraftItem || mongoose.model('DraftItem', DraftItemSchema);

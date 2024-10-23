@@ -17,7 +17,7 @@ const MAX_IMAGE_SIZES = {
   tiff: { width: 650, height: 650 },
 };
 
-export const validateImageFormat = (format) => {
+export const validateImageFormat = format => {
   if (!SUPPORTED_FORMATS.includes(format)) {
     throw new Error(
       `Unsupported image format: ${format}. Supported formats are: ${SUPPORTED_FORMATS.join(', ')}`
@@ -25,7 +25,7 @@ export const validateImageFormat = (format) => {
   }
 };
 
-export const validateBase64 = (base64String) => {
+export const validateBase64 = base64String => {
   const regex = /^data:image\/[a-z]+;base64,/;
   if (!regex.test(base64String)) {
     return false;
@@ -52,7 +52,7 @@ export const validateImageSize = (imageBuffer, format) => {
   }
 };
 
-export const validateAndResizeImage = async (imageBuffer) => {
+export const validateAndResizeImage = async imageBuffer => {
   try {
     console.log('Starting image validation and resizing');
     const metadata = await sharp(imageBuffer).metadata();
@@ -65,14 +65,10 @@ export const validateAndResizeImage = async (imageBuffer) => {
     }
 
     // Resize the image without explicitly removing metadata
-    let resizedImage = sharp(imageBuffer).resize(
-      maxSize.width,
-      maxSize.height,
-      {
-        fit: 'inside',
-        withoutEnlargement: true,
-      }
-    );
+    let resizedImage = sharp(imageBuffer).resize(maxSize.width, maxSize.height, {
+      fit: 'inside',
+      withoutEnlargement: true,
+    });
 
     // Get the new metadata after resizing
     const resizedMetadata = await resizedImage.metadata();
@@ -87,9 +83,7 @@ export const validateAndResizeImage = async (imageBuffer) => {
     console.log('Starting compression loop');
     do {
       attempts++;
-      console.log(
-        `Attempt ${attempts}, compression: ${compressionLevel}, scale: ${scaleFactor}`
-      );
+      console.log(`Attempt ${attempts}, compression: ${compressionLevel}, scale: ${scaleFactor}`);
 
       // Use existing resizeAndCompress functions with updated scale and compression
       switch (format) {
@@ -106,12 +100,7 @@ export const validateAndResizeImage = async (imageBuffer) => {
           break;
         case 'png':
           outputBuffer = await (
-            await resizeAndCompressPNG(
-              resizedImage,
-              resizedMetadata,
-              scaleFactor,
-              compressionLevel
-            )
+            await resizeAndCompressPNG(resizedImage, resizedMetadata, scaleFactor, compressionLevel)
           ).toBuffer();
           break;
         case 'webp':
@@ -126,29 +115,17 @@ export const validateAndResizeImage = async (imageBuffer) => {
           break;
         case 'gif':
           outputBuffer = await (
-            await resizeAndCompressGIF(
-              resizedImage,
-              resizedMetadata,
-              scaleFactor
-            )
+            await resizeAndCompressGIF(resizedImage, resizedMetadata, scaleFactor)
           ).toBuffer();
           break;
         case 'bmp':
           outputBuffer = await (
-            await resizeAndCompressBMP(
-              resizedImage,
-              resizedMetadata,
-              scaleFactor
-            )
+            await resizeAndCompressBMP(resizedImage, resizedMetadata, scaleFactor)
           ).toBuffer();
           break;
         case 'tiff':
           outputBuffer = await (
-            await resizeAndCompressTIFF(
-              resizedImage,
-              resizedMetadata,
-              scaleFactor
-            )
+            await resizeAndCompressTIFF(resizedImage, resizedMetadata, scaleFactor)
           ).toBuffer();
           break;
         default:
@@ -169,9 +146,7 @@ export const validateAndResizeImage = async (imageBuffer) => {
       if (tokenCount > TARGET_TOKENS && attempts < maxAttempts) {
         compressionLevel -= 25; // Reduce quality more aggressively
         scaleFactor *= 0.6; // Reduce scale more aggressively
-        console.log(
-          `Reducing quality to ${compressionLevel} and scale to ${scaleFactor}`
-        );
+        console.log(`Reducing quality to ${compressionLevel} and scale to ${scaleFactor}`);
       } else {
         break; // Exit loop if we've reached target tokens or max attempts
       }
@@ -218,10 +193,7 @@ async function resizeAndCompressPNG(image, metadata, scale, compressionLevel) {
 }
 
 async function resizeAndCompressGIF(image, metadata, scale) {
-  const targetSize = Math.min(
-    1300,
-    Math.max(metadata.width, metadata.height) * scale
-  );
+  const targetSize = Math.min(1300, Math.max(metadata.width, metadata.height) * scale);
   return image
     .resize(targetSize, targetSize, {
       fit: 'inside',
@@ -243,10 +215,7 @@ async function resizeAndCompressWebP(image, metadata, scale, quality) {
 }
 
 async function resizeAndCompressBMP(image, metadata, scale) {
-  const targetSize = Math.min(
-    500,
-    Math.max(metadata.width, metadata.height) * scale
-  );
+  const targetSize = Math.min(500, Math.max(metadata.width, metadata.height) * scale);
   return image
     .resize(targetSize, targetSize, {
       fit: 'inside',
@@ -256,10 +225,7 @@ async function resizeAndCompressBMP(image, metadata, scale) {
 }
 
 async function resizeAndCompressTIFF(image, metadata, scale) {
-  const targetSize = Math.min(
-    1000,
-    Math.max(metadata.width, metadata.height) * scale
-  );
+  const targetSize = Math.min(1000, Math.max(metadata.width, metadata.height) * scale);
   return image
     .resize(targetSize, targetSize, {
       fit: 'inside',

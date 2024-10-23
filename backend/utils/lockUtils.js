@@ -17,7 +17,7 @@ export const withLock = async (lockKey, callback) => {
   }
 };
 
-export const acquireLock = async (lockKey) => {
+export const acquireLock = async lockKey => {
   const now = new Date();
   const expiresAt = new Date(now.getTime() + LOCK_DURATION);
 
@@ -38,7 +38,7 @@ export const acquireLock = async (lockKey) => {
   }
 };
 
-export const releaseLock = async (lockKey) => {
+export const releaseLock = async lockKey => {
   await DraftItem.findOneAndUpdate(
     { itemId: lockKey },
     {

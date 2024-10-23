@@ -1,19 +1,13 @@
 // frontend/src/NewItemPage.js
 
-import React, {
-  useState,
-  useEffect,
-  useRef,
-  useCallback,
-  useMemo,
-} from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 import treasureSpecs from './Images/Treasure_Specs01.jpeg';
 import {
-  handleChatWithAssistant,
-  createUserMessage,
+  // handleChatWithAssistant,
+  // createUserMessage,
   handleAnalyzeImages, // Add this line
 } from './api/chat.js';
 import axios from 'axios';
@@ -25,14 +19,13 @@ import FormFields from './components/compFormFields.js';
 import {
   handleLocalSave,
   loadLocalData,
-  updateItem as updateItemFunc,
-  handleFileUpload,
+  // handleFileUpload,
   handleManualSave,
   useAutosave,
 } from './components/compSave.js';
 import {
   handleFileChange,
-  handleImageDeletion,
+  // handleImageDeletion,
   handleImageDelete, // Add this line
 } from './components/compUpload.js';
 
@@ -44,37 +37,25 @@ import {
   StaticLogo,
   StyledTitle,
   StyledSubtitle,
-  StyledForm,
-  StyledFormGroup,
-  StyledLabel,
-  StyledInput,
-  StyledSelect,
-  StyledTextarea,
   StyledButton,
-  StyledNotification,
   GlowingButton,
   ModalOverlay,
   ModalContent,
   ModalButton,
   MainContentArea,
   ButtonContainer,
-  WarningBoxOverlay,
-  WarningBox,
-  WarningBoxButtons,
-  WarningButton,
 } from './components/compStyles.js';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import RawAnalysisSummary from './components/compRawAnalysis.js';
 
-export const API_BASE_URL =
-  process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001';
+export const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001';
 
-const loadItemData = (itemId) => {
-  return loadLocalData(itemId);
-};
+// const loadItemData = itemId => {
+//   return loadLocalData(itemId);
+// };
 
-function NewItemPage({ setItem: setParentItem }) {
+function NewItemPage({ onItemSaved }) {
   // Remove the console.log at the start of the function
 
   const { itemId } = useParams();
@@ -85,8 +66,8 @@ function NewItemPage({ setItem: setParentItem }) {
   const [item, setItem] = useState(null);
 
   // State declarations
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
+  // const [name, setName] = useState('');
+  // const [description, setDescription] = useState('');
   const [contextData, setContextData] = useState({});
   const [messages, setMessages] = useState([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -94,23 +75,23 @@ function NewItemPage({ setItem: setParentItem }) {
   const backendPort = process.env.REACT_APP_BACKEND_PORT || 3001;
   const [isLoading, setIsLoading] = useState(true);
   const [imageUploaded, setImageUploaded] = useState(false);
-  const [imagePreview, setImagePreview] = useState('');
+  // const [imagePreview, setImagePreview] = useState('');
   const [uploadedImages, setUploadedImages] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
   const [showImageModal, setShowImageModal] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [message, setMessage] = useState('');
-  const [imageFile, setImageFile] = useState(null);
-  const [imageInput, setImageInput] = useState('');
-  const [imageAnalysis, setImageAnalysis] = useState(null);
-  const [imageAnalyzed, setImageAnalyzed] = useState(false);
+  // const [isSubmitting, setIsSubmitting] = useState(false);
+  // const [message, setMessage] = useState('');
+  // const [imageFile, setImageFile] = useState(null);
+  // const [imageInput, setImageInput] = useState('');
+  // const [imageAnalysis, setImageAnalysis] = useState(null);
+  // const [imageAnalyzed, setImageAnalyzed] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [galleryKey, setGalleryKey] = useState(0);
+  // const [galleryKey, setGalleryKey] = useState(0);
   const [analysisTimeLeft, setAnalysisTimeLeft] = useState(0);
 
   const fileInputRef = useRef(null);
-  const cameraInputRef = useRef(null);
-  const messagesContainerRef = useRef(null);
+  // const cameraInputRef = useRef(null);
+  // const messagesContainerRef = useRef(null);
 
   const [isUploading, setIsUploading] = useState(false);
 
@@ -140,13 +121,13 @@ function NewItemPage({ setItem: setParentItem }) {
   }, [item, itemId, uploadedImages, messages, contextData, updateAutosaveData]);
 
   // Memoize complex objects or functions
-  const memoizedContextData = useMemo(() => contextData, [contextData]);
+  // const memoizedContextData = useMemo(() => contextData, [contextData]);
   const memoizedMessages = useMemo(() => messages, [messages]);
 
   // Use useCallback for functions passed as props
   const memoizedUpdateItem = useCallback((field, value) => {
     // console.log('updateItem called', field, value);
-    setItem((prevItem) => {
+    setItem(prevItem => {
       const newItem = { ...prevItem };
       if (typeof field === 'string') {
         const fields = field.split('.');
@@ -176,6 +157,7 @@ function NewItemPage({ setItem: setParentItem }) {
     const loadData = async () => {
       if (!itemId || !location.pathname.includes(`/new-item/${itemId}`)) {
         console.error('No valid itemId in URL');
+        onItemSaved(null); // Replace setCurrentItemId
         navigate('/');
         return;
       }
@@ -186,57 +168,40 @@ function NewItemPage({ setItem: setParentItem }) {
         if (localData) {
           // Load local data first
           setItem(localData);
-          setParentItem(localData);
-          setUploadedImages(
-            Array.isArray(localData.images) ? localData.images : []
-          );
+          onItemSaved(localData.itemId);
+          setUploadedImages(Array.isArray(localData.images) ? localData.images : []);
           setContextData(localData.contextData || {});
           setMessages(localData.messages || []);
           setIsAnalyzing(localData.isAnalyzing || false);
 
           // Set analysis results if available
           if (localData.analysisResults) {
-            console.log(
-              'Loading analysis results from local storage:',
-              localData.analysisResults
-            );
+            console.log('Loading analysis results from local storage:', localData.analysisResults);
             setAnalysisPerformed(true);
           }
 
           // Now check the database for updates
           try {
-            const response = await axios.get(
-              `${API_BASE_URL}/api/items/${itemId}`
-            );
+            const response = await axios.get(`${API_BASE_URL}/api/items/${itemId}`);
             const dbItem = response.data;
 
             if (dbItem && dbItem.lastUpdated > localData.lastUpdated) {
               // DB data is newer, update the state
               setItem(dbItem);
-              setParentItem(dbItem);
-              setUploadedImages(
-                Array.isArray(dbItem.images) ? dbItem.images : []
-              );
+              onItemSaved(dbItem.itemId);
+              setUploadedImages(Array.isArray(dbItem.images) ? dbItem.images : []);
               setContextData(dbItem.contextData || {});
               setMessages(dbItem.messages || []);
               setIsAnalyzing(dbItem.isAnalyzing || false);
 
               // Set analysis results if available in DB
               if (dbItem.analysisResults) {
-                console.log(
-                  'Loading analysis results from database:',
-                  dbItem.analysisResults
-                );
+                console.log('Loading analysis results from database:', dbItem.analysisResults);
                 setAnalysisPerformed(true);
               }
 
               // Update local storage with the newer data
-              handleLocalSave(
-                dbItem,
-                dbItem.contextData,
-                dbItem.messages,
-                itemId
-              );
+              handleLocalSave(dbItem, dbItem.contextData, dbItem.messages, itemId);
             }
           } catch (dbError) {
             console.error('Error fetching item from database:', dbError);
@@ -245,36 +210,24 @@ function NewItemPage({ setItem: setParentItem }) {
         } else {
           // If no local data, fetch from database
           try {
-            const response = await axios.get(
-              `${API_BASE_URL}/api/items/${itemId}`
-            );
+            const response = await axios.get(`${API_BASE_URL}/api/items/${itemId}`);
             const dbItem = response.data;
             if (dbItem) {
               setItem(dbItem);
-              setParentItem(dbItem);
-              setUploadedImages(
-                Array.isArray(dbItem.images) ? dbItem.images : []
-              );
+              onItemSaved(dbItem.itemId);
+              setUploadedImages(Array.isArray(dbItem.images) ? dbItem.images : []);
               setContextData(dbItem.contextData || {});
               setMessages(dbItem.messages || []);
               setIsAnalyzing(dbItem.isAnalyzing || false);
 
               // Set analysis results if available in DB
               if (dbItem.analysisResults) {
-                console.log(
-                  'Loading analysis results from database:',
-                  dbItem.analysisResults
-                );
+                console.log('Loading analysis results from database:', dbItem.analysisResults);
                 setAnalysisPerformed(true);
               }
 
               // Save to local storage
-              handleLocalSave(
-                dbItem,
-                dbItem.contextData,
-                dbItem.messages,
-                itemId
-              );
+              handleLocalSave(dbItem, dbItem.contextData, dbItem.messages, itemId);
             } else {
               console.error('No data found for itemId:', itemId);
               navigate('/');
@@ -296,36 +249,34 @@ function NewItemPage({ setItem: setParentItem }) {
     };
 
     loadData();
-  }, [itemId, navigate, setParentItem, location.pathname]);
+  }, [itemId, navigate, onItemSaved, location.pathname]);
 
   // Update item in parent component when local item changes
   useEffect(() => {
     // console.log('Update parent item effect triggered');
     if (item) {
       // console.log('Updating parent item');
-      setParentItem(item);
+      onItemSaved(item.itemId);
     }
-  }, [item, setParentItem]);
+  }, [item, onItemSaved]);
 
   // Log item changes
   useEffect(() => {
     // console.log('Item changed:', item);
   }, [item]);
 
-  // Optimize the loadDraft function
-  const loadDraft = (draftData) => {
-    if (draftData) {
-      const uniqueImages = [
-        ...new Map(draftData.images.map((img) => [img.filename, img])).values(),
-      ];
-      const updatedDraftData = {
-        ...draftData,
-        images: uniqueImages,
-      };
-      setItem(updatedDraftData);
-      setUploadedImages(uniqueImages);
-    }
-  };
+  // // Optimize the loadDraft function
+  // const loadDraft = draftData => {
+  //   if (draftData) {
+  //     const uniqueImages = [...new Map(draftData.images.map(img => [img.filename, img])).values()];
+  //     const updatedDraftData = {
+  //       ...draftData,
+  //       images: uniqueImages,
+  //     };
+  //     setItem(updatedDraftData);
+  //     setUploadedImages(uniqueImages);
+  //   }
+  // };
 
   // ----------------------------
   // useEffect Hook: Save to localStorage
@@ -366,7 +317,7 @@ function NewItemPage({ setItem: setParentItem }) {
   }, [uploadedImages]);
 
   // Event handlers with added logging
-  const handleSubmit = async (e) => {
+  const handleSubmit = async e => {
     // console.log('handleSubmit called');
     e.preventDefault();
     // console.log('Submitting item:', item);
@@ -457,29 +408,22 @@ function NewItemPage({ setItem: setParentItem }) {
   // };
 
   // New function to fetch the latest item data from the server
-  const fetchLatestItemData = async () => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/api/items/${itemId}`);
-      const serverItem = response.data;
-      console.log('Fetched item data:', serverItem);
-      setItem(serverItem);
-      setParentItem(serverItem);
-      setUploadedImages(
-        Array.isArray(serverItem.images) ? serverItem.images : []
-      );
-      handleLocalSave(
-        serverItem,
-        serverItem.contextData,
-        serverItem.messages,
-        itemId
-      );
-      setGalleryKey((prevKey) => prevKey + 1);
-    } catch (error) {
-      console.error('Error fetching latest item data:', error);
-    }
-  };
+  // const fetchLatestItemData = async () => {
+  //   try {
+  //     const response = await axios.get(`${API_BASE_URL}/api/items/${itemId}`);
+  //     const serverItem = response.data;
+  //     console.log('Fetched item data:', serverItem);
+  //     setItem(serverItem);
+  //     setCurrentItemId(serverItem.itemId);
+  //     setUploadedImages(Array.isArray(serverItem.images) ? serverItem.images : []);
+  //     handleLocalSave(serverItem, serverItem.contextData, serverItem.messages, itemId);
+  //     setGalleryKey(prevKey => prevKey + 1);
+  //   } catch (error) {
+  //     console.error('Error fetching latest item data:', error);
+  //   }
+  // };
 
-  const handleFileChangeWrapper = async (event) => {
+  const handleFileChangeWrapper = async event => {
     // console.log('handleFileChangeWrapper called');
     setIsUploading(true);
     try {
@@ -494,7 +438,7 @@ function NewItemPage({ setItem: setParentItem }) {
       console.log('File change result:', result);
 
       if (Array.isArray(result)) {
-        setUploadedImages((prevImages) => [...prevImages, ...result]);
+        setUploadedImages(prevImages => [...prevImages, ...result]);
 
         await handleManualSave(
           item,
@@ -583,11 +527,11 @@ function NewItemPage({ setItem: setParentItem }) {
   */
 
   // Replace it with this simplified version that uses the existing handleFileChange function
-  const handleImageSelect = (event) => {
-    // console.log('handleImageSelect called');
-    // console.log('Selected files:', event.target.files);
-    handleFileChangeWrapper(event);
-  };
+  // const handleImageSelect = event => {
+  //   // console.log('handleImageSelect called');
+  //   // console.log('Selected files:', event.target.files);
+  //   handleFileChangeWrapper(event);
+  // };
 
   const handleImageButtonClick = () => {
     // console.log('handleImageButtonClick called');
@@ -596,11 +540,11 @@ function NewItemPage({ setItem: setParentItem }) {
     }
   };
 
-  const handleCameraButtonClick = () => {
-    if (cameraInputRef.current) {
-      cameraInputRef.current.click();
-    }
-  };
+  // const handleCameraButtonClick = () => {
+  //   if (cameraInputRef.current) {
+  //     cameraInputRef.current.click();
+  //   }
+  // };
 
   const handleMediaClick = () => {
     if (fileInputRef.current) {
@@ -617,7 +561,7 @@ function NewItemPage({ setItem: setParentItem }) {
     setIsLoading(false);
   };
 
-  const handleDeleteImageWrapper = (imageToDelete) => {
+  const handleDeleteImageWrapper = imageToDelete => {
     // console.log('handleDeleteImageWrapper called', imageToDelete);
     handleImageDelete(imageToDelete, itemId, setUploadedImages, setItem);
   };
@@ -625,7 +569,7 @@ function NewItemPage({ setItem: setParentItem }) {
   // Update the updateItem function to handle nested properties safely
   const updateItem = (field, value) => {
     // console.log('updateItem called', field, value);
-    setItem((prevItem) => {
+    setItem(prevItem => {
       const newItem = { ...prevItem };
       if (typeof field === 'string') {
         const fields = field.split('.');
@@ -650,7 +594,7 @@ function NewItemPage({ setItem: setParentItem }) {
   };
 
   // Update handlePurchaseRecommendationChange to use the updateItem function
-  const handlePurchaseRecommendationChange = (value) => {
+  const handlePurchaseRecommendationChange = value => {
     // console.log('handlePurchaseRecommendationChange called', value);
     updateItem(
       'finalRecommendation.purchaseRecommendation',
@@ -681,7 +625,7 @@ function NewItemPage({ setItem: setParentItem }) {
       await axios.put(`${API_BASE_URL}/api/items/${itemId}`, updatedItem);
 
       const result = await handleAnalyzeImages({
-        imageUrls: uploadedImages.map((img) => img.url),
+        imageUrls: uploadedImages.map(img => img.url),
         description: item.description || '',
         itemId: itemId,
         sellerNotes: item.sellerNotes || '',
@@ -699,10 +643,7 @@ function NewItemPage({ setItem: setParentItem }) {
 
         // Update local storage and database with the final result
         await handleLocalSave(finalUpdatedItem, contextData, messages, itemId);
-        await axios.put(
-          `${API_BASE_URL}/api/items/${itemId}`,
-          finalUpdatedItem
-        );
+        await axios.put(`${API_BASE_URL}/api/items/${itemId}`, finalUpdatedItem);
 
         toast.success('Image analysis completed successfully!');
       } else {
@@ -729,35 +670,35 @@ function NewItemPage({ setItem: setParentItem }) {
     let timer;
     if (isAnalyzing && analysisTimeLeft > 0) {
       timer = setInterval(() => {
-        setAnalysisTimeLeft((prevTime) => prevTime - 1);
+        setAnalysisTimeLeft(prevTime => prevTime - 1);
       }, 1000);
     }
     return () => clearInterval(timer);
   }, [isAnalyzing, analysisTimeLeft]);
 
-  const handleImageUpload = async (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      try {
-        const { newImage } = await handleFileUpload(
-          file,
-          backendPort,
-          itemId, // Use itemId here instead of item
-          setUploadedImages
-        );
+  // const handleImageUpload = async event => {
+  //   const file = event.target.files[0];
+  //   if (file) {
+  //     try {
+  //       const { newImage } = await handleFileUpload(
+  //         file,
+  //         backendPort,
+  //         itemId, // Use itemId here instead of item
+  //         setUploadedImages
+  //       );
 
-        setItem((prevItem) => ({
-          ...prevItem,
-          images: [...prevItem.images, newImage],
-        }));
+  //       setItem(prevItem => ({
+  //         ...prevItem,
+  //         images: [...prevItem.images, newImage],
+  //       }));
 
-        setImageUploaded(true);
-        setHasUnsavedChanges(true);
-      } catch (error) {
-        console.error('Error uploading image:', error);
-      }
-    }
-  };
+  //       setImageUploaded(true);
+  //       setHasUnsavedChanges(true);
+  //     } catch (error) {
+  //       console.error('Error uploading image:', error);
+  //     }
+  //   }
+  // };
 
   const handleSaveDraft = async () => {
     // console.log('handleSaveDraft called');
@@ -769,7 +710,7 @@ function NewItemPage({ setItem: setParentItem }) {
 
     try {
       // console.log('Saving draft:', item);
-      const savedDraft = await handleManualSave(
+      await handleManualSave(
         item,
         uploadedImages,
         messages,
@@ -779,8 +720,7 @@ function NewItemPage({ setItem: setParentItem }) {
         setHasUnsavedChanges,
         setLastAutoSave
       );
-      // console.log('Draft saved successfully:', savedDraft);
-
+      onItemSaved(itemId); // Update this line
       toast.success('Draft saved successfully!');
     } catch (error) {
       console.error('Error saving draft:', error);
@@ -834,16 +774,13 @@ function NewItemPage({ setItem: setParentItem }) {
             onEndLoading={handleEndLoading}
             imageUploaded={imageUploaded}
             setImageUploaded={setImageUploaded}
-            imagePreview={imagePreview}
+            // imagePreview={imagePreview} // Remove or comment out this line
             selectedImage={selectedImage}
             setSelectedImage={setSelectedImage}
           />
 
           <ButtonContainer>
-            <GlowingButton
-              onClick={handleImageButtonClick}
-              disabled={isAnalyzing}
-            >
+            <GlowingButton onClick={handleImageButtonClick} disabled={isAnalyzing}>
               <i className="fas fa-image"></i> Add Images
             </GlowingButton>
             <GlowingButton
@@ -863,8 +800,8 @@ function NewItemPage({ setItem: setParentItem }) {
           {isAnalyzing && (
             <div>
               <p>
-                Image analysis in progress... You can continue to interact with
-                other parts of the page.
+                Image analysis in progress... You can continue to interact with other parts of the
+                page.
               </p>
               <p>
                 Estimated time left: {Math.floor(analysisTimeLeft / 60)}:
@@ -874,9 +811,9 @@ function NewItemPage({ setItem: setParentItem }) {
           )}
 
           <UploadedImagesGallery
-            key={galleryKey}
+            // key={galleryKey}
             images={uploadedImages}
-            onSelect={(image) => setSelectedImage(image)}
+            onSelect={image => setSelectedImage(image)}
             selectedImage={selectedImage}
             onDelete={handleDeleteImageWrapper}
             itemId={itemId}
@@ -885,7 +822,7 @@ function NewItemPage({ setItem: setParentItem }) {
           {/* Image Selection Modal */}
           {showImageModal && (
             <ModalOverlay onClick={() => setShowImageModal(false)}>
-              <ModalContent onClick={(e) => e.stopPropagation()}>
+              <ModalContent onClick={e => e.stopPropagation()}>
                 <h2>Add Images</h2>
                 <p>Choose how you'd like to add images:</p>
                 <ModalButton onClick={handleCameraClick}>
@@ -912,9 +849,7 @@ function NewItemPage({ setItem: setParentItem }) {
           {/* New Save Draft button */}
           <StyledButton onClick={handleSaveDraft}>Save Draft</StyledButton>
 
-          {lastAutoSave && (
-            <p>Last auto-save: {lastAutoSave.toLocaleTimeString()}</p>
-          )}
+          {lastAutoSave && <p>Last auto-save: {lastAutoSave.toLocaleTimeString()}</p>}
 
           {hasUnsavedChanges && <span>Unsaved changes</span>}
 
@@ -924,9 +859,7 @@ function NewItemPage({ setItem: setParentItem }) {
             updateItem={memoizedUpdateItem}
             handleSubmit={handleSubmit}
             handleSaveDraft={handleSaveDraft}
-            handlePurchaseRecommendationChange={
-              handlePurchaseRecommendationChange
-            }
+            handlePurchaseRecommendationChange={handlePurchaseRecommendationChange}
             itemId={itemId}
             analysisResult={item.analysisResults}
           />
@@ -942,7 +875,7 @@ function NewItemPage({ setItem: setParentItem }) {
 }
 
 NewItemPage.propTypes = {
-  setItem: PropTypes.func.isRequired,
+  onItemSaved: PropTypes.func.isRequired,
 };
 
 export default React.memo(NewItemPage);

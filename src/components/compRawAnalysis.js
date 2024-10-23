@@ -15,9 +15,7 @@ const RawAnalysisSummary = ({ rawAnalysis }) => {
   let formattedAnalysis;
   try {
     formattedAnalysis =
-      typeof rawAnalysis === 'string'
-        ? rawAnalysis
-        : JSON.stringify(rawAnalysis, null, 2);
+      typeof rawAnalysis === 'string' ? rawAnalysis : JSON.stringify(rawAnalysis, null, 2);
   } catch (error) {
     console.error('Error formatting raw analysis:', error);
     formattedAnalysis = 'Error formatting raw analysis';

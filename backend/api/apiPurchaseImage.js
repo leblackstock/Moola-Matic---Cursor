@@ -18,14 +18,7 @@ router.post('/save', async (req, res) => {
       return res.status(400).json({ error: 'Missing required information' });
     }
 
-    const purchasedDir = path.join(
-      __dirname,
-      '..',
-      '..',
-      'uploads',
-      'purchased',
-      itemId
-    );
+    const purchasedDir = path.join(__dirname, '..', '..', 'uploads', 'purchased', itemId);
     await fs.mkdir(purchasedDir, { recursive: true });
 
     const newFilename = `purchased-${Date.now()}${path.extname(originalFilename)}`;

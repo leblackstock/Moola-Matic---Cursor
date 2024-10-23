@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   fetchAllItems,
-  fetchDrafts,
+  // fetchDrafts,
   deleteDraft,
   clearLocalData,
   saveToLocalStorage,
@@ -14,9 +14,9 @@ import {
   PageContainer,
   PageTitle,
   PageSubtitle,
-  ItemList,
-  ItemListItem,
-  ItemPrice,
+  // ItemList,
+  // ItemListItem,
+  // ItemPrice,
   StyledButton,
 } from './components/compStyles.js';
 import { DraftItemGallery } from './components/compGallery.js';
@@ -33,26 +33,23 @@ function ViewItemsPage({ currentItemId }) {
 
     // Fetch all items
     fetchAllItems()
-      .then((fetchedItems) => {
+      .then(fetchedItems => {
         console.log('Fetched all items:', fetchedItems);
         // Log the structure of the first item to understand its properties
         if (fetchedItems.length > 0) {
-          console.log(
-            'First item structure:',
-            JSON.stringify(fetchedItems[0], null, 2)
-          );
+          console.log('First item structure:', JSON.stringify(fetchedItems[0], null, 2));
         }
         // Filter out drafts and set as purchased items
-        const purchasedItems = fetchedItems.filter((item) => !item.isDraft);
+        const purchasedItems = fetchedItems.filter(item => !item.isDraft);
         console.log('Filtered purchased items:', purchasedItems);
         setPurchasedItems(purchasedItems);
 
         // Set drafts from the same fetchedItems array
-        const drafts = fetchedItems.filter((item) => item.isDraft);
+        const drafts = fetchedItems.filter(item => item.isDraft);
         console.log('Filtered drafts:', drafts);
         setDrafts(drafts);
       })
-      .catch((error) => {
+      .catch(error => {
         console.error('Error fetching all items:', error);
       });
 
@@ -65,9 +62,18 @@ function ViewItemsPage({ currentItemId }) {
     //   .catch((error) => {
     //     console.error('Error fetching drafts:', error);
     //   });
-  }, []);
 
-  const handleDraftClick = (draft) => {
+    if (currentItemId) {
+      // Scroll to the item with currentItemId or highlight it
+      const itemElement = document.getElementById(`item-${currentItemId}`);
+      if (itemElement) {
+        itemElement.scrollIntoView({ behavior: 'smooth' });
+        itemElement.classList.add('highlight');
+      }
+    }
+  }, [currentItemId]);
+
+  const handleDraftClick = draft => {
     console.log('Draft clicked:', draft);
     clearLocalData();
     console.log('Local data cleared');
@@ -96,7 +102,7 @@ function ViewItemsPage({ currentItemId }) {
     }
   };
 
-  const handleDeleteDraft = async (draft) => {
+  const handleDeleteDraft = async draft => {
     console.log('Attempting to delete draft:', draft);
     const id = draft.itemId || (draft._id && draft._id.toString());
     if (!id) {
@@ -118,7 +124,7 @@ function ViewItemsPage({ currentItemId }) {
       await deleteDraft(id);
       console.log('Draft deleted successfully');
       setDrafts(
-        drafts.filter((d) => {
+        drafts.filter(d => {
           const dId = d.itemId || d._id;
           return dId !== id;
         })
@@ -130,7 +136,7 @@ function ViewItemsPage({ currentItemId }) {
     }
   };
 
-  const handleSaveDraft = async (draft) => {
+  const handleSaveDraft = async draft => {
     if (!draft || !draft.itemId) {
       console.error('No draft to save or itemId is missing');
       alert('Error: Unable to save draft (missing itemId)');
@@ -143,8 +149,8 @@ function ViewItemsPage({ currentItemId }) {
       console.log('Draft saved successfully:', savedDraft);
 
       // Update the drafts state with the saved draft
-      setDrafts((prevDrafts) =>
-        prevDrafts.map((d) => (d.itemId === savedDraft.itemId ? savedDraft : d))
+      setDrafts(prevDrafts =>
+        prevDrafts.map(d => (d.itemId === savedDraft.itemId ? savedDraft : d))
       );
 
       // Show a success message to the user
@@ -158,9 +164,7 @@ function ViewItemsPage({ currentItemId }) {
   const handleDeleteAllDrafts = async () => {
     console.log('Attempting to delete all drafts');
     if (
-      window.confirm(
-        'Are you sure you want to delete ALL drafts? This action cannot be undone.'
-      )
+      window.confirm('Are you sure you want to delete ALL drafts? This action cannot be undone.')
     ) {
       try {
         console.log('Deleting all drafts...');
@@ -177,7 +181,7 @@ function ViewItemsPage({ currentItemId }) {
     }
   };
 
-  const handleDeletePurchasedItem = async (item) => {
+  const handleDeletePurchasedItem = async item => {
     console.log('Deleting purchased item:', item);
     // Implement the logic to delete a purchased item
     // This might involve calling an API endpoint and updating the state
@@ -212,7 +216,7 @@ function ViewItemsPage({ currentItemId }) {
       <h3>Purchased Items</h3>
       <PurchasedItemGallery
         items={purchasedItems}
-        onSelect={(item) => console.log('Selected purchased item:', item)}
+        onSelect={item => console.log('Selected purchased item:', item)}
         onDelete={handleDeletePurchasedItem}
       />
     </PageContainer>

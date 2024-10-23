@@ -1,10 +1,8 @@
 // frontend/src/components/compUpload.js
 
-import React from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { v4 as uuidv4 } from 'uuid';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 console.log('API_BASE_URL:', API_BASE_URL);
@@ -13,29 +11,21 @@ console.log('API_BASE_URL:', API_BASE_URL);
 const handleFileUpload = async (files, itemId) => {
   console.log(`Starting upload for ${files.length} files, itemId: ${itemId}`);
   const formData = new FormData();
-  files.forEach((file) => formData.append('images', file));
+  files.forEach(file => formData.append('images', file));
   formData.append('itemId', itemId);
 
   try {
-    console.log(
-      `Sending POST request to: ${API_BASE_URL}/api/items/draft-images/upload`
-    );
-    const response = await axios.post(
-      `${API_BASE_URL}/api/items/draft-images/upload`,
-      formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-        onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round(
-            (progressEvent.loaded * 100) / progressEvent.total
-          );
-          console.log(`Upload progress: ${percentCompleted}%`);
-        },
-        timeout: 60000, // 60 seconds timeout for multiple files
-      }
-    );
+    console.log(`Sending POST request to: ${API_BASE_URL}/api/items/draft-images/upload`);
+    const response = await axios.post(`${API_BASE_URL}/api/items/draft-images/upload`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      onUploadProgress: progressEvent => {
+        const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+        console.log(`Upload progress: ${percentCompleted}%`);
+      },
+      timeout: 60000, // 60 seconds timeout for multiple files
+    });
 
     console.log(`Upload response:`, response);
 
@@ -59,20 +49,20 @@ const handleFileUpload = async (files, itemId) => {
 };
 
 // New function to check if a file already exists
-const checkFileExists = async (itemId, filename) => {
-  console.log('checkFileExists called with:', { itemId, filename });
-  try {
-    const url = `${API_BASE_URL}/api/items/draft-images/check/${itemId}/${encodeURIComponent(filename)}`;
-    console.log('Sending GET request to:', url);
-    const response = await axios.get(url);
-    console.log('File exists response:', response.data);
-    return response.data.exists;
-  } catch (error) {
-    console.error('Error checking file existence:', error);
-    console.error('Error response:', error.response?.data);
-    return false;
-  }
-};
+// const checkFileExists = async (itemId, filename) => {
+//   console.log('checkFileExists called with:', { itemId, filename });
+//   try {
+//     const url = `${API_BASE_URL}/api/items/draft-images/check/${itemId}/${encodeURIComponent(filename)}`;
+//     console.log('Sending GET request to:', url);
+//     const response = await axios.get(url);
+//     console.log('File exists response:', response.data);
+//     return response.data.exists;
+//   } catch (error) {
+//     console.error('Error checking file existence:', error);
+//     console.error('Error response:', error.response?.data);
+//     return false;
+//   }
+// };
 
 // Updated handleFileChange function
 export const handleFileChange = async (
@@ -86,20 +76,16 @@ export const handleFileChange = async (
   const formData = new FormData();
   formData.append('itemId', itemId);
 
-  files.forEach((file) => {
+  files.forEach(file => {
     formData.append('images', file);
   });
 
   try {
-    const response = await axios.post(
-      `${API_BASE_URL}/api/items/draft-images/upload`,
-      formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      }
-    );
+    const response = await axios.post(`${API_BASE_URL}/api/items/draft-images/upload`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
 
     console.log('Upload response:', response.data);
 
@@ -117,7 +103,7 @@ export const handleFileChange = async (
 };
 
 // Function to process frontend image deletion
-export const processFrontendImageDeletion = (image) => {
+export const processFrontendImageDeletion = image => {
   console.log('processFrontendImageDeletion called with:', image);
   try {
     const filename = image.filename || image.url.split('/').pop() || '';
@@ -130,7 +116,7 @@ export const processFrontendImageDeletion = (image) => {
 };
 
 // Combined function to handle image deletion from UI
-export const handleImageDeletion = async (item, itemId, imageUrl) => {
+export const handleImageDeletion = async (item, itemId) => {
   if (!item || !itemId) {
     console.error('Item or itemId is missing');
     throw new Error('Item and itemId are required to delete an image');
@@ -169,42 +155,33 @@ export const deleteImageFromServer = async (image, itemId) => {
 // Function to handle multiple file uploads
 export const handleMultipleFileUploads = async (files, itemId) => {
   console.log('handleMultipleFileUploads called with:', {
-    files: files.map((f) => f.name),
+    files: files.map(f => f.name),
     itemId,
   });
-  const uploadPromises = files.map((file) => handleFileUpload(file, itemId));
+  const uploadPromises = files.map(file => handleFileUpload(file, itemId));
   const results = await Promise.allSettled(uploadPromises);
   console.log('Upload results:', results);
   return results
-    .filter((result) => result.status === 'fulfilled' && result.value !== null)
-    .map((result) => result.value);
+    .filter(result => result.status === 'fulfilled' && result.value !== null)
+    .map(result => result.value);
 };
 
-export const handleImageDelete = async (
-  image,
-  itemId,
-  setUploadedImages,
-  setItem
-) => {
+export const handleImageDelete = async (image, itemId, setUploadedImages, setItem) => {
   console.log('handleImageDelete called with:', { image, itemId });
   try {
     const result = await deleteImageFromServer(image, itemId);
 
     if (result.success) {
-      setUploadedImages((prevImages) => {
-        const updatedImages = prevImages.filter(
-          (img) => img.filename !== image.filename
-        );
+      setUploadedImages(prevImages => {
+        const updatedImages = prevImages.filter(img => img.filename !== image.filename);
         console.log('Updated images after deletion:', updatedImages);
         return updatedImages;
       });
 
-      setItem((prevItem) => {
+      setItem(prevItem => {
         const updatedItem = {
           ...prevItem,
-          images: prevItem.images.filter(
-            (img) => img.filename !== image.filename
-          ),
+          images: prevItem.images.filter(img => img.filename !== image.filename),
         };
         console.log('Updated item after image deletion:', updatedItem);
         return updatedItem;
@@ -222,27 +199,25 @@ export const handleImageDelete = async (
 
 // ... rest of the component ...
 
-export const FileUpload = ({ onFileChange, itemId }) => {
-  const handleChange = async (event) => {
-    const files = Array.from(event.target.files);
-    console.log('Files selected:', files);
+// export const FileUpload = ({ onFileChange, itemId }) => {
+//   const handleChange = async event => {
+//     const files = Array.from(event.target.files);
+//     console.log('Files selected:', files);
 
-    if (!itemId) {
-      console.error('ItemId is missing in FileUpload component');
-      return;
-    }
+//     if (!itemId) {
+//       console.error('ItemId is missing in FileUpload component');
+//       return;
+//     }
 
-    try {
-      console.log('Starting file upload process');
-      const uploadPromises = files.map((file) =>
-        handleFileUpload(file, itemId)
-      );
-      await Promise.all(uploadPromises);
-      onFileChange(files);
-    } catch (error) {
-      console.error('Error handling file change:', error);
-    }
-  };
+//     try {
+//       console.log('Starting file upload process');
+//       const uploadPromises = files.map(file => handleFileUpload(file, itemId));
+//       await Promise.all(uploadPromises);
+//       onFileChange(files);
+//     } catch (error) {
+//       console.error('Error handling file change:', error);
+//     }
+//   };
 
-  // ... rest of the component ...
-};
+//   // ... rest of the component ...
+// };

@@ -82,16 +82,11 @@ export const handleImageQuestion = async (question, imageReference) => {
     console.log('Handling image-related question:', question);
 
     // Process image question by sending it to chatImages.js
-    const assistantResponse = await processImageQuestion(
-      question,
-      imageReference
-    );
+    const assistantResponse = await processImageQuestion(question, imageReference);
 
     return assistantResponse;
   } catch (error) {
     console.error('Error in handleImageQuestion:', error);
-    throw new Error(
-      'Failed to process image question. Please try again later.'
-    );
+    throw new Error('Failed to process image question. Please try again later.');
   }
 };

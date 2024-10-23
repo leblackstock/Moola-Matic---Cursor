@@ -25,7 +25,7 @@ const executeQueuedOperations = () => {
 };
 
 // Wrapper function to ensure operations are performed sequentially
-const withLock = (operation) => {
+const withLock = operation => {
   return new Promise((resolve, reject) => {
     const execute = async () => {
       try {
@@ -74,7 +74,7 @@ export const createNewItem = () => {
       }
 
       // Add a small delay to ensure localStorage is updated
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       return itemId;
     } catch (error) {
@@ -96,7 +96,7 @@ export const generateItemId = () => uuidv4();
 
 export const getCurrentItemId = () => withLock(async () => generatedItemId);
 
-export const setCurrentItemId = (itemId) =>
+export const setCurrentItemId = itemId =>
   withLock(async () => {
     generatedItemId = itemId;
     isItemGenerated = true;
@@ -127,12 +127,10 @@ export const generateDraftFilename = (
   });
 };
 
-export const getNextSequentialNumber = async (itemId) => {
+export const getNextSequentialNumber = async itemId => {
   return withLock(async () => {
     try {
-      const response = await axios.get(
-        `${BACKEND_URL}/api/items/draft-images/${itemId}`
-      );
+      const response = await axios.get(`${BACKEND_URL}/api/items/draft-images/${itemId}`);
       return response.data.nextSequentialNumber;
     } catch (error) {
       console.error('Error getting next sequential number:', error);
@@ -143,7 +141,7 @@ export const getNextSequentialNumber = async (itemId) => {
   });
 };
 
-export const createDefaultItem = async (itemId) => {
+export const createDefaultItem = async itemId => {
   if (!itemId) {
     toast.error('ItemId is required when creating a new item');
     throw new Error('ItemId is required when creating a new item');
@@ -151,9 +149,7 @@ export const createDefaultItem = async (itemId) => {
 
   try {
     // Fetch the schema fields from the backend
-    const response = await axios.get(
-      `${BACKEND_URL}/api/items/draft-item-schema`
-    );
+    const response = await axios.get(`${BACKEND_URL}/api/items/draft-item-schema`);
     const schemaData = response.data;
 
     // Create a new item object based on the schema fields
@@ -164,7 +160,7 @@ export const createDefaultItem = async (itemId) => {
 
     // Check if schemaData is an object and has keys
     if (typeof schemaData === 'object' && Object.keys(schemaData).length > 0) {
-      Object.keys(schemaData).forEach((field) => {
+      Object.keys(schemaData).forEach(field => {
         if (field !== '_id' && field !== '__v') {
           switch (field) {
             case 'messages':

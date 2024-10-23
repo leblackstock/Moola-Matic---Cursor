@@ -7,10 +7,10 @@ dotenv.config();
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const uploadImagesAndGetFileIds = async (batchImages) => {
+const uploadImagesAndGetFileIds = async batchImages => {
   try {
     const fileIds = await Promise.all(
-      batchImages.map(async (base64) => {
+      batchImages.map(async base64 => {
         const file = await openai.files.create({
           file: Buffer.from(base64.split(',')[1], 'base64'),
           purpose: 'vision',
@@ -36,15 +36,12 @@ const analyzeImagesWithAssistant = async (fileIds, analysisPrompt) => {
       { role: 'user', content: analysisPrompt },
     ];
 
-    const imageContents = fileIds.map((fileId) => ({
+    const imageContents = fileIds.map(fileId => ({
       type: 'image_url',
       image_url: { url: `https://api.openai.com/v1/files/${fileId}/content` },
     }));
 
-    messages[1].content = [
-      { type: 'text', text: analysisPrompt },
-      ...imageContents,
-    ];
+    messages[1].content = [{ type: 'text', text: analysisPrompt }, ...imageContents];
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4-turbo',
@@ -72,10 +69,7 @@ const createUserMessage = async (threadId, analysisPrompt, fileIds = []) => {
   }
 };
 
-const summarizeAnalyses = async (
-  combinedAnalyses,
-  combineAndSummarizeAnalysisPrompt
-) => {
+const summarizeAnalyses = async (combinedAnalyses, combineAndSummarizeAnalysisPrompt) => {
   try {
     const response = await openai.chat.completions.create({
       model: 'gpt-4-1106-preview',
@@ -99,7 +93,7 @@ const summarizeAnalyses = async (
   }
 };
 
-const createAssistantMessage = async (userMessage) => {
+const createAssistantMessage = async userMessage => {
   try {
     const response = await openai.chat.completions.create({
       model: 'gpt-4-1106-preview',

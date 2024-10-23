@@ -75,8 +75,8 @@ if (!fs.existsSync(DRAFT_IMAGES_DIR)) {
  * Function to delete a file
  * @param {string} filePath - Path to the file to be deleted
  */
-const deleteFile = (filePath) => {
-  fs.unlink(filePath, (err) => {
+const deleteFile = filePath => {
+  fs.unlink(filePath, err => {
     if (err) {
       console.error(`Failed to delete file ${filePath}:`, err);
     } else {
@@ -148,8 +148,7 @@ async function analyzeImage(
       assistantPrompt = `User Question: ${message}\nPlease provide a relevant response.`;
     }
 
-    const assistantResponse =
-      await interactWithMoolaMaticAssistant(assistantPrompt);
+    const assistantResponse = await interactWithMoolaMaticAssistant(assistantPrompt);
 
     // Update contextData with the latest image analysis and assistant response
     if (isInitialAnalysis) {
@@ -171,10 +170,7 @@ async function analyzeImage(
  * Expects multipart/form-data with 'image' and 'messages' fields
  */
 router.post('/analyze-image', upload.single('image'), async (req, res) => {
-  console.log(
-    'analyze-image route: Received request for item with ID:',
-    req.body.itemId
-  );
+  console.log('analyze-image route: Received request for item with ID:', req.body.itemId);
   const { message, isInitialAnalysis, itemId } = req.body;
   let contextData;
 
@@ -205,15 +201,14 @@ router.post('/analyze-image', upload.single('image'), async (req, res) => {
 
   // Call the analyzeImage function to process the image and get financial advice
   try {
-    const { assistantResponse, contextData: updatedContextData } =
-      await analyzeImage(
-        base64Image,
-        message,
-        contextData,
-        req.session,
-        isInitialAnalysis === 'true',
-        itemId
-      );
+    const { assistantResponse, contextData: updatedContextData } = await analyzeImage(
+      base64Image,
+      message,
+      contextData,
+      req.session,
+      isInitialAnalysis === 'true',
+      itemId
+    );
 
     // Send the assistant's response and updated contextData to the frontend
     res.json({

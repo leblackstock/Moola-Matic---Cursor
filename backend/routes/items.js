@@ -20,7 +20,7 @@ const storage = multer.diskStorage({
     const uploadPath = path.join(__dirname, '..', 'uploads', 'drafts', itemId);
     fs.mkdir(uploadPath, { recursive: true })
       .then(() => cb(null, uploadPath))
-      .catch((err) => cb(err));
+      .catch(err => cb(err));
   },
   filename: (req, file, cb) => {
     cb(null, file.originalname);
@@ -46,13 +46,7 @@ router.post('/draft-images/upload', upload, async (req, res) => {
         throw new Error('DraftItem not found');
       }
 
-      const uploadPath = path.join(
-        __dirname,
-        '..',
-        'uploads',
-        'drafts',
-        itemId
-      );
+      const uploadPath = path.join(__dirname, '..', 'uploads', 'drafts', itemId);
 
       await fs.mkdir(uploadPath, { recursive: true });
       logger.info(`Created upload directory: ${uploadPath}`);
@@ -62,9 +56,7 @@ router.post('/draft-images/upload', upload, async (req, res) => {
         const result = await generateDraftFilename(itemId, file, uploadPath);
 
         // Check if the image already exists in the DraftItem
-        const imageExists = existingDraftItem.images.some(
-          (img) => img.filename === result.filename
-        );
+        const imageExists = existingDraftItem.images.some(img => img.filename === result.filename);
 
         if (!imageExists) {
           existingDraftItem.images.push({
@@ -103,9 +95,7 @@ router.get('/draft-item-schema', async (req, res) => {
       error: error.message,
       stack: error.stack,
     });
-    res
-      .status(500)
-      .json({ error: 'Internal server error', details: error.message });
+    res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 });
 
@@ -135,14 +125,7 @@ router.delete('/draft-images/delete/:itemId/:filename', async (req, res) => {
     const { itemId, filename } = req.params;
     logger.info(`Attempting to delete image: ${filename} for item: ${itemId}`);
 
-    const imagePath = path.join(
-      __dirname,
-      '..',
-      'uploads',
-      'drafts',
-      itemId,
-      filename
-    );
+    const imagePath = path.join(__dirname, '..', 'uploads', 'drafts', itemId, filename);
 
     // Check if the file exists
     try {
@@ -215,19 +198,12 @@ router.get('/', async (req, res) => {
 // GET /api/items/draft-images/:itemId/:filename
 router.get('/draft-images/:itemId/:filename', async (req, res) => {
   const { itemId, filename } = req.params;
-  const imagePath = path.join(
-    __dirname,
-    '..',
-    'uploads',
-    'drafts',
-    itemId,
-    filename
-  );
+  const imagePath = path.join(__dirname, '..', 'uploads', 'drafts', itemId, filename);
 
   try {
     await fs.access(imagePath);
     res.setHeader('Access-Control-Allow-Origin', '*'); // Allow CORS for this route
-    res.sendFile(imagePath, (err) => {
+    res.sendFile(imagePath, err => {
       if (err) {
         logger.error(`Error sending file: ${err}`);
         res.status(err.status || 500).end();
@@ -245,14 +221,10 @@ router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const updateData = req.body;
 
-    const updatedItem = await DraftItem.findOneAndUpdate(
-      { itemId: id },
-      updateData,
-      {
-        new: true,
-        runValidators: true,
-      }
-    );
+    const updatedItem = await DraftItem.findOneAndUpdate({ itemId: id }, updateData, {
+      new: true,
+      runValidators: true,
+    });
 
     if (!updatedItem) {
       return res.status(404).json({ error: 'Item not found' });
@@ -265,9 +237,7 @@ router.put('/:id', async (req, res) => {
       error: error.message,
       stack: error.stack,
     });
-    res
-      .status(500)
-      .json({ error: 'Failed to update item', details: error.message });
+    res.status(500).json({ error: 'Failed to update item', details: error.message });
   }
 });
 
@@ -298,9 +268,7 @@ router.post('/save-draft', async (req, res) => {
       error: error.message,
       stack: error.stack,
     });
-    res
-      .status(500)
-      .json({ error: 'Failed to save draft', details: error.message });
+    res.status(500).json({ error: 'Failed to save draft', details: error.message });
   }
 });
 
@@ -319,12 +287,9 @@ router.post('/autosave-draft', async (req, res) => {
         draftData.finalRecommendation.purchaseRecommendation === ''
       ) {
         draftData.finalRecommendation.purchaseRecommendation = null;
-      } else if (
-        typeof draftData.finalRecommendation.purchaseRecommendation === 'string'
-      ) {
+      } else if (typeof draftData.finalRecommendation.purchaseRecommendation === 'string') {
         draftData.finalRecommendation.purchaseRecommendation =
-          draftData.finalRecommendation.purchaseRecommendation.toLowerCase() ===
-          'true';
+          draftData.finalRecommendation.purchaseRecommendation.toLowerCase() === 'true';
       }
     }
 
@@ -351,9 +316,7 @@ router.post('/autosave-draft', async (req, res) => {
       error: error.message,
       stack: error.stack,
     });
-    res
-      .status(500)
-      .json({ error: 'Failed to autosave draft', details: error.message });
+    res.status(500).json({ error: 'Failed to autosave draft', details: error.message });
   }
 });
 
@@ -380,13 +343,7 @@ router.delete('/drafts/:id', async (req, res) => {
 
     if (deleteImages) {
       // Delete the image folder
-      const imageFolderPath = path.join(
-        __dirname,
-        '..',
-        'uploads',
-        'drafts',
-        result.itemId
-      );
+      const imageFolderPath = path.join(__dirname, '..', 'uploads', 'drafts', result.itemId);
       if (
         await fs
           .access(imageFolderPath)
@@ -405,9 +362,7 @@ router.delete('/drafts/:id', async (req, res) => {
       error: error.message,
       stack: error.stack,
     });
-    res
-      .status(500)
-      .json({ error: 'Failed to delete draft', details: error.message });
+    res.status(500).json({ error: 'Failed to delete draft', details: error.message });
   }
 });
 
@@ -441,9 +396,7 @@ router.delete('/drafts', async (req, res) => {
       error: error.message,
       stack: error.stack,
     });
-    res
-      .status(500)
-      .json({ error: 'Failed to delete all drafts', details: error.message });
+    res.status(500).json({ error: 'Failed to delete all drafts', details: error.message });
   }
 });
 

@@ -1,10 +1,10 @@
 // frontend/src/components/compChat.js
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   handleChatWithAssistant,
-  analyzeImageWithGPT4Turbo,
-  handleImageChat,
+  // analyzeImageWithGPT4Turbo,
+  // handleImageChat,
 } from '../api/chat.js';
 import '../App.css';
 
@@ -12,88 +12,52 @@ import '../App.css';
 import {
   AIChatBox,
   ChatHistory,
-  AITyping,
-  MessagesContainer,
+  // AITyping,
+  // MessagesContainer,
   MessageContainer,
   MessageBubble,
   InputContainer,
-  ChatInput,
-  SendButton,
-  ImageInputContainer,
+  // ChatInput,
+  // SendButton,
+  // ImageInputContainer,
   StyledTextarea,
   IconButton,
   TextIcon,
-  ImagePreviewContainer,
-  ImagePreview,
+  // ImagePreviewContainer,
+  // ImagePreview,
   LoadingIndicator,
-  StyledButton,
+  // StyledButton,
   LoadingOverlay,
   LoadingSpinner,
 } from './compStyles.js';
 
 import PropTypes from 'prop-types';
 
-function ChatComp({
-  item,
-  updateItem,
-  messages,
-  setMessages,
-  itemId,
-  isLoading,
-  onStartLoading,
-  onEndLoading,
-  imageUploaded,
-  setImageUploaded,
-  imagePreview: propImagePreview,
-  selectedImage,
-  setSelectedImage,
-}) {
+function ChatComp({ updateItem, messages, setMessages, isLoading, onStartLoading, onEndLoading }) {
   const [message, setMessage] = useState('');
-  const [localImagePreview, setLocalImagePreview] = useState(
-    propImagePreview || ''
-  );
 
   // Add this line to define the messagesContainerRef
   const messagesContainerRef = useRef(null);
 
-  // Use propImagePreview or localImagePreview as needed
-  const currentImagePreview = propImagePreview || localImagePreview;
-
-  // Update localImagePreview when propImagePreview changes
-  useEffect(() => {
-    setLocalImagePreview(propImagePreview || '');
-  }, [propImagePreview]);
-
   // Add this useEffect to scroll to the bottom of the chat
   useEffect(() => {
     if (messagesContainerRef.current) {
-      messagesContainerRef.current.scrollTop =
-        messagesContainerRef.current.scrollHeight;
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
     }
   }, [messages]);
-
-  // Helper function to convert File to base64
-  const getBase64 = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result.split(',')[1]);
-      reader.onerror = (error) => reject(error);
-    });
-  };
 
   const sendMessage = async () => {
     if (!message.trim()) return;
 
     const newUserMessage = { role: 'user', content: message };
-    setMessages((prevMessages) => [...prevMessages, newUserMessage]);
+    setMessages(prevMessages => [...prevMessages, newUserMessage]);
     setMessage('');
     onStartLoading();
 
     try {
       const response = await handleChatWithAssistant(message);
 
-      setMessages((prevMessages) => [
+      setMessages(prevMessages => [
         ...prevMessages,
         {
           role: 'assistant',
@@ -108,7 +72,7 @@ function ChatComp({
       }
     } catch (error) {
       console.error('Error interacting with Moola-Matic assistant:', error);
-      setMessages((prevMessages) => [
+      setMessages(prevMessages => [
         ...prevMessages,
         {
           role: 'assistant',
@@ -122,7 +86,7 @@ function ChatComp({
     }
   };
 
-  const renderContent = (content) => {
+  const renderContent = content => {
     let parsedContent;
 
     if (typeof content === 'string') {
@@ -138,9 +102,7 @@ function ChatComp({
     }
 
     if (typeof parsedContent === 'string') {
-      const lines = parsedContent
-        .split('\n')
-        .filter((line) => line.trim() !== '');
+      const lines = parsedContent.split('\n').filter(line => line.trim() !== '');
       return lines.map((line, i) => (
         <React.Fragment key={i}>
           {line.startsWith('###') ? (
@@ -156,9 +118,7 @@ function ChatComp({
               {line.replace('#', '').trim()}
             </h5>
           ) : line.startsWith('-') ? (
-            <li style={{ marginBottom: '0.1em' }}>
-              {line.replace('-', '').trim()}
-            </li>
+            <li style={{ marginBottom: '0.1em' }}>{line.replace('-', '').trim()}</li>
           ) : (
             <p style={{ marginBottom: '0.1em', marginTop: '0.1em' }}>{line}</p>
           )}
@@ -182,9 +142,7 @@ function ChatComp({
           messages.map((message, index) => (
             <MessageContainer key={index} $isUser={message.role === 'user'}>
               <MessageBubble $isUser={message.role === 'user'}>
-                {message.role === 'assistant'
-                  ? renderContent(message.content)
-                  : message.content}
+                {message.role === 'assistant' ? renderContent(message.content) : message.content}
               </MessageBubble>
             </MessageContainer>
           ))
@@ -192,15 +150,13 @@ function ChatComp({
           <p>No chat history available.</p>
         )}
       </ChatHistory>
-      {isLoading && (
-        <LoadingIndicator>Processing your request...</LoadingIndicator>
-      )}
+      {isLoading && <LoadingIndicator>Processing your request...</LoadingIndicator>}
       <InputContainer>
         <TextIcon className="fas fa-comment"></TextIcon>
         <StyledTextarea
           value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          onKeyPress={(e) => {
+          onChange={e => setMessage(e.target.value)}
+          onKeyPress={e => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
               sendMessage();
@@ -228,7 +184,6 @@ ChatComp.propTypes = {
   onEndLoading: PropTypes.func.isRequired,
   imageUploaded: PropTypes.bool.isRequired,
   setImageUploaded: PropTypes.func.isRequired,
-  imagePreview: PropTypes.string,
   selectedImage: PropTypes.object,
   setSelectedImage: PropTypes.func.isRequired,
 };

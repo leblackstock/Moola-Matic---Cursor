@@ -7,7 +7,7 @@ import axios from 'axios';
  * @param {Array} analyses - Array of image analysis JSON objects.
  * @returns {Promise<Object>} - The summarized JSON object.
  */
-export const combineImageAnalyses = async (analyses) => {
+export const combineImageAnalyses = async analyses => {
   try {
     const response = await axios.post(
       `${process.env.REACT_APP_BACKEND_URL}/api/combine-image-analyses`,

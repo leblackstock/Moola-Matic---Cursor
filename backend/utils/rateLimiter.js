@@ -15,21 +15,18 @@ const tokenLimiter = new Bottleneck({
   reservoirRefreshInterval: 60 * 1000, // Refill every 60 seconds
 });
 
-export const rateLimitedRequest = async (requestFunction) => {
+export const rateLimitedRequest = async requestFunction => {
   return requestLimiter.schedule(() => requestFunction());
 };
 
-export const rateLimitedTokens = async (tokenCount) => {
+export const rateLimitedTokens = async tokenCount => {
   return tokenLimiter.schedule({ weight: tokenCount }, () => {
     // This function doesn't actually do anything, it just "consumes" tokens
     return Promise.resolve();
   });
 };
 
-export const rateLimitedRequestWithTokens = async (
-  requestFunction,
-  estimatedTokens
-) => {
+export const rateLimitedRequestWithTokens = async (requestFunction, estimatedTokens) => {
   // First, check if we have enough tokens
   await rateLimitedTokens(estimatedTokens);
   // Then, execute the rate-limited request

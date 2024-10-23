@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { toast } from 'react-toastify';
+// import { toast } from 'react-toastify';
 import {
   GalleryContainer,
   ImageContainer,
@@ -12,26 +12,15 @@ import {
 } from './compStyles.js';
 import { getImageUrl } from '../helpers/itemGen.js';
 
-export const UploadedImagesGallery = ({
-  images,
-  onSelect,
-  selectedImage,
-  onDelete,
-  itemId,
-}) => {
+export const UploadedImagesGallery = ({ images, onSelect, selectedImage, onDelete, itemId }) => {
   const [deletingImages, setDeletingImages] = useState([]);
   const [addedImages, setAddedImages] = useState([]);
 
   useEffect(() => {
     // When images change, check for new images and add them to addedImages
-    const newImages = images.filter(
-      (img) => !addedImages.includes(img.filename)
-    );
+    const newImages = images.filter(img => !addedImages.includes(img.filename));
     if (newImages.length > 0) {
-      setAddedImages((prev) => [
-        ...prev,
-        ...newImages.map((img) => img.filename),
-      ]);
+      setAddedImages(prev => [...prev, ...newImages.map(img => img.filename)]);
       // Remove the 'adding' class after animation completes
       setTimeout(() => {
         setAddedImages([]);
@@ -39,13 +28,11 @@ export const UploadedImagesGallery = ({
     }
   }, [images]);
 
-  const handleDelete = (image) => {
+  const handleDelete = image => {
     setDeletingImages([...deletingImages, image.filename]);
     setTimeout(() => {
       onDelete(image);
-      setDeletingImages(
-        deletingImages.filter((filename) => filename !== image.filename)
-      );
+      setDeletingImages(deletingImages.filter(filename => filename !== image.filename));
     }, 500); // This should match the duration of the deleteAnimation
   };
 
@@ -68,7 +55,7 @@ export const UploadedImagesGallery = ({
                 style={{
                   border: selectedImage === image ? '2px solid blue' : 'none',
                 }}
-                onError={(e) => {
+                onError={e => {
                   console.error(`Failed to load image: ${image.filename}`);
                   e.target.onerror = null;
                   e.target.style.display = 'none';
@@ -79,7 +66,7 @@ export const UploadedImagesGallery = ({
               <ErrorImagePlaceholder>No Image</ErrorImagePlaceholder>
             )}
             <HoverDeleteButton
-              onClick={(e) => {
+              onClick={e => {
                 e.stopPropagation();
                 handleDelete(image);
               }}
@@ -124,28 +111,23 @@ export const DraftItemGallery = ({ items, onSelect, onDelete }) => {
 
         const uniqueKey = `${item.itemId || item._id || ''}-${index}`;
         return (
-          <ImageContainer
-            key={uniqueKey}
-            onClick={() => onSelect(item)}
-            $noImage={!imageUrl}
-          >
+          <ImageContainer key={uniqueKey} onClick={() => onSelect(item)} $noImage={!imageUrl}>
             {imageUrl ? (
               <StyledImage
                 src={imageUrl}
                 alt={`Draft image ${item.name || 'unnamed'}`}
-                onError={(e) => {
+                onError={e => {
                   console.error(`Failed to load image: ${imageUrl}`);
                   e.target.onerror = null;
                   e.target.style.display = 'none';
-                  e.target.parentElement.style.backgroundColor =
-                    'rgba(138, 43, 226, 0.2)';
+                  e.target.parentElement.style.backgroundColor = 'rgba(138, 43, 226, 0.2)';
                 }}
               />
             ) : (
               <ErrorImagePlaceholder>No Image</ErrorImagePlaceholder>
             )}
             <HoverDeleteButton
-              onClick={(e) => {
+              onClick={e => {
                 e.stopPropagation();
                 onDelete(item);
               }}
@@ -181,8 +163,7 @@ export const PurchasedItemGallery = ({ items, onSelect, onDelete }) => {
   return (
     <GalleryContainer>
       {items.map((item, index) => {
-        const imageUrl =
-          item.imageUrl || getImageUrl(item.itemId, item.filename);
+        const imageUrl = item.imageUrl || getImageUrl(item.itemId, item.filename);
         const uniqueKey = `${item.id || item._id || ''}-${index}`;
         return (
           <ImageContainer key={uniqueKey} onClick={() => onSelect(item)}>
@@ -190,7 +171,7 @@ export const PurchasedItemGallery = ({ items, onSelect, onDelete }) => {
               <StyledImage
                 src={imageUrl}
                 alt={`Purchased item ${item.name || 'unnamed'}`}
-                onError={(e) => {
+                onError={e => {
                   console.error(`Failed to load image: ${imageUrl}`);
                   e.target.onerror = null;
                   e.target.style.display = 'none';
@@ -201,7 +182,7 @@ export const PurchasedItemGallery = ({ items, onSelect, onDelete }) => {
               <ErrorImagePlaceholder>No Image</ErrorImagePlaceholder>
             )}
             <HoverDeleteButton
-              onClick={(e) => {
+              onClick={e => {
                 e.stopPropagation();
                 onDelete(item);
               }}

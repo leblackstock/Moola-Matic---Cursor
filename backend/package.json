@@ -1,10 +1,11 @@
 {
-  "name": "moola-matic_backend",
+  "name": "moola-matic-backend",
   "version": "1.0.0",
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev": "nodemon server.js"
   },
   "dependencies": {
     "async-lock": "^1.4.1",
@@ -15,25 +16,31 @@
     "dotenv": "^10.0.0",
     "express": "^4.17.1",
     "express-rate-limit": "^5.5.0",
-    "express-session": "^1.18.0",
+    "express-session": "^1.18.1",
     "form-data": "^4.0.0",
+    "glob": "^11.0.0",
     "gpt-3-encoder": "^1.1.4",
     "helmet": "^4.6.0",
     "limiter": "^2.1.0",
     "lodash": "^4.17.21",
     "mongoose": "^6.0.12",
     "morgan": "^1.10.0",
-    "multer": "^1.4.3",
+    "multer": "^1.4.5-lts.1",
     "openai": "^4.68.1",
+    "rimraf": "^6.0.1",
     "sharp": "^0.33.5",
     "uuid": "^10.0.0",
     "winston": "^3.3.3"
   },
   "devDependencies": {
+    "@eslint/config-array": "^0.18.0",
+    "@eslint/object-schema": "^2.1.4",
+    "concurrently": "^9.0.1",
     "eslint": "^9.13.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prettier": "^5.2.1",
     "eslint-plugin-react": "^7.37.1",
+    "nodemon": "^3.1.7",
     "prettier": "^3.3.3"
   }
 }

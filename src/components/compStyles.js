@@ -119,12 +119,12 @@ export const ImageContainer = styled.div`
     transform 0.3s ease,
     box-shadow 0.3s ease;
   height: 150px;
-  background-color: ${(props) =>
+  background-color: ${props =>
     props.$noImage
       ? 'rgba(138, 43, 226, 0.2)'
       : 'transparent'}; // Light purple background for items with no image
 
-  ${(props) =>
+  ${props =>
     props.$isSelected &&
     `
     transform: scale(1.05);
@@ -560,7 +560,7 @@ export const MessagesContainer = styled.div`
 export const MessageContainer = styled.div`
   display: flex;
   flex-direction: column;
-  align-items: ${(props) => (props.$isUser ? 'flex-end' : 'flex-start')};
+  align-items: ${props => (props.$isUser ? 'flex-end' : 'flex-start')};
   margin-bottom: 10px;
 `;
 
@@ -571,11 +571,9 @@ export const MessageBubble = styled.div`
   color: #f5deb3;
   white-space: pre-wrap;
   word-wrap: break-word;
-  background: ${(props) =>
-    props.$isUser
-      ? 'linear-gradient(45deg, #2D0037, #4A0E4E)'
-      : 'rgba(139, 0, 0, 0.8)'};
-  text-align: ${(props) => (props.$isUser ? 'right' : 'left')};
+  background: ${props =>
+    props.$isUser ? 'linear-gradient(45deg, #2D0037, #4A0E4E)' : 'rgba(139, 0, 0, 0.8)'};
+  text-align: ${props => (props.$isUser ? 'right' : 'left')};
 `;
 
 export const InputContainer = styled.div`
@@ -734,11 +732,7 @@ export const NavLink = styled.a`
       transform: translate(-50%, -50%);
       width: 30px;
       height: 30px;
-      background: radial-gradient(
-        circle,
-        rgba(0, 255, 255, 0.1) 0%,
-        rgba(0, 255, 255, 0) 70%
-      );
+      background: radial-gradient(circle, rgba(0, 255, 255, 0.1) 0%, rgba(0, 255, 255, 0) 70%);
       border-radius: 50%;
       z-index: -1;
       opacity: 1;
@@ -753,11 +747,7 @@ export const NavLink = styled.a`
       0 0 30px #00ffff;
 
     &::after {
-      background: radial-gradient(
-        circle,
-        rgba(0, 255, 255, 0.2) 0%,
-        rgba(0, 255, 255, 0) 70%
-      );
+      background: radial-gradient(circle, rgba(0, 255, 255, 0.2) 0%, rgba(0, 255, 255, 0) 70%);
     }
   }
 
@@ -888,7 +878,7 @@ export const GalleryContainer = styled.div`
   padding: 10px;
   user-select: none; // Prevent text selection during drag
 
-  ${(props) =>
+  ${props =>
     props.$isDraftGallery &&
     `
     flex-direction: row;

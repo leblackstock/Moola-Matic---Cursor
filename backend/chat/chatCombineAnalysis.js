@@ -5,13 +5,8 @@ import { DraftItem } from '../models/draftItem.js';
 
 const logger = winston.createLogger({
   level: 'debug',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.json()
-  ),
-  transports: [
-    new winston.transports.File({ filename: 'logs/chatCombineAnalysis.log' }),
-  ],
+  format: winston.format.combine(winston.format.timestamp(), winston.format.json()),
+  transports: [new winston.transports.File({ filename: 'logs/chatCombineAnalysis.log' })],
 });
 
 /**
@@ -19,7 +14,7 @@ const logger = winston.createLogger({
  * @param {string|Object} analysis - The analysis to parse.
  * @returns {Object} - The parsed analysis object.
  */
-const parseAnalysis = (analysis) => {
+const parseAnalysis = analysis => {
   try {
     logger.info('Parsing Analysis');
 
@@ -35,7 +30,7 @@ const parseAnalysis = (analysis) => {
     }
 
     // Improved number parsing
-    Object.keys(parsed).forEach((key) => {
+    Object.keys(parsed).forEach(key => {
       if (typeof parsed[key] === 'string') {
         const numValue = parseFloat(parsed[key]);
         if (!isNaN(numValue) && isFinite(parsed[key])) {
@@ -45,7 +40,7 @@ const parseAnalysis = (analysis) => {
     });
 
     // Ensure all fields from DraftItem schema are present
-    Object.keys(DraftItem.schema.paths).forEach((field) => {
+    Object.keys(DraftItem.schema.paths).forEach(field => {
       if (field !== '_id' && field !== '__v') {
         if (!(field in parsed)) {
           parsed[field] = null;
@@ -64,12 +59,12 @@ const parseAnalysis = (analysis) => {
 };
 
 // New function to extract rawAnalysis
-const extractRawAnalysis = (parsedResults) => {
-  const rawAnalysisResult = parsedResults.find((result) => result.rawAnalysis);
+const extractRawAnalysis = parsedResults => {
+  const rawAnalysisResult = parsedResults.find(result => result.rawAnalysis);
   return rawAnalysisResult ? rawAnalysisResult.rawAnalysis : null;
 };
 
-const combineAnalyses = (analysisResults) => {
+const combineAnalyses = analysisResults => {
   try {
     console.log('Combining Analyses');
     logger.info('Starting combineAnalyses function', { analysisResults });
@@ -79,18 +74,16 @@ const combineAnalyses = (analysisResults) => {
       return { error: 'Invalid or empty analysis results' };
     }
 
-    const parsedResults = analysisResults.map((result) =>
-      parseAnalysis(result)
-    );
+    const parsedResults = analysisResults.map(result => parseAnalysis(result));
 
-    const allParsed = parsedResults.every((result) => !result.rawAnalysis);
+    const allParsed = parsedResults.every(result => !result.rawAnalysis);
     if (!allParsed) {
       logger.warn('Not all results were successfully parsed');
       return { error: 'Some analyses could not be parsed' };
     }
 
     const combinedAnalysis = parsedResults.reduce((combined, result) => {
-      Object.keys(result).forEach((key) => {
+      Object.keys(result).forEach(key => {
         const newValue = result[key];
 
         if (newValue === null || newValue === 'Unknown') {
@@ -112,9 +105,9 @@ const combineAnalyses = (analysisResults) => {
     // Handle any additional data that doesn't fit into specific fields
     const detailedBreakdown = parsedResults.reduce((breakdown, result) => {
       const extraData = Object.keys(result).filter(
-        (key) => !Object.keys(DraftItem.schema.paths).includes(key)
+        key => !Object.keys(DraftItem.schema.paths).includes(key)
       );
-      extraData.forEach((key) => {
+      extraData.forEach(key => {
         if (!breakdown[key]) {
           breakdown[key] = result[key];
         } else if (Array.isArray(breakdown[key])) {
@@ -129,7 +122,7 @@ const combineAnalyses = (analysisResults) => {
     combinedAnalysis.detailedBreakdown = detailedBreakdown;
 
     // Ensure all fields from DraftItem schema are present in the final result
-    Object.keys(DraftItem.schema.paths).forEach((field) => {
+    Object.keys(DraftItem.schema.paths).forEach(field => {
       if (field !== '_id' && field !== '__v') {
         if (!(field in combinedAnalysis)) {
           combinedAnalysis[field] = null;

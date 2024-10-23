@@ -3,7 +3,7 @@
 import axios from 'axios';
 import { validateBase64, validateAndResizeImage } from './imageValidator.js';
 
-const convertUrlToBase64 = async (url) => {
+const convertUrlToBase64 = async url => {
   console.log('Starting convertUrlToBase64 function for URL:', url);
   try {
     console.log('Fetching image data...');
@@ -41,7 +41,7 @@ const convertUrlToBase64 = async (url) => {
   }
 };
 
-const processImages = async (imageUrls) => {
+const processImages = async imageUrls => {
   console.log('Starting processImages function');
   console.log('Number of image URLs received:', imageUrls.length);
 
@@ -49,9 +49,7 @@ const processImages = async (imageUrls) => {
     imageUrls.map(async (url, index) => {
       console.log(`Processing image ${index + 1}:`, url);
       try {
-        console.log(
-          `Attempting to convert URL to base64 for image ${index + 1}`
-        );
+        console.log(`Attempting to convert URL to base64 for image ${index + 1}`);
         const { base64Image, sizeMB, filename } = await convertUrlToBase64(url);
         console.log(`Successfully converted image ${index + 1} to base64`);
         console.log(`Image ${index + 1} size:`, sizeMB.toFixed(2), 'MB');
@@ -70,16 +68,11 @@ const processImages = async (imageUrls) => {
     })
   );
 
-  const filteredImages = processedImages.filter((img) => img !== null);
-  console.log(
-    'Number of successfully processed images:',
-    filteredImages.length
-  );
+  const filteredImages = processedImages.filter(img => img !== null);
+  console.log('Number of successfully processed images:', filteredImages.length);
 
   if (filteredImages.length === 0) {
-    console.warn(
-      'No images were successfully processed. Check the logs for details.'
-    );
+    console.warn('No images were successfully processed. Check the logs for details.');
   }
 
   return filteredImages;

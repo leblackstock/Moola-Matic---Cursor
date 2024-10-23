@@ -6,22 +6,16 @@ import { toast } from 'react-toastify';
 // Determine the API URL based on the environment
 const BACKEND_PORT = process.env.REACT_APP_BACKEND_PORT || 3001;
 const API_URL =
-  process.env.NODE_ENV === 'production'
-    ? '/api'
-    : `http://localhost:${BACKEND_PORT}/api`;
+  process.env.NODE_ENV === 'production' ? '/api' : `http://localhost:${BACKEND_PORT}/api`;
 
-export const API_BASE_URL =
-  process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001';
-
-// Add this at the top of the file
-let contextData = null;
+export const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001';
 
 /**
  * Creates a user message object.
  * @param {string} content - The content of the message.
  * @returns {Object} - Message object with role 'user'.
  */
-export const createUserMessage = (content) => ({
+export const createUserMessage = content => ({
   role: 'user',
   content,
 });
@@ -31,7 +25,7 @@ export const createUserMessage = (content) => ({
  * @param {string} content - The content of the message.
  * @returns {Object} - Message object with role 'assistant'.
  */
-export const createAssistantMessage = (content) => ({
+export const createAssistantMessage = content => ({
   role: 'assistant',
   content,
 });
@@ -57,9 +51,7 @@ export const handleChatWithAssistant = async (message, itemId) => {
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(
-        errorData.error || `HTTP error! status: ${response.status}`
-      );
+      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
     }
 
     const data = await response.json();
@@ -84,12 +76,7 @@ export const handleChatWithAssistant = async (message, itemId) => {
 };
 
 // Add this function to chat.js
-export const handleAnalyzeImages = async ({
-  itemId,
-  contextData,
-  setItem,
-  setMessages,
-}) => {
+export const handleAnalyzeImages = async ({ itemId, contextData, setItem, setMessages }) => {
   console.log('handleAnalyzeImages called with:', { itemId, contextData });
 
   if (!itemId) {
@@ -113,11 +100,9 @@ export const handleAnalyzeImages = async ({
     // Step 2: Process the image URLs
     const baseUrl = `http://localhost:${process.env.REACT_APP_BACKEND_PORT}`;
     const imageUrls = item.images
-      .map((image) => {
+      .map(image => {
         if (image.url) {
-          return image.url.startsWith('http')
-            ? image.url
-            : `${baseUrl}${image.url}`;
+          return image.url.startsWith('http') ? image.url : `${baseUrl}${image.url}`;
         } else if (image.filename) {
           // Construct the URL based on the provided path structure
           return `${baseUrl}/uploads/drafts/${itemId}/${image.filename}`;
@@ -149,7 +134,7 @@ export const handleAnalyzeImages = async ({
 
     // Update item state if setItem function is provided
     if (typeof setItem === 'function') {
-      setItem((prevItem) => ({
+      setItem(prevItem => ({
         ...prevItem,
         analysisResult: { analyses, summary, metadata },
       }));
@@ -157,7 +142,7 @@ export const handleAnalyzeImages = async ({
 
     // Update messages if setMessages function is provided
     if (typeof setMessages === 'function') {
-      setMessages((prevMessages) => [
+      setMessages(prevMessages => [
         ...prevMessages,
         createAssistantMessage(
           `Analysis complete. ${summary.finalRecommendation?.detailedBreakdown || 'No detailed breakdown available.'}`
@@ -170,9 +155,23 @@ export const handleAnalyzeImages = async ({
     return { analyses, summary, metadata };
   } catch (error) {
     console.error('Error in handleAnalyzeImages:', error);
-    toast.error(
-      'An error occurred while analyzing the images. Please try again.'
-    );
+    toast.error('An error occurred while analyzing the images. Please try again.');
     throw error;
   }
 };
+
+const sendMessageToOpenAI = async (messages, contextData = {}) => {
+  try {
+    /* const contextData = {
+      // ... context data
+    }; */
+
+    const response = await axios.post('/api/chat', { messages, contextData });
+    return response.data;
+  } catch (error) {
+    console.error('Error sending message to OpenAI:', error);
+    throw error;
+  }
+};
+
+export { sendMessageToOpenAI };

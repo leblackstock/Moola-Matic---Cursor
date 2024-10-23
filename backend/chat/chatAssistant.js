@@ -22,10 +22,7 @@ const openai = new OpenAI({
 // Initialize Winston logger
 const logger = winston.createLogger({
   level: 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.json()
-  ),
+  format: winston.format.combine(winston.format.timestamp(), winston.format.json()),
   transports: [
     new winston.transports.File({ filename: 'logs/chat_assistant.log' }),
     //new winston.transports.Console({
@@ -92,7 +89,7 @@ const uploadBase64Image = async (base64Image, originalFileName) => {
  * @param {string} fileId - The ID of the file to retrieve.
  * @returns {Promise<string>} - The content of the file in base64.
  */
-const retrieveFileContent = async (fileId) => {
+const retrieveFileContent = async fileId => {
   try {
     const apiUrl = `https://api.openai.com/v1/files/${fileId}/content`;
     const response = await axios.get(apiUrl, {
@@ -207,7 +204,7 @@ const summarizeAnalyses = async (combinedAnalysis, summarizePrompt) => {
  * @param {string} userMessage - The user's message.
  * @returns {Promise<string>} - The assistant's response.
  */
-const createAssistantMessage = async (userMessage) => {
+const createAssistantMessage = async userMessage => {
   try {
     const response = await rateLimitedRequestWithTokens(
       () =>

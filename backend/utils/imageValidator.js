@@ -15,7 +15,7 @@ const MAX_IMAGE_SIZES = {
   tiff: { width: 850, height: 850, maxBytes: MAX_SIZE_BYTES },
 };
 
-export const validateImageFormat = (format) => {
+export const validateImageFormat = format => {
   if (!SUPPORTED_FORMATS.includes(format)) {
     throw new Error(
       `Unsupported image format: ${format}. Supported formats are: ${SUPPORTED_FORMATS.join(', ')}`
@@ -23,21 +23,15 @@ export const validateImageFormat = (format) => {
   }
 };
 
-export const validateBase64 = (base64String) => {
-  console.log(
-    'Validating base64 string:',
-    base64String.substring(0, 50) + '...'
-  );
+export const validateBase64 = base64String => {
+  console.log('Validating base64 string:', base64String.substring(0, 50) + '...');
 
   // Less strict regex that allows for different image formats
   const regex = /^data:image\/[a-z]+;base64,/;
   if (!regex.test(base64String)) {
     console.log('Base64 string failed regex test');
     console.log('Regex pattern:', regex);
-    console.log(
-      'First 100 characters of base64 string:',
-      base64String.substring(0, 100)
-    );
+    console.log('First 100 characters of base64 string:', base64String.substring(0, 100));
     return false;
   }
 
@@ -48,23 +42,18 @@ export const validateBase64 = (base64String) => {
     return true;
   } catch (e) {
     console.log('Error decoding base64 string:', e.message);
-    console.log(
-      'First 100 characters of base64 data:',
-      base64Data.substring(0, 100)
-    );
+    console.log('First 100 characters of base64 data:', base64Data.substring(0, 100));
     return false;
   }
 };
 
 export const validateImageSize = (imageBuffer, format) => {
   if (imageBuffer.length > MAX_SIZE_BYTES) {
-    throw new Error(
-      `Image size exceeds maximum allowed: ${MAX_SIZE_BYTES} bytes`
-    );
+    throw new Error(`Image size exceeds maximum allowed: ${MAX_SIZE_BYTES} bytes`);
   }
 };
 
-export const validateAndResizeImage = async (imageBuffer) => {
+export const validateAndResizeImage = async imageBuffer => {
   try {
     const metadata = await sharp(imageBuffer).metadata();
     const format = metadata.format;

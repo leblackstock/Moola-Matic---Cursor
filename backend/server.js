@@ -124,18 +124,16 @@ app.post('/api/logout', async (req, res) => {
   const uploadedImages = req.session.uploadedImages || [];
 
   try {
-    await Promise.all(uploadedImages.map((imagePath) => fs.unlink(imagePath)));
+    await Promise.all(uploadedImages.map(imagePath => fs.unlink(imagePath)));
     logger.debug('All uploaded image files deleted successfully.');
   } catch (err) {
     logger.error('Error deleting uploaded image files:', err);
   }
 
-  req.session.destroy((err) => {
+  req.session.destroy(err => {
     if (err) {
       logger.error('Error destroying session during logout:', err);
-      return res
-        .status(500)
-        .json({ error: 'An error occurred during logout.' });
+      return res.status(500).json({ error: 'An error occurred during logout.' });
     }
     res.clearCookie('connect.sid');
     res.json({ message: 'Logged out successfully.' });
@@ -158,13 +156,9 @@ app.use((req, res, next) => {
 console.log('Available routes:');
 function print(path, layer) {
   if (layer.route) {
-    layer.route.stack.forEach(
-      print.bind(null, path.concat(split(layer.route.path)))
-    );
+    layer.route.stack.forEach(print.bind(null, path.concat(split(layer.route.path))));
   } else if (layer.name === 'router' && layer.handle.stack) {
-    layer.handle.stack.forEach(
-      print.bind(null, path.concat(split(layer.regexp)))
-    );
+    layer.handle.stack.forEach(print.bind(null, path.concat(split(layer.regexp))));
   } else if (layer.method) {
     console.log(
       '%s /%s',
@@ -182,9 +176,7 @@ function split(thing) {
     .replace('\\/?', '')
     .replace('(?=\\/|$)', '$')
     .match(/^\/\^((?:\\[.*+?^${}()|[\]\\\/]|[^.*+?^${}()|[\]\\\/])*)\$\//);
-  return match
-    ? match[1].replace(/\\(.)/g, '$1').split('/')
-    : '<complex:' + thing.toString() + '>';
+  return match ? match[1].replace(/\\(.)/g, '$1').split('/') : '<complex:' + thing.toString() + '>';
 }
 
 app._router.stack.forEach(print.bind(null, []));
@@ -205,21 +197,17 @@ const startServer = async () => {
     await connectDB();
     await ensureUploadsDirectory();
     const server = app.listen(BACKEND_PORT, () => {
-      logger.info(
-        `Backend server is running on http://localhost:${BACKEND_PORT}`
-      );
-      logger.info(
-        `Frontend is expected to run on http://localhost:${FRONTEND_PORT}`
-      );
+      logger.info(`Backend server is running on http://localhost:${BACKEND_PORT}`);
+      logger.info(`Frontend is expected to run on http://localhost:${FRONTEND_PORT}`);
     });
 
     // Add error logging for the server
-    server.on('error', (error) => {
+    server.on('error', error => {
       logger.error('Server error:', error);
     });
 
     // Add MongoDB connection error handling
-    mongoose.connection.on('error', (error) => {
+    mongoose.connection.on('error', error => {
       logger.error('MongoDB connection error:', error);
     });
 

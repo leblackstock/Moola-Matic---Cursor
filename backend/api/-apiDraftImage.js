@@ -25,7 +25,7 @@ async function getNextSequentialNumber(itemId) {
     }
 
     // Extract sequential numbers from existing filenames
-    const sequentialNumbers = draft.images.map((img) => {
+    const sequentialNumbers = draft.images.map(img => {
       const match = img.filename.match(/Draft-\w{6}-(\d{2})\./);
       if (match && match[1]) {
         return parseInt(match[1], 10);
@@ -42,11 +42,7 @@ async function getNextSequentialNumber(itemId) {
 }
 
 // Helper Function: Generate Draft Filename
-function generateDraftFilename(
-  itemId,
-  sequentialNumber = 1,
-  originalFilename = 'image'
-) {
+function generateDraftFilename(itemId, sequentialNumber = 1, originalFilename = 'image') {
   const fileExtension = originalFilename.includes('.')
     ? originalFilename.split('.').pop().toLowerCase()
     : 'jpg';
@@ -71,34 +67,21 @@ router.post('/upload', upload.single('image'), async (req, res) => {
       });
     }
 
-    const uploadDir = path.join(
-      __dirname,
-      '..',
-      '..',
-      'uploads',
-      'drafts',
-      itemId
-    );
+    const uploadDir = path.join(__dirname, '..', '..', 'uploads', 'drafts', itemId);
 
     // Create the upload directory if it doesn't exist
     try {
       await fs.mkdir(uploadDir, { recursive: true });
     } catch (mkdirError) {
       console.error('Error creating upload directory:', mkdirError);
-      return res
-        .status(500)
-        .json({ error: 'Failed to create upload directory' });
+      return res.status(500).json({ error: 'Failed to create upload directory' });
     }
 
     // Get the next sequential number
     const nextSequentialNumber = await getNextSequentialNumber(itemId);
 
     // Generate the new filename
-    const filename = generateDraftFilename(
-      itemId,
-      nextSequentialNumber,
-      `file.${fileExtension}`
-    );
+    const filename = generateDraftFilename(itemId, nextSequentialNumber, `file.${fileExtension}`);
     const newPath = path.join(uploadDir, filename);
 
     // Write the file to the filesystem
@@ -138,15 +121,11 @@ router.post('/upload', upload.single('image'), async (req, res) => {
       });
     } catch (dbError) {
       console.error('Error updating draft with new image:', dbError);
-      return res
-        .status(500)
-        .json({ error: 'Failed to update draft with new image' });
+      return res.status(500).json({ error: 'Failed to update draft with new image' });
     }
   } catch (error) {
     console.error('Error processing upload:', error);
-    res
-      .status(500)
-      .json({ error: 'An error occurred while processing the upload' });
+    res.status(500).json({ error: 'An error occurred while processing the upload' });
   }
 });
 
@@ -156,15 +135,7 @@ router.delete('/:itemId/:filename', async (req, res) => {
     const { itemId, filename } = req.params;
     console.log(`Attempting to delete image: ${filename} for item: ${itemId}`);
 
-    const imagePath = path.join(
-      __dirname,
-      '..',
-      '..',
-      'uploads',
-      'drafts',
-      itemId,
-      filename
-    );
+    const imagePath = path.join(__dirname, '..', '..', 'uploads', 'drafts', itemId, filename);
 
     // Check if the file exists
     try {

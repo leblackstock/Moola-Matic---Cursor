@@ -1,9 +1,8 @@
 // frontend\src\components\compSave.js
 
 import axios from 'axios';
-import { useEffect, useCallback, useState, useRef, useMemo } from 'react';
+import { useEffect, useCallback, useRef, useMemo } from 'react';
 import debounce from 'lodash.debounce';
-import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'react-toastify';
 import { getNextSequentialNumber } from '../helpers/itemGen.js';
 
@@ -26,12 +25,12 @@ export const handleDraftSave = async (item, messages, currentItemId) => {
     const images = Array.isArray(itemCopy.images) ? itemCopy.images : [];
 
     const existingImages = images
-      .filter((image) => image.url && !image.file)
-      .map((image) => ({ ...image, isNewItem: false }));
+      .filter(image => image.url && !image.file)
+      .map(image => ({ ...image, isNewItem: false }));
 
     const newImages = images
-      .filter((image) => image.file)
-      .map((image) => ({ ...image, isNewItem: true }));
+      .filter(image => image.file)
+      .map(image => ({ ...image, isNewItem: true }));
 
     const allImages = [...existingImages, ...newImages];
 
@@ -43,15 +42,11 @@ export const handleDraftSave = async (item, messages, currentItemId) => {
       isDraft: true, // Ensure isDraft is set to true
     };
 
-    const response = await axios.post(
-      `${API_URL}/api/items/save-draft`,
-      dataToSend,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    const response = await axios.post(`${API_URL}/api/items/save-draft`, dataToSend, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
 
     if (response.status !== 200) {
       throw new Error('Failed to save draft');
@@ -89,15 +84,15 @@ export const handleAutoSave = async (
       throw new Error('Item or itemId is missing');
     }
 
-    const uniqueImageUrls = new Set(item.images.map((img) => img.url));
+    const uniqueImageUrls = new Set(item.images.map(img => img.url));
 
     const draftData = {
       ...item,
       images: [
-        ...item.images.filter((img) => uniqueImageUrls.has(img.url)),
+        ...item.images.filter(img => uniqueImageUrls.has(img.url)),
         ...uploadedImages
-          .filter((img) => !uniqueImageUrls.has(img.url))
-          .map((image) => ({
+          .filter(img => !uniqueImageUrls.has(img.url))
+          .map(image => ({
             id: image.id,
             url: image.url,
             filename: image.filename,
@@ -113,15 +108,11 @@ export const handleAutoSave = async (
       itemId: item.itemId,
     };
 
-    const response = await axios.post(
-      `${API_URL}/api/items/autosave-draft`,
-      requestBody,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    const response = await axios.post(`${API_URL}/api/items/autosave-draft`, requestBody, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
 
     if (response.data && response.data.item) {
       setItem(response.data.item);
@@ -159,11 +150,7 @@ export const handleLocalSave = (item, contextData, messages, itemId) => {
   // Validate messages
   const validMessages = Array.isArray(messages)
     ? messages.filter(
-        (msg) =>
-          typeof msg === 'object' &&
-          msg !== null &&
-          'role' in msg &&
-          'content' in msg
+        msg => typeof msg === 'object' && msg !== null && 'role' in msg && 'content' in msg
       )
     : [];
 
@@ -171,7 +158,7 @@ export const handleLocalSave = (item, contextData, messages, itemId) => {
     ...item,
     itemId: effectiveItemId,
     images: item.images
-      ? item.images.map((img) => ({
+      ? item.images.map(img => ({
           id: img.id,
           url: img.url,
           filename: img.filename,
@@ -184,17 +171,14 @@ export const handleLocalSave = (item, contextData, messages, itemId) => {
   saveToLocalStorage(effectiveItemId, itemToSave);
 
   if (typeof localStorage !== 'undefined' && localStorage !== null) {
-    localStorage.setItem(
-      `contextData_${effectiveItemId}`,
-      JSON.stringify(contextData || {})
-    );
+    localStorage.setItem(`contextData_${effectiveItemId}`, JSON.stringify(contextData || {}));
   } else {
     console.warn('localStorage is not available for saving context data');
   }
 };
 
 // Function to load local data based on itemId
-export const loadLocalData = (itemId) => {
+export const loadLocalData = itemId => {
   try {
     const storageKey = `item_${itemId}`;
     const data = localStorage.getItem(storageKey);
@@ -214,8 +198,7 @@ export const clearLocalData = () => {
 // Function to update context data
 export const updateContextData = (itemId, newData) => {
   try {
-    const prevData =
-      JSON.parse(localStorage.getItem(`contextData_${itemId}`)) || {};
+    const prevData = JSON.parse(localStorage.getItem(`contextData_${itemId}`)) || {};
     const updatedData = {
       ...prevData,
       ...newData,
@@ -261,11 +244,9 @@ export const saveDraft = async (draftData, contextData, messages) => {
 };
 
 // Function to delete a draft
-export const deleteDraft = async (draftId) => {
+export const deleteDraft = async draftId => {
   try {
-    const response = await axios.delete(
-      `${API_URL}/api/items/drafts/${draftId}?deleteImages=true`
-    );
+    const response = await axios.delete(`${API_URL}/api/items/drafts/${draftId}?deleteImages=true`);
     console.log('Draft and associated images deleted successfully');
     return response.data;
   } catch (error) {
@@ -311,12 +292,7 @@ export const fetchItems = async () => {
 };
 
 // Function to handle draft save with image processing
-export const handleDraftSaveWithImages = async (
-  item,
-  messages,
-  currentItemId,
-  backendPort
-) => {
+export const handleDraftSaveWithImages = async (item, messages, currentItemId, backendPort) => {
   if (!currentItemId) {
     console.error('Cannot save draft without a valid item ID');
     return;
@@ -326,7 +302,7 @@ export const handleDraftSaveWithImages = async (
     const itemCopy = { ...item };
 
     if (itemCopy.images && itemCopy.images.length > 0) {
-      itemCopy.images = itemCopy.images.map((image) => ({
+      itemCopy.images = itemCopy.images.map(image => ({
         id: image.id,
         url: image.url,
         filename: image.filename,
@@ -392,14 +368,14 @@ export const handleManualSave = async (
   setHasUnsavedChanges,
   setLastAutoSave
 ) => {
-  const uniqueImageUrls = new Set(item.images.map((img) => img.url));
+  const uniqueImageUrls = new Set(item.images.map(img => img.url));
 
   const combinedImages = [
-    ...item.images.filter((img) => uniqueImageUrls.has(img.url)),
+    ...item.images.filter(img => uniqueImageUrls.has(img.url)),
     ...uploadedImages
-      .filter((img) => !uniqueImageUrls.has(img.url))
-      .map((img) => ({
-        id: img.id || uuidv4(),
+      .filter(img => !uniqueImageUrls.has(img.url))
+      .map(img => ({
+        id: img.id,
         url: img.url,
         filename: img.filename,
         isNewItem: img.isNewItem,
@@ -408,11 +384,7 @@ export const handleManualSave = async (
 
   const validMessages = Array.isArray(messages)
     ? messages.filter(
-        (msg) =>
-          typeof msg === 'object' &&
-          msg !== null &&
-          'role' in msg &&
-          'content' in msg
+        msg => typeof msg === 'object' && msg !== null && 'role' in msg && 'content' in msg
       )
     : [];
 
@@ -465,20 +437,13 @@ export const handleFileUpload = async (file, itemId) => {
     const formData = new FormData();
     formData.append('image', file);
     formData.append('itemId', itemId);
-    formData.append(
-      'sequentialNumber',
-      String(sequentialNumber).padStart(2, '0')
-    );
+    formData.append('sequentialNumber', String(sequentialNumber).padStart(2, '0'));
 
-    const response = await axios.post(
-      `${API_URL}/api/items/draft-images/upload`,
-      formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      }
-    );
+    const response = await axios.post(`${API_URL}/api/items/draft-images/upload`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
 
     console.log('Upload response:', response.data);
 
@@ -517,7 +482,7 @@ export const deleteAllDrafts = async (deleteImages = true) => {
 export const loadItemData = loadLocalData; // Assuming these are the same function
 
 // Add a new function to create an item in the database
-export const createItem = async (itemData) => {
+export const createItem = async itemData => {
   try {
     const response = await axios.post(`${API_URL}/api/items`, itemData);
     console.log('Item created:', response.data);
@@ -562,11 +527,11 @@ export const updateItem = async (
   try {
     const schemaFields = await fetchDraftItemSchema();
 
-    const uniqueImageUrls = new Set(itemData.images.map((img) => img.url));
+    const uniqueImageUrls = new Set(itemData.images.map(img => img.url));
 
     const updatedItemData = {
       ...itemData,
-      images: itemData.images.filter((img) => uniqueImageUrls.has(img.url)),
+      images: itemData.images.filter(img => uniqueImageUrls.has(img.url)),
     };
 
     // Process data types
@@ -585,28 +550,21 @@ export const updateItem = async (
       'marketAnalysisMinimumAcceptablePrice',
     ];
 
-    numericFields.forEach((field) => {
-      if (
-        updatedItemData[field] !== undefined &&
-        updatedItemData[field] !== ''
-      ) {
+    numericFields.forEach(field => {
+      if (updatedItemData[field] !== undefined && updatedItemData[field] !== '') {
         updatedItemData[field] = Number(updatedItemData[field]);
       }
     });
 
-    const dateFields = [
-      'purchaseDate',
-      'listingDate',
-      'inventoryDetailsAcquisitionDate',
-    ];
-    dateFields.forEach((field) => {
+    const dateFields = ['purchaseDate', 'listingDate', 'inventoryDetailsAcquisitionDate'];
+    dateFields.forEach(field => {
       if (updatedItemData[field]) {
         updatedItemData[field] = new Date(updatedItemData[field]);
       }
     });
 
     // Remove any fields that are not in the DraftItemSchema
-    Object.keys(updatedItemData).forEach((key) => {
+    Object.keys(updatedItemData).forEach(key => {
       if (!schemaFields.includes(key)) {
         delete updatedItemData[key];
       }
@@ -624,10 +582,7 @@ export const updateItem = async (
     }
 
     // Update in database
-    const response = await axios.put(
-      `${API_URL}/api/items/${id}`,
-      updatedItemData
-    );
+    const response = await axios.put(`${API_URL}/api/items/${id}`, updatedItemData);
     console.log('Item updated:', response.data);
     return response.data;
   } catch (error) {
@@ -661,15 +616,11 @@ export const useAutosave = (
         itemId: itemId,
       };
 
-      const response = await axios.post(
-        `${API_URL}/api/items/autosave-draft`,
-        requestBody,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      const response = await axios.post(`${API_URL}/api/items/autosave-draft`, requestBody, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
 
       if (response.data && response.data.item) {
         setItem(response.data.item);
@@ -684,13 +635,10 @@ export const useAutosave = (
     }
   }, [itemId, setItem, setLastSaved]);
 
-  const debouncedSave = useMemo(
-    () => debounce(saveData, debounceDelay),
-    [saveData, debounceDelay]
-  );
+  const debouncedSave = useMemo(() => debounce(saveData, debounceDelay), [saveData, debounceDelay]);
 
   const updateSavedData = useCallback(
-    (data) => {
+    data => {
       if (isPaused) {
         console.log('Autosave is paused');
         return;
@@ -705,10 +653,7 @@ export const useAutosave = (
       }
       timeoutRef.current = setTimeout(() => {
         const now = Date.now();
-        if (
-          !lastSavedRef.current ||
-          now - lastSavedRef.current >= forceSaveInterval
-        ) {
+        if (!lastSavedRef.current || now - lastSavedRef.current >= forceSaveInterval) {
           saveData();
         }
       }, forceSaveInterval);
@@ -740,12 +685,12 @@ export const handleSave = async (item, messages, currentItemId) => {
     const itemCopy = { ...item, itemId: currentItemId };
 
     const existingImages = itemCopy.images
-      .filter((image) => image.url && !image.file)
-      .map((image) => ({ ...image, isNewItem: false }));
+      .filter(image => image.url && !image.file)
+      .map(image => ({ ...image, isNewItem: false }));
 
     const newImages = itemCopy.images
-      .filter((image) => image.file)
-      .map((image) => ({ ...image, isNewItem: true }));
+      .filter(image => image.file)
+      .map(image => ({ ...image, isNewItem: true }));
 
     const allImages = [...existingImages, ...newImages];
 
@@ -756,15 +701,11 @@ export const handleSave = async (item, messages, currentItemId) => {
       images: allImages,
     };
 
-    const response = await axios.post(
-      `${API_URL}/api/items/save-draft`,
-      draftData,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    const response = await axios.post(`${API_URL}/api/items/save-draft`, draftData, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
 
     if (response.status !== 200) {
       throw new Error('Failed to save draft');
@@ -811,32 +752,23 @@ export const deleteImageFromServer = async (image, itemId) => {
   }
 };
 
-export const handleImageDelete = async (
-  image,
-  itemId,
-  setUploadedImages,
-  setItem
-) => {
+export const handleImageDelete = async (image, itemId, setUploadedImages, setItem) => {
   console.log('handleImageDelete called with:', { image, itemId });
   try {
     const updatedDraft = await deleteImageFromServer(image, itemId);
 
     // Update uploadedImages state
-    setUploadedImages((prevImages) => {
-      const updatedImages = prevImages.filter(
-        (img) => img.filename !== image.filename
-      );
+    setUploadedImages(prevImages => {
+      const updatedImages = prevImages.filter(img => img.filename !== image.filename);
       console.log('Updated images after deletion:', updatedImages);
       return updatedImages;
     });
 
     // Update item state
-    setItem((prevItem) => {
+    setItem(prevItem => {
       const updatedItem = {
         ...prevItem,
-        images: prevItem.images.filter(
-          (img) => img.filename !== image.filename
-        ),
+        images: prevItem.images.filter(img => img.filename !== image.filename),
       };
       console.log('Updated item after image deletion:', updatedItem);
 

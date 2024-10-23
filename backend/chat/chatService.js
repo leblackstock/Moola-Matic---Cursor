@@ -25,7 +25,7 @@ if (!SESSION_SECRET) {
  * @param {Array} messages - Array of message objects { role: 'user' | 'assistant', content: '...' }
  * @returns {Promise<Array>} - Returns the original messages array
  */
-export const manageContext = async (messages) => {
+export const manageContext = async messages => {
   try {
     console.log('Managing conversation context.');
     // For now, we're just returning the original messages without any summarization

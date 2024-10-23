@@ -1,12 +1,6 @@
 // frontend/src/components/compFormFields.js
 
-import React, {
-  useState,
-  useEffect,
-  useCallback,
-  useRef,
-  useMemo,
-} from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import _ from 'lodash'; // Import the full lodash library
 import {
@@ -21,14 +15,14 @@ import {
 } from './compStyles.js';
 
 // Add this function at the top of your component or in a utility file
-const formatDate = (date) => {
+const formatDate = date => {
   if (date instanceof Date) {
     return date.toISOString().split('T')[0];
   }
   return date;
 };
 
-const parseNumber = (value) => {
+const parseNumber = value => {
   const parsed = parseFloat(value);
   return isNaN(parsed) ? '' : parsed.toString();
 };
@@ -53,7 +47,7 @@ const FormFields = React.memo(function FormFields({
   // Memoize the debouncedSave function
   const debouncedSave = useMemo(
     () =>
-      _.debounce((newItem) => {
+      _.debounce(newItem => {
         handleSaveDraft(itemId, newItem);
       }, 1000),
     [handleSaveDraft, itemId]
@@ -74,7 +68,7 @@ const FormFields = React.memo(function FormFields({
       const updatedFieldsSet = new Set();
 
       // Helper function to check if a value is valid
-      const isValidValue = (value) => {
+      const isValidValue = value => {
         if (typeof value === 'string') {
           return value.trim() !== '';
         } else if (typeof value === 'object' && value !== null) {
@@ -93,30 +87,16 @@ const FormFields = React.memo(function FormFields({
       });
 
       // Handle specific fields that might need special processing
-      if (
-        isValidValue(
-          analysisResult.summary.purchaseRecommendation,
-          'purchaseRecommendation'
-        )
-      ) {
-        updatedItem.purchaseRecommendation =
-          analysisResult.summary.purchaseRecommendation;
-        handlePurchaseRecommendationChange(
-          analysisResult.summary.purchaseRecommendation
-        );
+      if (isValidValue(analysisResult.summary.purchaseRecommendation, 'purchaseRecommendation')) {
+        updatedItem.purchaseRecommendation = analysisResult.summary.purchaseRecommendation;
+        handlePurchaseRecommendationChange(analysisResult.summary.purchaseRecommendation);
         updatedFieldsSet.add('purchaseRecommendation');
       }
 
       // Handle date fields
-      [
-        'purchaseDate',
-        'listingDate',
-        'inventoryDetailsAcquisitionDate',
-      ].forEach((dateField) => {
+      ['purchaseDate', 'listingDate', 'inventoryDetailsAcquisitionDate'].forEach(dateField => {
         if (isValidValue(analysisResult.summary[dateField])) {
-          updatedItem[dateField] = formatDate(
-            analysisResult.summary[dateField]
-          );
+          updatedItem[dateField] = formatDate(analysisResult.summary[dateField]);
           updatedFieldsSet.add(dateField);
         }
       });
@@ -130,7 +110,7 @@ const FormFields = React.memo(function FormFields({
         'conditionEstimatedRepairCosts',
         'marketAnalysisSuggestedListingPrice',
         'marketAnalysisMinimumAcceptablePrice',
-      ].forEach((numField) => {
+      ].forEach(numField => {
         if (isValidValue(analysisResult.summary[numField])) {
           updatedItem[numField] = parseNumber(analysisResult.summary[numField]);
           updatedFieldsSet.add(numField);
@@ -151,16 +131,9 @@ const FormFields = React.memo(function FormFields({
       let formattedValue = value;
 
       // If the field is a date field, format the value
-      if (
-        field === 'purchaseDate' ||
-        field === 'listingDate' ||
-        field === 'soldDate'
-      ) {
+      if (field === 'purchaseDate' || field === 'listingDate' || field === 'soldDate') {
         formattedValue = formatDate(value);
-      } else if (
-        Array.isArray(value) ||
-        (typeof value === 'object' && value !== null)
-      ) {
+      } else if (Array.isArray(value) || (typeof value === 'object' && value !== null)) {
         // Use handleComplexField for array or object values
         handleComplexField(field, value);
         return;
@@ -189,7 +162,7 @@ const FormFields = React.memo(function FormFields({
             <StyledTextarea
               id={key}
               value={value}
-              onChange={(e) => handleFieldChange(key, e.target.value)}
+              onChange={e => handleFieldChange(key, e.target.value)}
               rows="3"
             />
           );
@@ -200,9 +173,7 @@ const FormFields = React.memo(function FormFields({
               type="number"
               id={key}
               value={value}
-              onChange={(e) =>
-                handleFieldChange(key, parseFloat(e.target.value))
-              }
+              onChange={e => handleFieldChange(key, parseFloat(e.target.value))}
             />
           );
           break;
@@ -211,12 +182,8 @@ const FormFields = React.memo(function FormFields({
             <StyledInput
               type="date"
               id={key}
-              value={
-                value instanceof Date
-                  ? value.toISOString().split('T')[0]
-                  : value
-              }
-              onChange={(e) => handleFieldChange(key, e.target.value)}
+              value={value instanceof Date ? value.toISOString().split('T')[0] : value}
+              onChange={e => handleFieldChange(key, e.target.value)}
             />
           );
           break;
@@ -225,9 +192,7 @@ const FormFields = React.memo(function FormFields({
             <StyledSelect
               id={key}
               value={value.toString()}
-              onChange={(e) =>
-                handleFieldChange(key, e.target.value === 'true')
-              }
+              onChange={e => handleFieldChange(key, e.target.value === 'true')}
             >
               <option value="true">Yes</option>
               <option value="false">No</option>
@@ -240,7 +205,7 @@ const FormFields = React.memo(function FormFields({
               type={type}
               id={key}
               value={value}
-              onChange={(e) => handleFieldChange(key, e.target.value)}
+              onChange={e => handleFieldChange(key, e.target.value)}
             />
           );
       }
@@ -325,10 +290,7 @@ const FormFields = React.memo(function FormFields({
         'Jewelry Measurements',
         [
           ['jewelryMeasurementsRingSize', 'Ring Size'],
-          [
-            'jewelryMeasurementsNecklaceBraceletLength',
-            'Necklace/Bracelet Length',
-          ],
+          ['jewelryMeasurementsNecklaceBraceletLength', 'Necklace/Bracelet Length'],
           ['jewelryMeasurementsPendantDimensions', 'Pendant Dimensions'],
           ['jewelryMeasurementsJewelryDimensions', 'Jewelry Dimensions'],
         ],
@@ -341,10 +303,7 @@ const FormFields = React.memo(function FormFields({
           ['furnitureLargeItemMeasurementsDepth', 'Depth'],
           ['furnitureLargeItemMeasurementsLength', 'Length'],
           ['furnitureLargeItemMeasurementsSeatHeight', 'Seat Height'],
-          [
-            'furnitureLargeItemMeasurementsTabletopDimensions',
-            'Tabletop Dimensions',
-          ],
+          ['furnitureLargeItemMeasurementsTabletopDimensions', 'Tabletop Dimensions'],
         ],
       ],
       [
@@ -353,10 +312,7 @@ const FormFields = React.memo(function FormFields({
           ['generalMeasurementsWeight', 'Weight'],
           ['generalMeasurementsDiameter', 'Diameter'],
           ['generalMeasurementsVolumeCapacity', 'Volume/Capacity'],
-          [
-            'generalMeasurementsOtherSpecificMeasurements',
-            'Other Specific Measurements',
-          ],
+          ['generalMeasurementsOtherSpecificMeasurements', 'Other Specific Measurements'],
         ],
       ],
       [
@@ -368,39 +324,20 @@ const FormFields = React.memo(function FormFields({
           ['conditionRepairNeeds', 'Repair Needs'],
           ['conditionCleaningRequirements', 'Cleaning Requirements'],
           ['conditionEstimatedRepairCosts', 'Estimated Repair Costs', 'number'],
-          [
-            'conditionEstimatedCleaningCosts',
-            'Estimated Cleaning Costs',
-            'number',
-          ],
-          [
-            'conditionTimeSpentOnRepairsCleaning',
-            'Time Spent on Repairs/Cleaning',
-          ],
+          ['conditionEstimatedCleaningCosts', 'Estimated Cleaning Costs', 'number'],
+          ['conditionTimeSpentOnRepairsCleaning', 'Time Spent on Repairs/Cleaning'],
         ],
       ],
       [
         'Financials',
         [
           ['financialsPurchasePrice', 'Purchase Price', 'number'],
-          [
-            'financialsTotalRepairAndCleaningCosts',
-            'Total Repair and Cleaning Costs',
-            'number',
-          ],
-          [
-            'financialsEstimatedShippingCosts',
-            'Estimated Shipping Costs',
-            'number',
-          ],
+          ['financialsTotalRepairAndCleaningCosts', 'Total Repair and Cleaning Costs', 'number'],
+          ['financialsEstimatedShippingCosts', 'Estimated Shipping Costs', 'number'],
           ['financialsPlatformFees', 'Platform Fees', 'number'],
           ['financialsExpectedProfit', 'Expected Profit', 'number'],
           ['financialsProfitMargin', 'Profit Margin', 'number'],
-          [
-            'financialsEstimatedMarketValue',
-            'Estimated Market Value',
-            'number',
-          ],
+          ['financialsEstimatedMarketValue', 'Estimated Market Value', 'number'],
           ['financialsAcquisitionCost', 'Acquisition Cost', 'number'],
         ],
       ],
@@ -411,16 +348,8 @@ const FormFields = React.memo(function FormFields({
           ['marketAnalysisHistoricalPriceTrends', 'Historical Price Trends'],
           ['marketAnalysisMarketSaturation', 'Market Saturation'],
           ['marketAnalysisSalesVelocity', 'Sales Velocity'],
-          [
-            'marketAnalysisSuggestedListingPrice',
-            'Suggested Listing Price',
-            'number',
-          ],
-          [
-            'marketAnalysisMinimumAcceptablePrice',
-            'Minimum Acceptable Price',
-            'number',
-          ],
+          ['marketAnalysisSuggestedListingPrice', 'Suggested Listing Price', 'number'],
+          ['marketAnalysisMinimumAcceptablePrice', 'Minimum Acceptable Price', 'number'],
         ],
       ],
       [
@@ -479,9 +408,7 @@ const FormFields = React.memo(function FormFields({
       ],
     ];
 
-    return fieldGroups
-      .map(([title, fields]) => renderFieldGroup(title, fields))
-      .filter(Boolean);
+    return fieldGroups.map(([title, fields]) => renderFieldGroup(title, fields)).filter(Boolean);
   }, [renderFieldGroup, item]);
 
   useEffect(() => {
@@ -495,9 +422,7 @@ const FormFields = React.memo(function FormFields({
         <StyledTitle>Sample For Sale Listing</StyledTitle>
         <StyledTextarea
           value={item.sampleForSaleListing}
-          onChange={(e) =>
-            handleFieldChange('sampleForSaleListing', e.target.value)
-          }
+          onChange={e => handleFieldChange('sampleForSaleListing', e.target.value)}
           rows="10"
           readOnly
         />
@@ -506,7 +431,7 @@ const FormFields = React.memo(function FormFields({
   }, [item.sampleForSaleListing, handleFieldChange]);
 
   const onSubmit = useCallback(
-    (e) => {
+    e => {
       e.preventDefault();
       handleSubmit(itemId);
     },
@@ -529,10 +454,7 @@ const FormFields = React.memo(function FormFields({
         {hasPopulatedFields && (
           <>
             <StyledButton type="submit">Purchase Item</StyledButton>
-            <StyledButton
-              onClick={() => handleSaveDraft(itemId, item)}
-              type="button"
-            >
+            <StyledButton onClick={() => handleSaveDraft(itemId, item)} type="button">
               Save Draft
             </StyledButton>
           </>

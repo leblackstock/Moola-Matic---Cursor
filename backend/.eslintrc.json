@@ -1,16 +1,8 @@
-// frontend/.eslintrc.json
+// backend/.eslintrc.json
 
 {
-  "extends": [
-    // ... other extends ...
-    "plugin:react/recommended",
-    "plugin:prettier/recommended"
-  ],
-  "plugins": [
-    // ... other plugins ...
-    "react",
-    "prettier"
-  ],
+  "extends": ["eslint:recommended", "plugin:react/recommended", "plugin:prettier/recommended"],
+  "plugins": ["react", "prettier"],
   "parser": "espree",
   "parserOptions": {
     "ecmaVersion": 2021,

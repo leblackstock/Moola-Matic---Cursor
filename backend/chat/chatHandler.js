@@ -18,13 +18,8 @@ import winston from 'winston';
 // Create a logger instance
 const logger = winston.createLogger({
   level: 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.json()
-  ),
-  transports: [
-    new winston.transports.File({ filename: 'logs/api-errors.log' }),
-  ],
+  format: winston.format.combine(winston.format.timestamp(), winston.format.json()),
+  transports: [new winston.transports.File({ filename: 'logs/api-errors.log' })],
 });
 
 // Resolve __dirname in ES modules
@@ -43,7 +38,7 @@ const requiredEnvVars = [
   'MOOLA_MATIC_ASSISTANT_ID',
 ];
 
-requiredEnvVars.forEach((varName) => {
+requiredEnvVars.forEach(varName => {
   if (!process.env[varName]) {
     logger.error(`Error: ${varName} is not defined in the .env file.`);
     process.exit(1);
@@ -57,7 +52,7 @@ mongoose
     useUnifiedTopology: true,
   })
   .then(() => logger.info('Connected to MongoDB'))
-  .catch((err) => {
+  .catch(err => {
     logger.error('MongoDB connection error:', err);
     process.exit(1);
   });
@@ -82,38 +77,27 @@ router.post('/analyze-images', async (req, res) => {
       return res.status(400).json({ error: 'No valid image URLs provided' });
     }
 
-    const analysisPrompt = generateAnalysisPrompt(
-      description,
-      itemId,
-      sellerNotes,
-      context
-    );
-    const combineAndSummarizeAnalysisPrompt =
-      generateCombineAndSummarizeAnalysisPrompt();
+    const analysisPrompt = generateAnalysisPrompt(description, itemId, sellerNotes, context);
+    const combineAndSummarizeAnalysisPrompt = generateCombineAndSummarizeAnalysisPrompt();
 
     const processedImages = await processImages(imageUrls);
 
-    const analysisPromises = processedImages.map(
-      async ({ base64Image, filename }) => {
-        try {
-          console.log(`Analyzing image: ${filename}`);
-          logger.info(`Analyzing image: ${filename}`);
-          const analysis = await analyzeImagesWithVision(
-            analysisPrompt,
-            base64Image
-          );
-          const parsedAnalysis = parseAnalysis(analysis);
-          console.log('Analysis parsed');
-          return parsedAnalysis;
-        } catch (error) {
-          logger.error(`Failed to analyze image: ${filename}`, { error });
-          return null; // Return null for failed analyses
-        }
+    const analysisPromises = processedImages.map(async ({ base64Image, filename }) => {
+      try {
+        console.log(`Analyzing image: ${filename}`);
+        logger.info(`Analyzing image: ${filename}`);
+        const analysis = await analyzeImagesWithVision(analysisPrompt, base64Image);
+        const parsedAnalysis = parseAnalysis(analysis);
+        console.log('Analysis parsed');
+        return parsedAnalysis;
+      } catch (error) {
+        logger.error(`Failed to analyze image: ${filename}`, { error });
+        return null; // Return null for failed analyses
       }
-    );
+    });
 
     const analyses = await Promise.all(analysisPromises);
-    const validAnalyses = analyses.filter((analysis) => analysis !== null);
+    const validAnalyses = analyses.filter(analysis => analysis !== null);
 
     if (validAnalyses.length === 0) {
       throw new Error('All image analyses failed');
@@ -122,10 +106,7 @@ router.post('/analyze-images', async (req, res) => {
     const combinedAnalysis = combineAnalyses(validAnalyses);
     logger.info('Combined analysis:', combinedAnalysis);
     console.log('Analyses combined, summarizing...');
-    const summary = await summarizeAnalyses(
-      combinedAnalysis,
-      combineAndSummarizeAnalysisPrompt
-    );
+    const summary = await summarizeAnalyses(combinedAnalysis, combineAndSummarizeAnalysisPrompt);
     const parsedSummary = parseAnalysis(summary);
 
     // Extract rawAnalysis from the first valid analysis (assuming it's the same for all)
@@ -144,9 +125,7 @@ router.post('/analyze-images', async (req, res) => {
       { new: true, upsert: true }
     );
 
-    console.log(
-      `DraftItem updated with analysis summary for itemId: ${itemId}`
-    );
+    console.log(`DraftItem updated with analysis summary for itemId: ${itemId}`);
 
     res.json({
       combinedAnalysis,
@@ -155,9 +134,7 @@ router.post('/analyze-images', async (req, res) => {
     });
   } catch (error) {
     logger.error('Error in /analyze-images:', { error });
-    res
-      .status(500)
-      .json({ error: 'An unexpected error occurred', details: error.message });
+    res.status(500).json({ error: 'An unexpected error occurred', details: error.message });
   }
 });
 
