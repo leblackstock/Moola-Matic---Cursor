@@ -108,6 +108,85 @@ const addImageAnimation = keyframes`
   }
 `;
 
+// Add these new animations after your existing keyframes (around line 109)
+const shimmer = keyframes`
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+`;
+
+const fadeSlideIn = keyframes`
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+`;
+
+// Add this new keyframe animation with your other keyframes
+const glowPulse = keyframes`
+  0% {
+    text-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+    transform: scale(1);
+  }
+  50% {
+    text-shadow: 
+      0 0 20px rgba(0, 255, 255, 0.5),
+      0 0 30px rgba(0, 255, 255, 0.3),
+      0 0 40px rgba(0, 255, 255, 0.1);
+    transform: scale(1.05);
+  }
+  100% {
+    text-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+    transform: scale(1);
+  }
+`;
+
+// First, define basic styled components
+export const StyledTitle = styled.h1`
+  color: #f5deb3;
+  text-align: center;
+  margin-bottom: 1rem;
+  font-size: 2.5em;
+`;
+
+// Then define components that depend on StyledTitle
+export const AnimatedTitle = styled(StyledTitle)`
+  background: linear-gradient(
+    90deg,
+    #ff7f7f 0%,
+    /* Muted Red */ #ffb07f 20%,
+    /* Muted Orange */ #87ceeb 40%,
+    /* Sky Blue */ #b19cd9 60%,
+    /* Soft Purple */ #ffb6c1 80%,
+    /* Light Pink */ #ff7f7f 100% /* Back to Muted Red */
+  );
+  background-size: 200% auto;
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation:
+    ${shimmer} 8s linear infinite,
+    ${glowPulse} 3s ease-in-out infinite;
+  font-size: 3em;
+  font-weight: bold;
+  letter-spacing: 2px;
+  margin: 0.5em 0;
+
+  &:hover {
+    animation-duration: 4s, 1.5s;
+  }
+
+  /* Add text stroke for better visibility */
+  -webkit-text-stroke: 1px rgba(255, 255, 255, 0.1);
+`;
+
 // Gallery Components
 export const ImageContainer = styled.div`
   position: relative;
@@ -205,11 +284,6 @@ export const StyledLogo = styled.img`
   margin-bottom: 1rem;
 `;
 
-export const StyledTitle = styled.h2`
-  color: #f5deb3;
-  margin-bottom: 0.5rem;
-`;
-
 export const StyledSubtitle = styled.p`
   color: #d3d3d3;
 `;
@@ -255,6 +329,15 @@ export const GlowingButton = styled(StyledButton)`
     box-shadow 0.3s ease,
     transform 0.3s ease;
   margin: 10px 5px; // This adds additional margin to each button
+
+  i {
+    margin-right: 8px;
+    transition: transform 0.3s ease;
+  }
+
+  &:hover i {
+    transform: scale(1.2);
+  }
 
   &:hover {
     box-shadow: 0 0 15px rgba(138, 43, 226, 0.7); // BlueViolet glow
@@ -1584,5 +1667,64 @@ export const ItemIdOverlay = styled.div`
 
   ${ImageContainer}:hover & {
     opacity: 1;
+  }
+`;
+
+// Add these new styled components after your existing components (around line 1552)
+export const AnimatedSubtitle = styled(StyledSubtitle)`
+  background: linear-gradient(
+    90deg,
+    #f5deb3 0%,
+    #00ffff 25%,
+    #f5deb3 50%,
+    #00ffff 75%,
+    #f5deb3 100%
+  );
+  background-size: 200% auto;
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: ${shimmer} 6s linear infinite;
+  font-size: 1.3em;
+  margin: 1.5em 0;
+  text-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+`;
+
+export const TextContainer = styled.div`
+  margin-top: 2em;
+  padding: 1em;
+  background: rgba(13, 0, 26, 0.4);
+  border-radius: 15px;
+  box-shadow: 0 0 20px rgba(138, 43, 226, 0.2);
+  transition: all 0.3s ease;
+
+  &:hover {
+    background: rgba(13, 0, 26, 0.6);
+    box-shadow: 0 0 30px rgba(138, 43, 226, 0.4);
+    transform: translateY(-5px);
+  }
+`;
+
+export const AnimatedText = styled.p`
+  color: #f5deb3;
+  font-size: 1.1em;
+  line-height: 1.6;
+  margin: 1em 0;
+  opacity: 0;
+  animation: ${fadeSlideIn} 0.8s ease-out forwards;
+  animation-delay: ${props => props.delay || '0s'};
+
+  i {
+    margin-right: 10px;
+    color: #00ffff;
+    transition: transform 0.3s ease;
+  }
+
+  &:hover {
+    i {
+      transform: scale(1.2) rotate(360deg);
+    }
+    color: #00ffff;
+    text-shadow: 0 0 5px rgba(0, 255, 255, 0.5);
   }
 `;

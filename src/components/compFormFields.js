@@ -467,11 +467,12 @@ const FormFields = React.memo(function FormFields({
 
   return (
     <>
+      {/* Move recommendation section to the top */}
+      {renderRecommendation()}
+
       <FormContainer>
         <StyledForm onSubmit={onSubmit}>{memoizedFields}</StyledForm>
       </FormContainer>
-
-      {renderRecommendation()}
 
       <ActionContainer>
         <ButtonGroup>

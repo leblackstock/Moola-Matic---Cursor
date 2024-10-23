@@ -29,6 +29,11 @@ import {
   MainContent,
   ButtonContainer,
   StyledToastContainer,
+  // Add these new imports
+  AnimatedSubtitle,
+  TextContainer,
+  AnimatedText,
+  AnimatedTitle, // Add this new import
 } from './components/compStyles.js';
 import GlobalStyles from './GlobalStyles.js';
 import { library } from '@fortawesome/fontawesome-svg-core';
@@ -207,24 +212,29 @@ function LandingPage({ setCurrentItemId, handleSetItemId }) {
         <LogoContainer>
           <Logo src={moolaMaticLogo} alt="Moola-Matic Logo" />
         </LogoContainer>
-        <StyledTitle>Moola-Matic</StyledTitle>
-        <StyledSubtitle>
+        <AnimatedTitle>Moola-Matic</AnimatedTitle>
+        <AnimatedSubtitle>
           Turn your thrifty finds into a treasure trove of cold, hard cash!
-        </StyledSubtitle>
+        </AnimatedSubtitle>
         <ButtonContainer>
-          <GlowingButton onClick={handleNewItemClick}>New Item</GlowingButton>
+          <GlowingButton onClick={handleNewItemClick}>
+            <i className="fas fa-plus-circle"></i> New Item
+          </GlowingButton>
           <GlowingButton as={Link} to="/view-items">
-            View Items
+            <i className="fas fa-list"></i> View Items
           </GlowingButton>
         </ButtonContainer>
         {showWarning && <WarningBoxModal onProceed={handleProceed} onGoBack={handleGoBack} />}
-        <div>
-          <p>
-            Are you sitting on a goldmine of garage sale goodies? Let Moola-Matic help you squeeze
-            every last penny out of your dusty discoveries!
-          </p>
-          <p>We're like a money-making time machine for your junk drawer!</p>
-        </div>
+        <TextContainer>
+          <AnimatedText>
+            <i className="fas fa-gem"></i> Are you sitting on a goldmine of garage sale goodies? Let
+            Moola-Matic help you squeeze every last penny out of your dusty discoveries!
+          </AnimatedText>
+          <AnimatedText delay="0.3s">
+            <i className="fas fa-magic"></i> We're like a money-making time machine for your junk
+            drawer!
+          </AnimatedText>
+        </TextContainer>
       </div>
     </StyledContainer>
   );
