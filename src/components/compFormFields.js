@@ -399,13 +399,7 @@ const FormFields = React.memo(function FormFields({
           ['contextData', 'Context Data', 'textarea'],
         ],
       ],
-      [
-        'Final Recommendation',
-        [
-          ['detailedBreakdown', 'Detailed Breakdown', 'textarea'],
-          ['sampleForSaleListing', 'Sample For Sale Listing', 'textarea'],
-        ],
-      ],
+      ['Final Recommendation', [['detailedBreakdown', 'Detailed Breakdown', 'textarea']]],
     ];
 
     return fieldGroups.map(([title, fields]) => renderFieldGroup(title, fields)).filter(Boolean);

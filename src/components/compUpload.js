@@ -3,6 +3,7 @@
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { processMultipleImages } from '../helpers/resizeImage.js';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 console.log('API_BASE_URL:', API_BASE_URL);
@@ -75,29 +76,45 @@ export const handleFileChange = async (
   const files = Array.from(event.target.files);
   const formData = new FormData();
   formData.append('itemId', itemId);
-
-  files.forEach(file => {
-    formData.append('images', file);
-  });
+  files.forEach(file => formData.append('images', file));
 
   try {
-    const response = await axios.post(`${API_BASE_URL}/api/items/draft-images/upload`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-
-    console.log('Upload response:', response.data);
+    // Try original upload first
+    const response = await attemptUpload(formData);
 
     if (Array.isArray(response.data)) {
       setHasUnsavedChanges(true);
       setImageUploaded(true);
-      return response.data; // Return the newly uploaded images
-    } else {
-      throw new Error('Unexpected response format');
+      toast.success('Images uploaded successfully');
+      return response.data;
     }
   } catch (error) {
     console.error('Error uploading images:', error);
+
+    // If error is related to file size, try resizing
+    if (error.response?.status === 413 || error.message?.includes('size')) {
+      try {
+        toast.info('Optimizing images for upload...');
+        const processedFiles = await processMultipleImages(files);
+
+        const processedFormData = new FormData();
+        processedFormData.append('itemId', itemId);
+        processedFiles.forEach(file => processedFormData.append('images', file));
+
+        const retryResponse = await attemptUpload(processedFormData);
+
+        if (Array.isArray(retryResponse.data)) {
+          setHasUnsavedChanges(true);
+          setImageUploaded(true);
+          toast.success('Images optimized and uploaded successfully');
+          return retryResponse.data;
+        }
+      } catch (retryError) {
+        console.error('Retry upload failed:', retryError);
+        toast.error('Failed to upload images even after optimization');
+        throw retryError;
+      }
+    }
     throw error;
   }
 };
@@ -221,3 +238,17 @@ export const handleImageDelete = async (image, itemId, setUploadedImages, setIte
 
 //   // ... rest of the component ...
 // };
+
+// Add this helper function at the top with other constants
+const attemptUpload = async formData => {
+  return await axios.post(`${API_BASE_URL}/api/items/draft-images/upload`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+    onUploadProgress: progressEvent => {
+      const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+      console.log(`Upload progress: ${percentCompleted}%`);
+    },
+    timeout: 60000,
+  });
+};
